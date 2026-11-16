@@ -1,0 +1,15 @@
+[
+  {
+    "id": "LSN-EXAMPLE",
+    "fingerprint": "EXAMPLE-ONLY",
+    "what_and_why": "Illustrative example; replace with empirical root causes from verified post-mortems.",
+    "how_to_fix": "Record verified remediation procedures and regression test suites.",
+    "prevention_invariant": "Preventative policies require authorized stakeholder sign-off prior to codification.",
+    "applies_to_stages": [
+      "sdlc-plan",
+      "sdlc-code",
+      "sdlc-review",
+      "sdlc-release"
+    ]
+  }
+]

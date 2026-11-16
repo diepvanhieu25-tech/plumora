@@ -1,0 +1,8 @@
+# Mẫu cấu hình môi trường cho giai đoạn 4; chỉ giữ biến dự án thực sự sử dụng.
+# Ghi ý nghĩa, bắt buộc/tùy chọn và giá trị mặc định an toàn trong hướng dẫn chạy.
+# Không điền bí mật thật; bí mật được cấp qua cơ chế quản lý của môi trường đích.
+APP_ENV=development
+PORT=3000
+LOG_LEVEL=info
+# DATABASE_URL=REPLACE_WITH_LOCAL_TEST_DATABASE_URL
+# EXTERNAL_API_KEY=REPLACE_USING_TARGET_SECRET_PROVIDER

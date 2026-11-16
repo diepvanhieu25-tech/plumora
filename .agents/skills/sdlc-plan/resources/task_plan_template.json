@@ -1,0 +1,47 @@
+{
+  "project": "[Project Name]",
+  "module_id": "[Feature / Module ID]",
+  "version": "1.0.0",
+  "spec_reference": "docs/spec.md",
+  "architecture_reference": "docs/design.md",
+  "execution_mode": "sequential",
+  "tasks": [
+    {
+      "id": "TASK-01",
+      "name": "Implement core behavior according to AC-01",
+      "complexity": "medium",
+      "reasoning_effort": "medium",
+      "execution_mode": "sequential",
+      "is_foundation": false,
+      "type": "vertical_slice",
+      "depends_on": [],
+      "target_files": [
+        "src/feature.ts",
+        "tests/feature.spec.ts"
+      ],
+      "definition_of_done": [
+        "AC-01 validated via automated behavioral test suites.",
+        "Record CLI commands, exit codes, and output logs for Phase 2 handover."
+      ]
+    },
+    {
+      "id": "TASK-02",
+      "name": "Verify integration behavior and error handling per AC-02",
+      "complexity": "high",
+      "reasoning_effort": "high",
+      "execution_mode": "isolated_subagent",
+      "is_foundation": false,
+      "type": "verification",
+      "depends_on": [
+        "TASK-01"
+      ],
+      "target_files": [
+        "tests/feature.spec.ts"
+      ],
+      "definition_of_done": [
+        "Reconcile AC-01/AC-02 in an independent review pass on the final integrated build.",
+        "Audit findings documented with empirical terminal evidence and routed to originating stage."
+      ]
+    }
+  ]
+}

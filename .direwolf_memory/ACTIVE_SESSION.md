@@ -1,0 +1,11 @@
+# Plumora — phiên hiện tại
+
+- Ngày: 2026-11-16; nhánh hiện tại: `feat/mvp-slice-1`.
+- Chủ dự án đã phê duyệt trọn vẹn toàn bộ các cổng từ **Gate 1 (`D-14`, `D-15`)** đến **Gate 4 (`DEFENSE-01`)**.
+- **Đã hoàn tất trọn vẹn 5 nhiệm vụ thuộc Pha 1 MVP (`ENV-01` $\rightarrow$ `RL-01` $\rightarrow$ `SLICE-01` $\rightarrow$ `REVIEW-01` $\rightarrow$ `DEFENSE-01`):**
+  1. **`ENV-01` (Gate 2 Readiness):** [`docs/environment.md`](../docs/environment.md), [`docs/verification/HANDOFF_ENV_01.md`](../docs/verification/HANDOFF_ENV_01.md).
+  2. **`RL-01` (`PL-RL-01`):** [`docs/verification/HANDOFF_RL_01.md`](../docs/verification/HANDOFF_RL_01.md) — `StudentSimulatorEnv` 24 chiều, 3 Baselines (`B1`, `B2`, `B3`), huấn luyện `DQN` trên `train_seeds = (101, 202, 303)`, chọn `seed = 303` trên `val_seed = 999`, đánh giá trên `eval_seed = 2026` (`500` episodes: `invalid_action_rate = 0.00%`, vượt `B2`), xuất `rl/artifacts/checkpoint.zip` (`SHA-256 = e464fa638cee04fda6a386ffb6cdf24d9190d0f1167feb56d4da0063499a6b6b`).
+  3. **`SLICE-01` (`PL-AUTH-01`..`PL-E2E-01`):** [`docs/verification/HANDOFF_SLICE_01.md`](../docs/verification/HANDOFF_SLICE_01.md) — Hoàn thiện `FastAPI Modular Monolith` (`auth`, `content`, `assessment`, `recommendation`, `PostgreSQL SSoT`, `Redis 24-dim State Cache`, `backend_12_concepts.json`) và `React SPA` (`SCR-01`..`SCR-08` theo bảng màu Chồi Cây Non & 100% SVG icons `lucide-react`, 0 emoji).
+  4. **`REVIEW-01` (Gate 3 Independent 4-Axis Review):** [`docs/verification/VERIFICATION_GATE3.md`](../docs/verification/VERIFICATION_GATE3.md) — Kiểm định viên Độc lập Đối kháng hoàn tất rà soát Bốn Trục và Chuỗi Bằng chứng RL; kết luận Gate 3 Verdict: **`APPROVED`** (0 Blocker, 0 Critical).
+  5. **`DEFENSE-01` (Gate 4 Packaging & Defense Preparation):** [`docs/verification/RELEASE_GATE4.md`](../docs/verification/RELEASE_GATE4.md), [`docs/defense/DEMO_RUNBOOK.md`](../docs/defense/DEMO_RUNBOOK.md), [`docs/defense/RL_EXPERIMENTAL_REPORT.md`](../docs/defense/RL_EXPERIMENTAL_REPORT.md), [`docker-compose.demo.yml`](../docker-compose.demo.yml).
+- **Trạng thái:** Toàn bộ sản phẩm MVP đã sẵn sàng cho buổi bảo vệ đồ án tốt nghiệp và nộp mã nguồn.

@@ -1,0 +1,21 @@
+{
+  "name": "Illustrative Design Tokens Template (Pending Approval)",
+  "version": "1.0.0",
+  "typography": {
+    "body_font": "system-ui, sans-serif"
+  },
+  "colors": {
+    "background": "#ffffff",
+    "text": "#111111",
+    "action": "#1256a0"
+  },
+  "states": {
+    "ideal": "Populated content and available actions under normal conditions.",
+    "loading": "Task-appropriate visual skeleton or progress indicator.",
+    "empty": "Explanatory empty state with primary action guidance.",
+    "error": "Actionable error feedback with retry triggers.",
+    "success": "Visual confirmation and payload presentation.",
+    "disabled": "Disabled state with tooltip explaining prerequisite conditions."
+  },
+  "accessibility_note": "Validate keyboard navigation, semantic ARIA labels, focus management, and WCAG AA contrast."
+}
