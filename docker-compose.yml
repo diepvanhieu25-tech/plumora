@@ -8,13 +8,13 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-plumora_dev_pass_local_only}
       POSTGRES_DB: ${DB_NAME:-plumora_dev}
     ports:
-      - "127.0.0.1:${DB_PORT:-5432}:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - plumora_pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-plumora_app} -d ${DB_NAME:-plumora_dev}"]
-      interval: 5s
-      timeout: 5s
+      interval: 3s
+      timeout: 3s
       retries: 5
 
   redis:
@@ -22,14 +22,51 @@ services:
     container_name: plumora-redis
     restart: unless-stopped
     ports:
-      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - plumora_redisdata:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
+      interval: 3s
+      timeout: 3s
       retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: plumora-backend
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      DATABASE_URL: postgresql+psycopg://${DB_USER:-plumora_app}:${DB_PASSWORD:-plumora_dev_pass_local_only}@postgres:5432/${DB_NAME:-plumora_dev}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-plumora_jwt_secret_key_2026_super_secure}
+      FRONTEND_ORIGIN: http://localhost:${WEB_PORT:-3000}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:8000/api/v1/health\")'"]
+      interval: 4s
+      timeout: 4s
+      retries: 5
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: plumora-frontend
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
 
 volumes:
   plumora_pgdata:

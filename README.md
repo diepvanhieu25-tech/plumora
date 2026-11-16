@@ -7,7 +7,7 @@
 [![Tests](https://img.shields.io/badge/Tests-29%2F29%20Passed-15803D?style=flat-square)](docs/verification/VERIFICATION_GATE3.md)
 [![Python](https://img.shields.io/badge/Python-3.12-3B82F6?style=flat-square&logo=python&logoColor=white)](backend/pyproject.toml)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](frontend/package.json)
-[![Docker](https://img.shields.io/badge/Docker-Compose%20Ready-2496ED?style=flat-square&logo=docker&logoColor=white)](docker-compose.demo.yml)
+[![Docker](https://img.shields.io/badge/Docker-Compose%20Ready-2496ED?style=flat-square&logo=docker&logoColor=white)](docker-compose.yml)
 [![WCAG](https://img.shields.io/badge/Accessibility-WCAG%202.1%20AA-0D9488?style=flat-square)](docs/ui-design-system.md)
 [![Gate 3](https://img.shields.io/badge/Gate%203-APPROVED-15803D?style=flat-square)](docs/verification/VERIFICATION_GATE3.md)
 
@@ -72,16 +72,16 @@ flowchart TD
 
 ---
 
-## 4. Khởi Chạy Nhanh 1 Bước Bằng Docker Compose (`Demo Ready`)
+## 4. Khởi Chạy 1 Bước Bằng Docker Compose
 
 Không cần cài đặt Python, Node.js hay cơ sở dữ liệu trên máy tính. Chỉ cần cài sẵn Docker:
 
 ```bash
 # 1. Khởi chạy toàn bộ cụm 4 dịch vụ (PostgreSQL 16, Redis 7, FastAPI, Nginx React)
-docker compose -f docker-compose.demo.yml up --build -d
+docker compose up --build -d
 
 # 2. Kiểm tra trạng thái hoạt động (Tất cả container hiển thị Up / healthy)
-docker compose -f docker-compose.demo.yml ps
+docker compose ps
 ```
 
 - **Giao diện Web Học viên:** [http://localhost:3000](http://localhost:3000)
@@ -90,6 +90,12 @@ docker compose -f docker-compose.demo.yml ps
   ```bash
   curl -s http://127.0.0.1:8000/api/v1/health | jq .
   ```
+
+> **Dành cho Lập trình viên (Chỉ chạy Cơ sở dữ liệu):**
+> Nếu muốn chạy trực tiếp Backend/Frontend trên máy để phát triển với tính năng Hot-Reloading, chỉ cần khởi động CSDL:
+> ```bash
+> docker compose up -d postgres redis
+> ```
 
 ---
 

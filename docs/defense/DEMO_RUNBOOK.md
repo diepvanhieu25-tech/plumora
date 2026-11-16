@@ -14,12 +14,12 @@ Trước khi vào phòng hội đồng, hãy đảm bảo hệ thống ở trạ
 # Di chuyển vào thư mục dự án
 cd /home/diepvanhieu/workspace/plumora
 
-# Dọn dẹp trạng thái cũ (nếu có) và khởi động cụm 4 dịch vụ Demo
-docker compose -f docker-compose.demo.yml down -v
-docker compose -f docker-compose.demo.yml up --build -d
+# Dọn dẹp trạng thái cũ (nếu có) và khởi động cụm 4 dịch vụ
+docker compose down -v
+docker compose up --build -d
 
 # Kiểm tra trạng thái toàn bộ dịch vụ (Cả 4 container phải hiển thị Up/healthy)
-docker compose -f docker-compose.demo.yml ps
+docker compose ps
 ```
 
 - **Giao diện Web Người học (Frontend):** Mở trình duyệt tại `http://localhost:3000` (hoặc `http://localhost:5173` nếu chạy dev mode).
@@ -127,13 +127,13 @@ sequenceDiagram
 - **Hành động trên màn hình:**
   - Mở terminal và chạy lệnh tạm dừng Redis:
     ```bash
-    docker stop plumora-demo-redis
+    docker stop plumora-redis
     ```
   - Quay lại trình duyệt và tải lại trang web `http://localhost:3000`.
   - Web **hoàn toàn không bị lỗi 500 hay treo ứng dụng**. Mở ngăn kéo bằng chứng: trạng thái hiển thị rõ ràng: `state_source: postgres_fallback`.
   - Chạy lệnh bật lại Redis:
     ```bash
-    docker start plumora-demo-redis
+    docker start plumora-redis
     ```
 - **Thuyết minh với Hội đồng:**
   > *"Trong kỹ thuật phần mềm doanh nghiệp, một mô hình AI xuất sắc vẫn vô nghĩa nếu hệ thống sập khi gặp sự cố mạng. Plumora thiết kế kiến trúc PostgreSQL làm nguồn chân lý duy nhất (SSoT) và Redis làm bộ đệm. Khi Redis gặp sự cố, hệ thống tự động giáng cấp nhẹ nhàng (Graceful Fallback), đọc trực tiếp từ PostgreSQL và tiếp tục phục vụ người học mà không làm gián đoạn bài giảng."*

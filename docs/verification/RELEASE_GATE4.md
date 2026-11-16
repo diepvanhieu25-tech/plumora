@@ -14,10 +14,10 @@ Hệ thống được đóng gói hoàn chỉnh bằng Docker Compose, sẵn sà
 
 | Dịch Vụ (`Service`) | Container Name | Base Image & Tag | Cổng Nội Bộ / Cổng Ngoại Vi | Mục Đích Hoạt Động & Bảo Mật |
 | --- | --- | --- | --- | --- |
-| **`postgres`** | `plumora-demo-postgres` | `postgres:16-alpine` | `5432:5432` | Nguồn chân lý duy nhất (SSoT), lưu 7 bảng dữ liệu, ACID Locking `SELECT ... FOR UPDATE`, volume bền vững `plumora_demo_pgdata`. |
-| **`redis`** | `plumora-demo-redis` | `redis:7-alpine` | `6379:6379` | Bộ nhớ đệm trạng thái học viên 24 chiều (`TTL = 3600s`), volume `plumora_demo_redisdata`. |
-| **`backend`** | `plumora-demo-backend` | `python:3.12-slim-bookworm` (Multi-stage) | `8000:8000` | FastAPI Modular Monolith, nạp Checkpoint DQN bằng `SafeTorchUnpickler`, suy luận MLP thuần NumPy, non-root user `plumora:plumora` (UID 10001). |
-| **`frontend`** | `plumora-demo-frontend` | `nginx:1.27-alpine` (Multi-stage) | `80:3000` | Nginx Alpine phục vụ React SPA bundle (269 kB gzip 81 kB), reverse proxy `/api/` về Backend, gzip compression, SPA fallback. |
+| **`postgres`** | `plumora-postgres` | `postgres:16-alpine` | `5432:5432` | Nguồn chân lý duy nhất (SSoT), lưu 7 bảng dữ liệu, ACID Locking `SELECT ... FOR UPDATE`, volume bền vững `plumora_pgdata`. |
+| **`redis`** | `plumora-redis` | `redis:7-alpine` | `6379:6379` | Bộ nhớ đệm trạng thái học viên 24 chiều (`TTL = 3600s`), volume `plumora_redisdata`. |
+| **`backend`** | `plumora-backend` | `python:3.12-slim-bookworm` (Multi-stage) | `8000:8000` | FastAPI Modular Monolith, nạp Checkpoint DQN bằng `SafeTorchUnpickler`, suy luận MLP thuần NumPy, non-root user `plumora:plumora` (UID 10001). |
+| **`frontend`** | `plumora-frontend` | `nginx:1.27-alpine` (Multi-stage) | `80:3000` | Nginx Alpine phục vụ React SPA bundle (269 kB gzip 81 kB), reverse proxy `/api/` về Backend, gzip compression, SPA fallback. |
 
 ---
 
@@ -29,7 +29,7 @@ Hệ thống được đóng gói hoàn chỉnh bằng Docker Compose, sẵn sà
 | `rl/artifacts/manifest.json` | Metadata Checkpoint | `dfa34eb4dc5ae8a6c2617d9406556dc5b6c029631bcc11ae90d7e47717b6177d` | Khớp 100% |
 | `rl/artifacts/evaluation_report.json` | Báo cáo 500 Episodes | `c9b384187f858c6708a5ea1ad99ef7bc6a31b1c1f77f385ebdb02dbf3cd67c45` | Khớp 100% |
 | `backend/app/seed/backend_12_concepts.json` | 12 Khái niệm & 48 MCQ | `0b819196e3a9411917167f452f28fa8647d5367b0949a0c1ecfe9348a7f7d358` | Khớp 100% |
-| `docker-compose.demo.yml` | Cấu hình Compose Demo | *Được sinh tự động* | Đã kiểm định cú pháp hợp lệ |
+| `docker-compose.yml` | Cấu hình Compose 4 Dịch Vụ | *Được sinh tự động* | Đã kiểm định cú pháp hợp lệ |
 | `backend/Dockerfile` | Multi-stage non-root Backend | *Được sinh tự động* | Build thành công |
 | `frontend/Dockerfile` | Multi-stage Nginx Frontend | *Được sinh tự động* | Build thành công |
 
@@ -39,13 +39,13 @@ Hệ thống được đóng gói hoàn chỉnh bằng Docker Compose, sẵn sà
 
 ### 3.1. Khởi chạy toàn bộ hệ thống
 ```bash
-docker compose -f docker-compose.demo.yml up --build -d
+docker compose up --build -d
 ```
 
 ### 3.2. Kiểm tra sức khỏe các dịch vụ (Three-Barrier Health Check)
 1. **Kiểm tra trạng thái container:**
    ```bash
-   docker compose -f docker-compose.demo.yml ps
+   docker compose ps
    # Cả 4 container phải ở trạng thái Up (healthy)
    ```
 2. **Kiểm tra Backend Probe:**
@@ -61,10 +61,10 @@ docker compose -f docker-compose.demo.yml up --build -d
 ### 3.3. Dừng và dọn dẹp hệ thống
 ```bash
 # Dừng các container (giữ nguyên dữ liệu)
-docker compose -f docker-compose.demo.yml stop
+docker compose stop
 
-# Dừng và xóa toàn bộ container cùng volumes dữ liệu demo (khôi phục trạng thái trắng ban đầu)
-docker compose -f docker-compose.demo.yml down -v
+# Dừng và xóa toàn bộ container cùng volumes dữ liệu (khôi phục trạng thái trắng ban đầu)
+docker compose down -v
 ```
 
 ---
@@ -73,7 +73,7 @@ docker compose -f docker-compose.demo.yml down -v
 
 1. **Xem nhật ký hoạt động thời gian thực:**
    ```bash
-   docker compose -f docker-compose.demo.yml logs -f backend
+   docker compose logs -f backend
    ```
 2. **Cơ chế tự động giáng cấp (Graceful Fallback):**
    - Khi Redis dừng: Backend tự động ghi nhận cảnh báo và chuyển cờ `state_source: postgres_fallback`. Hệ thống web duy trì hoạt động 100% bình thường.
