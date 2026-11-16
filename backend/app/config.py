@@ -25,9 +25,7 @@ def resolve_jwt_secret() -> str:
             return file_secret
     if os.getenv("APP_ENV") == "production":
         raise RuntimeError("JWT_SECRET_KEY must be set in production environment.")
-    logger.warning(
-        "Generating ephemeral secret for development/testing. Instance-isolated!"
-    )
+    logger.warning("Generating ephemeral secret for development/testing. Instance-isolated!")
     return secrets.token_hex(32)
 
 
@@ -46,8 +44,7 @@ class Settings(BaseSettings):
     frontend_origin: str = "http://127.0.0.1:5173"
 
     database_url: str = (
-        "postgresql+psycopg://plumora_app:plumora_dev_pass_local_only"
-        "@127.0.0.1:5432/plumora_dev"
+        "postgresql+psycopg://plumora_app:plumora_dev_pass_local_only@127.0.0.1:5432/plumora_dev"
     )
     redis_url: str = "redis://127.0.0.1:6379/0"
     redis_state_ttl_seconds: int = 3600

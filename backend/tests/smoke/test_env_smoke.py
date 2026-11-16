@@ -25,7 +25,5 @@ def test_security_headers_attached_to_responses() -> None:
     response = client.get("/api/v1/health")
     assert response.headers.get("x-content-type-options") == "nosniff"
     assert response.headers.get("x-frame-options") == "DENY"
-    assert "frame-ancestors 'self'" in response.headers.get(
-        "content-security-policy", ""
-    )
+    assert "frame-ancestors 'self'" in response.headers.get("content-security-policy", "")
     assert "camera=()" in response.headers.get("permissions-policy", "")

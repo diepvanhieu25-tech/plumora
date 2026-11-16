@@ -37,7 +37,9 @@ class LearnerState24D:
     state_source: str  # "redis_cache" | "postgres_cache_warm" | "postgres_fallback"
 
 
-def compute_state_from_postgres(db: Session, user_id: uuid.UUID) -> tuple[int, list[float], list[float]]:
+def compute_state_from_postgres(
+    db: Session, user_id: uuid.UUID
+) -> tuple[int, list[float], list[float]]:
     """Compute (state_version, mastery[12], is_eligible[12]) authoritatively from PostgreSQL."""
     user = db.get(UserModel, user_id)
     state_version = user.state_version if user is not None else 1
@@ -45,7 +47,9 @@ def compute_state_from_postgres(db: Session, user_id: uuid.UUID) -> tuple[int, l
     mastery_rows = db.scalars(
         select(UserConceptMasteryModel).where(UserConceptMasteryModel.user_id == user_id)
     ).all()
-    mastery_map: dict[int, float] = {row.concept_action_id: float(row.mastery_score) for row in mastery_rows}
+    mastery_map: dict[int, float] = {
+        row.concept_action_id: float(row.mastery_score) for row in mastery_rows
+    }
     mastery = [round(mastery_map.get(i, 0.0), 4) for i in range(ACT_DIM)]
 
     prereq_rows = db.scalars(select(ConceptPrerequisiteModel)).all()
@@ -141,7 +145,9 @@ def get_learner_state_24d(
                 )
     except (redis.RedisError, OSError, ValueError, KeyError) as exc:
         redis_alive = False
-        logger.warning("Redis read failed for user %s, falling back to PostgreSQL: %s", user_id, exc)
+        logger.warning(
+            "Redis read failed for user %s, falling back to PostgreSQL: %s", user_id, exc
+        )
     finally:
         client.close()
 

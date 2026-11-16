@@ -52,9 +52,7 @@ class ConceptModel(Base):
     """12 Backend learning concepts table (D-05)."""
 
     __tablename__ = "concepts"
-    __table_args__ = (
-        CheckConstraint("tier BETWEEN 1 AND 4", name="ck_concepts_tier_1_4"),
-    )
+    __table_args__ = (CheckConstraint("tier BETWEEN 1 AND 4", name="ck_concepts_tier_1_4"),)
 
     action_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
     slug: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
