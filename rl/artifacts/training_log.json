@@ -1,0 +1,209 @@
+{
+  "algorithm": "DQN (Stable-Baselines3)",
+  "hyperparameters": {
+    "learning_rate": 0.001,
+    "buffer_size": 50000,
+    "learning_starts": 1000,
+    "batch_size": 64,
+    "gamma": 0.98,
+    "train_freq": 4,
+    "gradient_steps": 1,
+    "target_update_interval": 500,
+    "exploration_fraction": 0.35,
+    "exploration_final_eps": 0.02,
+    "policy_kwargs": {
+      "net_arch": [
+        128,
+        128
+      ]
+    }
+  },
+  "train_seeds": [
+    101,
+    202,
+    303
+  ],
+  "val_seed": 999,
+  "val_episodes": 200,
+  "selected_seed": 303,
+  "runs": [
+    {
+      "seed": 101,
+      "timesteps": 100000,
+      "duration_seconds": 65.71,
+      "val_seed": 999,
+      "val_episodes": 200,
+      "val_unmasked_metrics": {
+        "completion_rate": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "iqr": 0.0
+        },
+        "steps_to_completion": {
+          "mean": 17.95,
+          "std": 4.4786,
+          "median": 19.0,
+          "iqr": 5.25
+        },
+        "episodic_reward": {
+          "mean": 98.15,
+          "std": 17.2172,
+          "median": 107.0,
+          "iqr": 13.375
+        },
+        "invalid_action_rate": {
+          "mean": 0.0,
+          "std": 0.0,
+          "median": 0.0,
+          "iqr": 0.0
+        }
+      },
+      "val_masked_metrics": {
+        "completion_rate": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "iqr": 0.0
+        },
+        "steps_to_completion": {
+          "mean": 17.95,
+          "std": 4.4786,
+          "median": 19.0,
+          "iqr": 5.25
+        },
+        "episodic_reward": {
+          "mean": 98.15,
+          "std": 17.2172,
+          "median": 107.0,
+          "iqr": 13.375
+        },
+        "invalid_action_rate": {
+          "mean": 0.0,
+          "std": 0.0,
+          "median": 0.0,
+          "iqr": 0.0
+        }
+      }
+    },
+    {
+      "seed": 202,
+      "timesteps": 100000,
+      "duration_seconds": 66.33,
+      "val_seed": 999,
+      "val_episodes": 200,
+      "val_unmasked_metrics": {
+        "completion_rate": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "iqr": 0.0
+        },
+        "steps_to_completion": {
+          "mean": 18.005,
+          "std": 4.2172,
+          "median": 19.0,
+          "iqr": 6.0
+        },
+        "episodic_reward": {
+          "mean": 98.1375,
+          "std": 17.2278,
+          "median": 107.0,
+          "iqr": 12.625
+        },
+        "invalid_action_rate": {
+          "mean": 0.0,
+          "std": 0.0,
+          "median": 0.0,
+          "iqr": 0.0
+        }
+      },
+      "val_masked_metrics": {
+        "completion_rate": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "iqr": 0.0
+        },
+        "steps_to_completion": {
+          "mean": 18.005,
+          "std": 4.2172,
+          "median": 19.0,
+          "iqr": 6.0
+        },
+        "episodic_reward": {
+          "mean": 98.1375,
+          "std": 17.2278,
+          "median": 107.0,
+          "iqr": 12.625
+        },
+        "invalid_action_rate": {
+          "mean": 0.0,
+          "std": 0.0,
+          "median": 0.0,
+          "iqr": 0.0
+        }
+      }
+    },
+    {
+      "seed": 303,
+      "timesteps": 100000,
+      "duration_seconds": 60.64,
+      "val_seed": 999,
+      "val_episodes": 200,
+      "val_unmasked_metrics": {
+        "completion_rate": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "iqr": 0.0
+        },
+        "steps_to_completion": {
+          "mean": 17.955,
+          "std": 4.4207,
+          "median": 19.0,
+          "iqr": 5.25
+        },
+        "episodic_reward": {
+          "mean": 98.1925,
+          "std": 17.2305,
+          "median": 107.0,
+          "iqr": 12.5
+        },
+        "invalid_action_rate": {
+          "mean": 0.0,
+          "std": 0.0,
+          "median": 0.0,
+          "iqr": 0.0
+        }
+      },
+      "val_masked_metrics": {
+        "completion_rate": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "iqr": 0.0
+        },
+        "steps_to_completion": {
+          "mean": 17.955,
+          "std": 4.4207,
+          "median": 19.0,
+          "iqr": 5.25
+        },
+        "episodic_reward": {
+          "mean": 98.1925,
+          "std": 17.2305,
+          "median": 107.0,
+          "iqr": 12.5
+        },
+        "invalid_action_rate": {
+          "mean": 0.0,
+          "std": 0.0,
+          "median": 0.0,
+          "iqr": 0.0
+        }
+      }
+    }
+  ],
+  "generated_at": "2026-11-16T13:14:15.258978+00:00"
+}

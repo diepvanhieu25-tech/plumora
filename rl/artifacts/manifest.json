@@ -1,0 +1,21 @@
+{
+  "policy_type": "dqn",
+  "policy_version": "dqn-v1-seed303",
+  "checkpoint_file": "checkpoint.zip",
+  "checkpoint_sha256": "e464fa638cee04fda6a386ffb6cdf24d9190d0f1167feb56d4da0063499a6b6b",
+  "obs_dim": 24,
+  "act_dim": 12,
+  "pass_threshold": 0.75,
+  "max_steps": 40,
+  "train_seeds": [
+    101,
+    202,
+    303
+  ],
+  "selected_seed": 303,
+  "timesteps_per_seed": 100000,
+  "val_seed": 999,
+  "eval_seed": 2026,
+  "eval_episodes": 500,
+  "generated_at": "2026-11-16T13:14:15.258983+00:00"
+}
