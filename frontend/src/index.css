@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+:root {
+  --bg-canvas: #F6F8F5;
+  --bg-surface: #FFFFFF;
+  --bg-subtle: #F5F5F4;
+  --border-default: #D8E2D8;
+  --text-primary: #14241B;
+  --text-secondary: #3F5247;
+  --text-muted: #57534E;
+  --brand-primary: #15803D;
+  --brand-hover: #166534;
+  --ai-sunlit-bg: #FFFBEB;
+  --ai-sunlit-border: #D97706;
+  --ai-sunlit-text: #78350F;
+  --state-mastered: #16A34A;
+  --state-unlocked: #0D9488;
+  --state-locked: #57534E;
+  --state-error: #9F1239;
+
+  --font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+code, pre, .font-mono {
+  font-family: var(--font-mono);
+}
+
+.plumora-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.plumora-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 2px rgba(20, 36, 27, 0.04);
+}
+
+.plumora-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 18px;
+  background-color: var(--brand-primary);
+  color: #FFFFFF;
+  font-weight: 600;
+  font-size: 14px;
+  border-radius: 8px;
+  border: 1px solid var(--brand-primary);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.plumora-btn-primary:hover:not(:disabled) {
+  background-color: var(--brand-hover);
+}
+
+.plumora-btn-primary:disabled {
+  background-color: #D6D3D1;
+  border-color: #D6D3D1;
+  color: #57534E;
+  cursor: not-allowed;
+}
+
+.plumora-btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 14px;
+  background-color: #FFFFFF;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 13px;
+  border-radius: 8px;
+  border: 1px solid var(--border-default);
+  cursor: pointer;
+}
+
+.plumora-btn-outline:hover:not(:disabled) {
+  background-color: #F0FDF4;
+  border-color: var(--brand-primary);
+}
