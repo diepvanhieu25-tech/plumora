@@ -65,7 +65,7 @@
       "title": "Hệ điều hành, Process/Thread & I/O cơ bản",
       "tier": 1,
       "prerequisites": [],
-      "lesson_markdown": "## 1. Tiến trình (Process) và Luồng (Thread)\n\n- **Process:** Đơn vị cấp phát tài nguyên độc lập của hệ điều hành, có không gian địa chỉ bộ nhớ (Virtual Memory) riêng biệt.\n- **Thread:** Đơn vị thực thi nhỏ hơn nằm trong một Process, dùng chung vùng nhớ Heap nhưng có Stack riêng.\n\n## 2. Mô hình I/O trong Dịch vụ Backend\n\n- **Blocking I/O:** Luồng bị treo chờ đến khi Kernel đọc/ghi xong socket hoặc đĩa.\n- **Non-blocking I/O & Event Loop (`epoll` / `kqueue` / `asyncio`):** Một luồng đơn có thể phục vụ hàng nghìn kết nối mạng đồng thời bằng cách nhường CPU khi chờ I/O.",
+      "lesson_markdown": "## 1. Tiến trình (Process) và Luồng (Thread)\n\n| Tiêu chí so sánh | Tiến trình (Process) | Luồng (Thread) |\n| --- | --- | --- |\n| Cấp phát tài nguyên | Không gian bộ nhớ ảo (Virtual Memory) độc lập | Dùng chung vùng nhớ Heap của Process cha |\n| Chi phí khởi tạo | Cao, nhân bản bảng trang bộ nhớ (Page Tables) | Thấp, chỉ khởi tạo ngăn xếp (Stack) riêng |\n| Cơ chế giao tiếp | IPC (Pipes, Sockets, Shared Memory) | Truy cập trực tiếp biến dùng chung trong Heap |\n| Mức độ an toàn | Cô lập lỗi, crash một process không ảnh hưởng process khác | Lỗi bộ nhớ trong một thread có thể sập cả process |\n\n## 2. Mô hình Non-blocking I/O & Event Loop trong Backend\n\n```python\nimport asyncio\n\nasync def handle_backend_io():\n    # Nhường quyền CPU cho Event Loop trong khi chờ I/O mạng hoặc Database\n    reader, writer = await asyncio.open_connection(\"127.0.0.1\", 5432)\n    # Non-blocking: một luồng có thể phục vụ đồng thời hàng nghìn kết nối\n    return \"Connected to PostgreSQL via Event Loop\"\n```\n\n- **Blocking I/O:** Luồng bị treo (blocked) chờ đến khi Kernel đọc/ghi xong socket hoặc đĩa.\n- **Event Loop (`epoll` / `asyncio`):** Xử lý bất đồng bộ thông qua bộ đa hợp I/O, giải quyết triệt để vấn đề C10K trong dịch vụ Backend hiện đại.",
       "questions": [
         {
           "id": "00000000-0000-4000-8000-000000000101",
@@ -122,8 +122,10 @@
       "slug": "web-http",
       "title": "Giao thức HTTP/HTTPS (Methods, Status, Headers)",
       "tier": 2,
-      "prerequisites": [0],
-      "lesson_markdown": "## 1. Cấu trúc Thông điệp HTTP & Tính chất Idempotent\n\n- **Methods chuẩn:** `GET` (đọc an toàn), `POST` (tạo mới / xử lý), `PUT` (thay thế lũy đẳng), `PATCH` (cập nhật một phần), `DELETE` (xóa).\n- **Status Codes:** `2xx` (Thành công: `200 OK`, `201 Created`), `4xx` (Lỗi phía Client: `400`, `401 Unauthorized`, `403 Forbidden`, `404 Not Found`, `409 Conflict`, `422 Unprocessable Entity`), `5xx` (Lỗi phía Server: `500`, `503 Service Unavailable`).\n\n## 2. Bảo mật Giao vận với HTTPS / TLS\n\nHTTPS bọc HTTP bên trong kênh mã hóa **TLS**, đảm bảo 3 thuộc tính: **Bí mật (Confidentiality)**, **Toàn vẹn (Integrity)** và **Xác thực máy chủ (Authentication qua Chứng chỉ số)**.",
+      "prerequisites": [
+        0
+      ],
+      "lesson_markdown": "## 1. Cấu trúc Thông điệp HTTP & Tính chất Idempotent\n\n| Phương thức (Method) | Tính An toàn (Safe) | Tính Lũy đẳng (Idempotent) | Ứng dụng Backend Chuẩn |\n| --- | --- | --- | --- |\n| `GET` | Có (Không đổi trạng thái) | Có (Gọi nhiều lần kết quả như một) | Đọc dữ liệu tài nguyên (`/api/v1/roadmap`) |\n| `POST` | Không (Tạo mới tài nguyên) | Không (Mỗi lần gọi sinh bản ghi mới) | Gửi nộp bài thi (`/attempts`), Đăng nhập |\n| `PUT` | Không (Sửa tài nguyên) | Có (Ghi đè toàn bộ tài nguyên đích) | Cập nhật cấu hình toàn diện người dùng |\n| `PATCH` | Không (Sửa một phần) | Thường không (Tùy thuộc nghiệp vụ) | Cập nhật một số trường dữ liệu lẻ |\n| `DELETE` | Không (Xóa tài nguyên) | Có (Xóa một tài nguyên đã mất) | Hủy phiên làm việc hoặc tài khoản |\n\n## 2. Cấu trúc Giao thức & Bảo mật HTTPS / TLS\n\n```http\nPOST /api/v1/auth/login HTTP/1.1\nHost: 127.0.0.1:8000\nContent-Type: application/json\nUser-Agent: PlumoraClient/1.0.0\n\n{\"username\": \"learner_foundation\", \"password\": \"***\"}\n```\n\n- **HTTPS / TLS:** Bọc phiên truyền thông bên trong tầng mã hóa TLS, đảm bảo tính bí mật, chống giả mạo gói tin (Tampering / MITM) và xác thực danh tính máy chủ thông qua chứng chỉ số X.509.",
       "questions": [
         {
           "id": "00000000-0000-4000-8000-000000000201",
@@ -180,8 +182,10 @@
       "slug": "db-relational",
       "title": "CSDL Quan hệ & SQL cơ bản",
       "tier": 2,
-      "prerequisites": [1],
-      "lesson_markdown": "## 1. Mô hình Quan hệ & Toàn vẹn Tham chiếu\n\nTrong `PostgreSQL`, dữ liệu được tổ chức thành các bảng (Relations) với ràng buộc chặt chẽ:\n- **Primary Key (`PK`):** Định danh duy nhất mỗi bản ghi (`NOT NULL, UNIQUE`).\n- **Foreign Key (`FK`):** Đảm bảo toàn vẹn tham chiếu giữa các bảng (ví dụ `user_concept_mastery.user_id -> users.id`).\n- **Unique & Check Constraints:** Ngăn dữ liệu sai lệch ngay tại tầng lưu trữ chuẩn (`SSoT`).",
+      "prerequisites": [
+        1
+      ],
+      "lesson_markdown": "## 1. Mô hình Quan hệ & Ràng buộc Toàn vẹn Dữ liệu\n\n| Loại ràng buộc | Mục đích Kỹ thuật | Ví dụ trong CSDL Plumora |\n| --- | --- | --- |\n| `PRIMARY KEY` (`PK`) | Định danh duy nhất mỗi hàng dữ liệu | `users.id UUID PRIMARY KEY` |\n| `FOREIGN KEY` (`FK`) | Bảo đảm toàn vẹn tham chiếu giữa các bảng | `user_concept_mastery.user_id -> users.id` |\n| `UNIQUE` | Ngăn chặn trùng lặp dữ liệu trên tập cột | `UNIQUE (user_id, submission_id)` chống nộp trùng |\n| `CHECK` | Ràng buộc miền giá trị hợp lệ của cột | `CHECK (0.0 <= mastery_score <= 1.0)` |\n\n## 2. Định nghĩa Bảng Chuẩn trong PostgreSQL\n\n```sql\nCREATE TABLE user_concept_mastery (\n    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n    concept_action_id INT NOT NULL REFERENCES concepts(action_id),\n    mastery_score NUMERIC(5, 4) NOT NULL CHECK (mastery_score >= 0.0 AND mastery_score <= 1.0),\n    is_mastered BOOLEAN NOT NULL DEFAULT FALSE,\n    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),\n    PRIMARY KEY (user_id, concept_action_id)\n);\n```",
       "questions": [
         {
           "id": "00000000-0000-4000-8000-000000000301",
@@ -238,7 +242,9 @@
       "slug": "db-transactions",
       "title": "Transaction (ACID) & Indexing trong RDBMS",
       "tier": 2,
-      "prerequisites": [3],
+      "prerequisites": [
+        3
+      ],
       "lesson_markdown": "## 1. Bốn tính chất ACID của Giao dịch Cơ sở dữ liệu\n\n| Thuộc tính | Ý nghĩa Kỹ thuật trong Plumora |\n| --- | --- |\n| **Atomicity (Nguyên tử)** | Khi nộp Quiz, việc ghi `quiz_attempts`, cập nhật `user_concept_mastery` và tăng `state_version` hoặc thành công trọn vẹn (`COMMIT`), hoặc hủy bỏ hoàn toàn (`ROLLBACK`). |\n| **Consistency (Nhất quán)** | Dữ liệu luôn thỏa mãn mọi ràng buộc `PK`, `FK`, `UNIQUE(user_id, submission_id)` và `CHECK (0.0 <= mastery_score <= 1.0)`. |\n| **Isolation (Cô lập)** | Các giao dịch đồng thời không làm sai lệch điểm `mastery = max(old, score)` nhờ khóa dòng (`SELECT ... FOR UPDATE`). |\n| **Durability (Bền vững)** | Sau khi `COMMIT`, kết quả được ghi vào Write-Ahead Log (`WAL`) của PostgreSQL, không mất khi khởi động lại. |\n\n```sql\nBEGIN;\nSELECT state_version FROM users WHERE id = :user_id FOR UPDATE;\nINSERT INTO quiz_attempts (...) VALUES (...);\nUPDATE user_concept_mastery SET mastery_score = GREATEST(mastery_score, :score) WHERE ...;\nUPDATE users SET state_version = state_version + 1 WHERE id = :user_id;\nCOMMIT;\n```\n\n## 2. Đánh đổi khi thiết kế B-Tree Index\n\n- **Ưu điểm:** Giảm độ phức tạp tìm kiếm từ quét tuần tự `O(N)` (`Seq Scan`) xuống `O(log N)` (`Index Scan`) trên các cột tra cứu thường xuyên (`username`, `(user_id, submission_id)`).\n- **Đánh đổi (Trade-off):** Tốn thêm dung lượng lưu trữ và tăng chi phí ghi (`INSERT/UPDATE/DELETE`) do phải cập nhật cây chỉ mục.",
       "questions": [
         {
@@ -296,8 +302,10 @@
       "slug": "db-nosql",
       "title": "CSDL NoSQL (Document & Key-Value Store)",
       "tier": 2,
-      "prerequisites": [3],
-      "lesson_markdown": "## 1. Phân loại NoSQL & Khi nào Kết hợp cùng RDBMS\n\n- **Key-Value Store (`Redis`):** Truy xuất cực nhanh `O(1)` trong bộ nhớ RAM theo khóa định danh (`plumora:state:{user_id}`), hỗ trợ `TTL` tự động hết hạn.\n- **Document Store (`MongoDB` / `JSONB`):** Lưu cấu trúc tài liệu linh hoạt.\n- **Nguyên tắc Kiến trúc Plumora (`D-10`):** Dùng `PostgreSQL` làm nguồn dữ liệu chuẩn duy nhất (`SSoT`) cho dữ liệu giao dịch bền vững, và dùng `Redis` làm lớp tăng tốc truy xuất trạng thái (`State Cache`).",
+      "prerequisites": [
+        3
+      ],
+      "lesson_markdown": "## 1. So sánh Cơ sở Dữ liệu Quan hệ (RDBMS) và NoSQL Caching\n\n| Tiêu chí kỹ thuật | PostgreSQL (RDBMS SSoT) | Redis (In-Memory Key-Value) |\n| --- | --- | --- |\n| Phương tiện lưu trữ | Đĩa cứng (NVMe / SSD) có Write-Ahead Log (WAL) | Bộ nhớ truy cập ngẫu nhiên (RAM) |\n| Tốc độ truy xuất | Khoảng 1 - 10 milliseconds | Dưới 1 millisecond (`O(1)` in-memory) |\n| Mục đích sử dụng | Nguồn chân lý duy nhất (`SSoT`), giao dịch ACID | Bộ nhớ đệm trạng thái (`State Cache`), khóa phân tán |\n| Cơ chế hết hạn (TTL) | Không hỗ trợ tự động (cần cron job dọn dẹp) | Hỗ trợ lệnh `EXPIRE` và `SETEX` tự động dọn |\n\n## 2. Thao tác Lưu Cache Vector Trạng thái Học viên trong Redis\n\n```bash\n# Ghi vector quan sát 24 chiều của học viên vào Redis với TTL 3600 giây\nSETEX plumora:state:611f715b-d69e 3600 '{\"state_version\": 5, \"vector\": [1, 1, 0, ...]}'\n\n# Đọc nhanh trạng thái phục vụ mô hình DQN suy luận đề xuất\nGET plumora:state:611f715b-d69e\n```",
       "questions": [
         {
           "id": "00000000-0000-4000-8000-000000000501",
@@ -354,8 +362,10 @@
       "slug": "api-rest",
       "title": "Thiết kế RESTful API chuẩn",
       "tier": 3,
-      "prerequisites": [2],
-      "lesson_markdown": "## 1. Nguyên lý Thiết kế RESTful API hướng Tài nguyên\n\n- **Định danh tài nguyên bằng danh từ phân cấp:** `/api/v1/roadmap`, `/api/v1/concepts/{slug}`, `/api/v1/concepts/{slug}/attempts`.\n- **Phiên bản hóa hợp đồng (`API Versioning`):** Tiền tố `/api/v1` giúp bảo toàn tương thích ngược.\n- **Tính lũy đẳng khi tạo giao dịch (`Idempotency`):** Khi mạng chập chờn, client gửi kèm `submission_id` (UUID) để server nhận diện retry và trả lại đúng kết quả lần nộp đầu tiên mà không chấm điểm lặp.",
+      "prerequisites": [
+        2
+      ],
+      "lesson_markdown": "## 1. Chuẩn Thiết Kế RESTful API & Mã Trạng Thái HTTP\n\n| Hành động Nghiệp vụ | Endpoint Chuẩn RESTful | Phương thức | Mã HTTP Thành công |\n| --- | --- | --- | --- |\n| Xem danh sách lộ trình | `/api/v1/roadmap` | `GET` | `200 OK` |\n| Xem chi tiết một bài học | `/api/v1/concepts/{slug}` | `GET` | `200 OK` |\n| Nộp bài kiểm tra trắc nghiệm | `/api/v1/concepts/{slug}/attempts` | `POST` | `200 OK` |\n| Đăng nhập hệ thống | `/api/v1/auth/login` | `POST` | `200 OK` |\n| Đăng xuất và hủy phiên | `/api/v1/auth/logout` | `POST` | `200 OK` |\n\n## 2. Khởi tạo Route RESTful với FastAPI & Pydantic\n\n```python\nfrom fastapi import APIRouter, Depends, status\nfrom pydantic import BaseModel\n\nrouter = APIRouter(prefix=\"/api/v1/concepts\", tags=[\"content\"])\n\n@router.get(\"/{slug}\", status_code=status.HTTP_200_OK)\ndef get_concept_detail(slug: str, current_user = Depends(get_current_user)):\n    \"\"\"Truy xuất chi tiết khái niệm theo chuẩn RESTful.\"\"\"\n    return {\"slug\": slug, \"status\": \"unlocked\"}\n```",
       "questions": [
         {
           "id": "00000000-0000-4000-8000-000000000601",
@@ -412,8 +422,10 @@
       "slug": "api-validation",
       "title": "Validation, Serialization & Xử lý lỗi API",
       "tier": 3,
-      "prerequisites": [6],
-      "lesson_markdown": "## 1. Kiểm tra Đầu vào tại Biên Hệ thống (`Schema Validation`)\n\nMọi dữ liệu từ Client đều không đáng tin cậy và phải được kiểm tra chặt bằng `Pydantic`:\n- Kiểm tra đúng số lượng câu trả lời (`len(answers) == 4`), không trùng lặp `question_id`, và `selected_option` thuộc `{'A', 'B', 'C', 'D'}`.\n- Từ chối ngay lập tức với `422 Unprocessable Entity` trước khi mở giao dịch ghi dữ liệu.\n\n## 2. Cấu trúc Phản hồi Lỗi Chuẩn (`Standard Error Envelope`)\n\nTrả về JSON thống nhất gồm `error_code` máy đọc được, `message` tiếng Việt rõ ràng và `details` bổ trợ, không lộ stack trace nội bộ.",
+      "prerequisites": [
+        6
+      ],
+      "lesson_markdown": "## 1. Kiểm Thực Dữ Liệu Tầng Server vs Tầng Client\n\n| Tiêu chí | Kiểm thực Client-side (Frontend) | Kiểm thực Server-side (FastAPI / Pydantic) |\n| --- | --- | --- |\n| Trải nghiệm người dùng | Phản hồi tức thì, không tốn băng thông mạng | Độ trễ mạng phụ thuộc đường truyền |\n| Độ tin cậy bảo mật | Không đáng tin cậy (kẻ tấn công có thể bypass) | Đáng tin cậy tuyệt đối, là rào chắn phòng thủ |\n| Xử lý khi vi phạm | Hiển thị cảnh báo trực tiếp trên form nhập | Trả về mã lỗi `422 Unprocessable Entity` |\n\n## 2. Định nghĩa Schema Kiểm thực Pydantic v2\n\n```python\nfrom pydantic import BaseModel, Field, field_validator\nimport uuid\n\nclass SubmitAttemptRequest(BaseModel):\n    submission_id: str = Field(..., description=\"UUID định danh duy nhất lượt nộp\")\n    answers: list[AnswerItemRequest] = Field(..., min_length=4, max_length=4)\n\n    @field_validator(\"submission_id\")\n    def validate_uuid_format(cls, value: str) -> str:\n        # Ngăn chặn injection và bảo đảm cấu trúc UUID hợp lệ\n        uuid.UUID(value)\n        return value\n```",
       "questions": [
         {
           "id": "00000000-0000-4000-8000-000000000701",
@@ -470,8 +482,11 @@
       "slug": "api-data",
       "title": "Kết nối API với Database & Query Patterns",
       "tier": 3,
-      "prerequisites": [4, 6],
-      "lesson_markdown": "## 1. Mẫu Unit of Work & Quản lý Connection Pool\n\n- **Connection Pooling (`SQLAlchemy Engine`):** Tái sử dụng kết nối TCP đã xác thực tới PostgreSQL kèm `pool_pre_ping=True` để phát hiện kết nối đứt.\n- **Tránh lỗi N+1 Queries:** Khi dựng lộ trình 12 khái niệm (`GET /api/v1/roadmap`), nạp toàn bộ `concepts`, `concept_prerequisites` và `user_concept_mastery` theo lô thay vì truy vấn lặp từng dòng.",
+      "prerequisites": [
+        4,
+        6
+      ],
+      "lesson_markdown": "## 1. So Sánh Truy Cập Dữ Liệu: ORM vs Raw SQL\n\n| Tiêu chí so sánh | ORM (SQLAlchemy 2.0) | Câu lệnh SQL Thuần (Raw SQL) |\n| --- | --- | --- |\n| Tốc độ phát triển | Nhanh, ánh xạ trực tiếp thành đối tượng Python | Chậm hơn, phải nối chuỗi và map kết quả thủ công |\n| Phòng chống SQL Injection | Tự động hóa tham số hóa truy vấn (Parameterized) | Dễ dính lỗ hổng SQLi nếu nối chuỗi không an toàn |\n| Hiệu năng tối đa | Thêm lớp trừu tượng (overhead nhỏ) | Hiệu năng cao nhất, tối ưu câu lệnh phức tạp |\n\n## 2. Thực thi Truy vấn Tham số hóa An toàn với SQLAlchemy 2.0\n\n```python\nfrom sqlalchemy import select\nfrom app.db.models import ConceptModel\n\n# Truy vấn an toàn tuyệt đối chống SQL Injection qua Parameter Binding\nstmt = select(ConceptModel).where(ConceptModel.slug == concept_slug)\nconcept = db.scalar(stmt)\n```",
       "questions": [
         {
           "id": "00000000-0000-4000-8000-000000000801",
@@ -528,8 +543,11 @@
       "slug": "cache-redis",
       "title": "Caching & Quản lý State với Redis",
       "tier": 3,
-      "prerequisites": [5, 6],
-      "lesson_markdown": "## 1. Mẫu Read-Through / Write-Through State Cache (`D-10`)\n\n- **Khóa lưu trữ:** `plumora:state:{user_id}` với `TTL = 3600s`, lưu `state_version` cùng vector Observation 24 chiều (`12 mastery + 12 is_eligible`).\n- **Write-Through:** Ngay sau khi PostgreSQL `COMMIT` lượt nộp Quiz hoặc đổi Preset, Backend ghi đè khóa Redis với `state_version` mới.\n- **Graceful Fallback (`PL-REC-02`):** Nếu Redis Cache Miss (`postgres_cache_warm`) hoặc Redis mất kết nối (`postgres_fallback`), Backend tự động tính lại vector 24 chiều trực tiếp từ PostgreSQL mà không làm gián đoạn API.",
+      "prerequisites": [
+        5,
+        6
+      ],
+      "lesson_markdown": "## 1. So Sánh Các Chiến Lược Caching Phổ Biến\n\n| Chiến lược Caching | Cách thức Vận hành | Ưu điểm & Đánh đổi |\n| --- | --- | --- |\n| `Cache-Aside` (Lazy Loading) | Ứng dụng đọc Cache trước; nếu miss thì đọc DB rồi ghi vào Cache | Giảm tải DB, nhưng lần đọc đầu tiên bị chậm (Cache Miss) |\n| `Write-Through` (Plumora D-10) | Khi cập nhật, ghi đồng thời vào DB và Cache trong cùng luồng | Dữ liệu luôn nhất quán, nhưng tăng nhẹ độ trễ lúc ghi |\n| `Write-Behind` (Write-Back) | Ghi vào Cache trước, sau đó bất đồng bộ đẩy xuống DB | Tốc độ ghi cực nhanh, nhưng rủi ro mất dữ liệu nếu Redis crash |\n\n## 2. Triển khai Write-Through Cache trong Plumora\n\n```python\ndef write_through_state_cache(db: Session, user_id: UUID) -> None:\n    \"\"\"Đồng bộ trạng thái từ PostgreSQL sang Redis ngay sau khi COMMIT.\"\"\"\n    state_vector = compute_24d_observation(db, user_id)\n    redis_client.setex(\n        f\"plumora:state:{user_id}\",\n        3600,\n        json.dumps({\"vector\": state_vector, \"version\": user.state_version})\n    )\n```",
       "questions": [
         {
           "id": "00000000-0000-4000-8000-000000000901",
@@ -586,8 +604,11 @@
       "slug": "sec-authn",
       "title": "Xác thực & Phân quyền (Session/JWT, RBAC)",
       "tier": 4,
-      "prerequisites": [6, 9],
-      "lesson_markdown": "## 1. Băm Mật khẩu Một chiều & Quản lý Phiên Xác thực (`D-11`)\n\n- **Password Hashing (`Argon2id`):** Băm mật khẩu kèm muối ngẫu nhiên (`Salt`) và chi phí bộ nhớ chống tấn công vét cạn GPU.\n- **Token & Cookie Security:** Cấp JWT ký bằng `HS256` từ khóa bí mật môi trường, đính kèm trong `HttpOnly, SameSite=Lax` Cookie.\n\n## 2. Chống Truy cập Chéo Trái phép (`Anti-IDOR`)\n\nMọi truy vấn đọc/ghi tiến độ, nộp bài Quiz và đặt lại Preset đều bắt buộc lấy định danh từ `current_user.id` đã xác thực phía server, không bao giờ tin `user_id` do client tự truyền lên.",
+      "prerequisites": [
+        6,
+        9
+      ],
+      "lesson_markdown": "## 1. So Sánh Xác Thực: Cookie HttpOnly vs Bearer JWT Token\n\n| Thuộc tính Bảo mật | Cookie Phiên (HttpOnly, SameSite) | Bearer Token (JWT trong Header) |\n| --- | --- | --- |\n| Chống tấn công XSS | Miễn nhiễm (JavaScript không thể đọc `document.cookie`) | Dễ bị đánh cắp nếu lưu trong `localStorage` |\n| Chống tấn công CSRF | Cần cờ `SameSite=Lax/Strict` hoặc Anti-CSRF Token | Miễn nhiễm tự nhiên với CSRF truyền thống |\n| Thu hồi phiên (Revocation) | Dễ dàng (xóa phiên trong Redis / DB) | Khó hơn (cần Token Blacklist hoặc thời gian sống ngắn) |\n\n## 2. Băm Mật Khẩu An Toàn và Tạo Chữ Ký JWT\n\n```python\nimport jwt\nfrom passlib.context import CryptContext\n\npwd_context = CryptContext(schemes=[\"bcrypt\"], deprecated=\"auto\")\n\n# Băm mật khẩu với muối ngẫu nhiên (Salt)\nhashed_pwd = pwd_context.hash(\"PlumoraDemo#2026\")\n\n# Tạo JWT Access Token có thời hạn (TTL) và chữ ký HMAC-SHA256\ntoken = jwt.encode({\"sub\": str(user_id), \"exp\": exp_time}, SECRET_KEY, algorithm=\"HS256\")\n```",
       "questions": [
         {
           "id": "00000000-0000-4000-8000-000000001001",
@@ -644,8 +665,12 @@
       "slug": "sec-api",
       "title": "Bảo mật API cơ bản (SQLi, Rate Limit, CORS)",
       "tier": 4,
-      "prerequisites": [7, 8, 10],
-      "lesson_markdown": "## 1. Phòng vệ Đa lớp cho Dịch vụ Backend (`Defense in Depth`)\n\n- **SQL Injection Prevention:** Luôn dùng truy vấn tham số hóa (`SQLAlchemy` bound parameters).\n- **CORS (`Cross-Origin Resource Sharing`):** Chỉ cho phép origin được duyệt (`http://127.0.0.1:5173`), không dùng wildcard `*` kèm `allow_credentials=True`.\n- **HTTP Security Headers:** Đính kèm `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Content-Security-Policy` và `Permissions-Policy`.\n- **Toàn vẹn Mô hình RL (`Checkpoint Integrity`):** Kiểm tra mã băm `SHA-256` của `checkpoint.zip` khớp với `manifest.json` trước khi nạp phục vụ; nếu sai lệch thì chuyển về `fallback_rule` an toàn.",
+      "prerequisites": [
+        7,
+        8,
+        10
+      ],
+      "lesson_markdown": "## 1. Phòng Thủ Các Lỗ Hổng Bảo Mật OWASP API Top 10\n\n| Lỗ hổng OWASP | Nguy cơ Kỹ thuật | Cơ chế Phòng vệ trong Plumora |\n| --- | --- | --- |\n| `API1: BOLA / IDOR` | Người dùng đổi ID trong URL để đọc dữ liệu người khác | Xác thực danh tính qua Token và ràng buộc `WHERE user_id = me.id` |\n| `API2: Broken Authentication` | Token bị lộ hoặc không kiểm tra chữ ký | Ký JWT với thuật toán bảo mật và kiểm tra thời hạn `exp` |\n| `API3: Broken Object Property` | Rò rỉ thông tin mật (mật khẩu băm, UUID nội bộ) | Dùng Pydantic Response Model ẩn toàn bộ trường nhạy cảm |\n| `API4: Unrestricted Resource` | Tấn công từ chối dịch vụ DoS do gọi API liên tục | Áp dụng giới hạn tần suất gọi (Rate Limiting) qua Redis |\n\n## 2. Kiểm Soát Quyền Truy Cập (RBAC) với FastAPI Dependency\n\n```python\nfrom fastapi import Depends, HTTPException, status\n\ndef require_concept_unlocked(slug: str, user = Depends(get_current_user), db = Depends(get_db)):\n    \"\"\"Kiểm tra điều kiện tiên quyết trước khi cho phép học hoặc thi.\"\"\"\n    if not is_concept_eligible(db, user.id, slug):\n        raise HTTPException(\n            status_code=status.HTTP_403_FORBIDDEN,\n            detail=\"403 CONCEPT_LOCKED: Cần đạt >= 75% ở các bài tiên quyết.\"\n        )\n```",
       "questions": [
         {
           "id": "00000000-0000-4000-8000-000000001101",

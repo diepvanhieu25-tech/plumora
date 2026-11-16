@@ -5,8 +5,10 @@ import {
   Clock,
   Compass,
   FileCheck2,
+  Sparkles,
 } from 'lucide-react'
 import type { ConceptDetail } from '../../types'
+import { MarkdownRenderer } from './MarkdownRenderer'
 
 interface LessonReaderProps {
   currentConcept: ConceptDetail
@@ -101,13 +103,19 @@ export function LessonReader({
 
             <div className="border-t border-[#D8E2D8] my-6"></div>
 
-            {/* Markdown Body */}
-            <div
-              className="prose max-w-none whitespace-pre-line text-sm leading-relaxed text-[#14241B] space-y-4"
-              data-testid="lesson-markdown-body"
-            >
-              {currentConcept.lesson_markdown}
+            {/* Key Concept Highlights Card */}
+            <div className="bg-[#F8FAF7] border border-[#D8E2D8] rounded-xl p-4.5 mb-6 shadow-2xs">
+              <div className="flex items-center gap-2 text-xs font-bold text-[#15803D] uppercase tracking-wider mb-2">
+                <Sparkles className="w-4 h-4 text-[#15803D]" aria-hidden="true" />
+                <span>Mục tiêu &amp; Trọng tâm Bài học</span>
+              </div>
+              <p className="text-xs sm:text-sm text-[#3F5247] leading-relaxed">
+                Nắm vững các nguyên lý vận hành cốt lõi, so sánh ưu nhược điểm kỹ thuật và thực hành thông qua bài kiểm tra trắc nghiệm 4 câu để nâng điểm thông thạo lên tối thiểu <strong>75%</strong>.
+              </p>
             </div>
+
+            {/* Rich Markdown Body */}
+            <MarkdownRenderer content={currentConcept.lesson_markdown} />
 
             {/* Bottom Completion Banner & Primary Quiz CTA */}
             <div className="bg-[#F0FDF4] border border-[#86EFAC] rounded-xl p-5 sm:p-6 mt-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-5 shadow-xs">

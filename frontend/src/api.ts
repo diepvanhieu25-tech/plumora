@@ -145,8 +145,28 @@ export const FALLBACK_CONCEPT_DETAIL: ConceptDetail = {
   slug: 'db-transactions',
   title: 'Transaction (ACID) & Indexing trong RDBMS',
   tier: 2,
-  lesson_markdown:
-    '## 1. Bốn tính chất ACID của Giao dịch Cơ sở dữ liệu\n\n- **Atomicity (Nguyên tử):** Giao dịch hoặc thành công trọn vẹn (`COMMIT`), hoặc hủy bỏ hoàn toàn (`ROLLBACK`).\n- **Consistency (Nhất quán):** Bảo toàn toàn bộ ràng buộc `PK`, `FK`, `UNIQUE(user_id, submission_id)`.\n- **Isolation (Cô lập):** Khóa dòng (`SELECT ... FOR UPDATE`) tránh Lost Update.\n- **Durability (Bền vững):** Ghi nhận xuống nhật ký `WAL` của PostgreSQL.\n\n## 2. Đánh đổi khi thiết kế B-Tree Index\n\nGiảm độ phức tạp tra cứu từ `O(N)` xuống `O(log N)` nhưng tăng chi phí cập nhật cây chỉ mục khi `INSERT / UPDATE`.',
+  lesson_markdown: `## 1. Bốn tính chất ACID của Giao dịch Cơ sở dữ liệu
+
+| Thuộc tính | Ý nghĩa Kỹ thuật trong Plumora |
+| --- | --- |
+| **Atomicity (Nguyên tử)** | Khi nộp Quiz, việc ghi \`quiz_attempts\`, cập nhật \`user_concept_mastery\` và tăng \`state_version\` hoặc thành công trọn vẹn (\`COMMIT\`), hoặc hủy bỏ hoàn toàn (\`ROLLBACK\`). |
+| **Consistency (Nhất quán)** | Dữ liệu luôn thỏa mãn mọi ràng buộc \`PK\`, \`FK\`, \`UNIQUE(user_id, submission_id)\` và \`CHECK (0.0 <= mastery_score <= 1.0)\`. |
+| **Isolation (Cô lập)** | Các giao dịch đồng thời không làm sai lệch điểm \`mastery = max(old, score)\` nhờ khóa dòng (\`SELECT ... FOR UPDATE\`). |
+| **Durability (Bền vững)** | Sau khi \`COMMIT\`, kết quả được ghi vào Write-Ahead Log (\`WAL\`) của PostgreSQL, không mất khi khởi động lại. |
+
+\`\`\`sql
+BEGIN;
+SELECT state_version FROM users WHERE id = :user_id FOR UPDATE;
+INSERT INTO quiz_attempts (...) VALUES (...);
+UPDATE user_concept_mastery SET mastery_score = GREATEST(mastery_score, :score) WHERE ...;
+UPDATE users SET state_version = state_version + 1 WHERE id = :user_id;
+COMMIT;
+\`\`\`
+
+## 2. Đánh đổi khi thiết kế B-Tree Index
+
+- **Ưu điểm:** Giảm độ phức tạp tìm kiếm từ quét tuần tự \`O(N)\` (\`Seq Scan\`) xuống \`O(log N)\` (\`Index Scan\`) trên các cột tra cứu thường xuyên (\`username\`, \`(user_id, submission_id)\`).
+- **Đánh đổi (Trade-off):** Tốn thêm dung lượng lưu trữ và tăng chi phí ghi (\`INSERT/UPDATE/DELETE\`) do phải cập nhật cây chỉ mục.`,
   mastery_score: 0.0,
   status: 'unlocked',
   prerequisites: ['db-relational'],

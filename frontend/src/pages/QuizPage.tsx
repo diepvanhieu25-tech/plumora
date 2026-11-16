@@ -92,6 +92,7 @@ export function QuizPage({
             onSubmit={onSubmit}
             isLoading={isLoading}
             quizError={quizError}
+            isSubmitted={!!attemptResult}
           />
         </div>
 
@@ -102,6 +103,7 @@ export function QuizPage({
               attemptResult={attemptResult}
               onRetry={onRetry}
               onBackToRoadmap={onBackToRoadmap}
+              onBackToLesson={onBackToLesson}
             />
           ) : (
             <>

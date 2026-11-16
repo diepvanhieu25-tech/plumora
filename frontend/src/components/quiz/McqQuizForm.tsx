@@ -1,4 +1,4 @@
-import { Check, FileCheck2, Lock } from 'lucide-react'
+import { Check, FileCheck2, Loader2, ShieldCheck } from 'lucide-react'
 import type { ConceptDetail } from '../../types'
 
 interface McqQuizFormProps {
@@ -9,6 +9,7 @@ interface McqQuizFormProps {
   onSubmit: (e: React.FormEvent) => Promise<void>
   isLoading: boolean
   quizError: string | null
+  isSubmitted?: boolean
 }
 
 export function McqQuizForm({
@@ -19,6 +20,7 @@ export function McqQuizForm({
   onSubmit,
   isLoading,
   quizError,
+  isSubmitted = false,
 }: McqQuizFormProps) {
   const questions = currentConcept.questions ?? []
   const totalQuestions = questions.length
@@ -73,45 +75,48 @@ export function McqQuizForm({
       ) : null}
 
       {/* 2. List of 4 MCQ Questions */}
-      <div className="space-y-4">
+      <div className="space-y-5">
         {questions.map((q, idx) => {
           const isAnswered = selectedAnswers[q.id] !== undefined
           return (
             <article
               key={q.id}
-              className={`bg-white border rounded-xl p-5 shadow-sm space-y-4 transition-all ${
+              className={`bg-white border rounded-xl p-5 sm:p-6 shadow-sm space-y-4 transition-all ${
                 isAnswered ? 'border-[#BBF7D0]' : 'border-[#D8E2D8]'
               }`}
               data-testid={`question-block-${idx + 1}`}
             >
               <div className="flex items-start justify-between gap-4">
-                <div className="flex gap-2.5">
-                  <span className="shrink-0 w-6 h-6 rounded-md bg-[#F0FDF4] text-[#15803D] text-xs font-bold flex items-center justify-center font-mono border border-[#BBF7D0]">
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                  <span className="shrink-0 w-7 h-7 rounded-lg bg-[#F0FDF4] text-[#15803D] text-xs font-bold flex items-center justify-center font-mono border border-[#BBF7D0] mt-0.5">
                     0{idx + 1}
                   </span>
-                  <h3 className="text-sm font-semibold text-[#14241B] leading-snug">
+                  <h3 className="text-sm sm:text-base font-semibold text-[#14241B] leading-snug break-words flex-1 min-w-0">
                     Câu {idx + 1} / {totalQuestions}: {q.prompt}
                   </h3>
                 </div>
-                <span className="text-[11px] font-mono text-[#57534E] bg-[#F6F8F5] px-1.5 py-0.5 rounded border border-[#D8E2D8]">
+                <span className="shrink-0 text-[11px] font-mono font-medium text-[#57534E] bg-[#F6F8F5] px-2 py-0.5 rounded border border-[#D8E2D8]">
                   1 điểm
                 </span>
               </div>
 
               {/* Radio Options A, B, C, D */}
-              <div className="space-y-2.5 pl-0 sm:pl-8">
+              <div className="space-y-3 pl-0 sm:pl-10">
                 {(['A', 'B', 'C', 'D'] as const).map((optKey) => {
                   const isChecked = selectedAnswers[q.id] === optKey
                   return (
                     <label
                       key={optKey}
-                      className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${
+                      className={`flex items-start gap-3.5 p-3.5 sm:p-4 rounded-xl border transition-all ${
+                        isSubmitted ? 'cursor-default' : 'cursor-pointer'
+                      } ${
                         isChecked
-                          ? 'border-2 border-[#15803D] bg-[#F0FDF4]'
-                          : 'border-[#D8E2D8] hover:border-[#15803D]/50 bg-white'
+                          ? 'border-2 border-[#15803D] bg-[#F0FDF4] shadow-2xs'
+                          : 'border-[#D8E2D8] hover:border-[#15803D]/60 hover:bg-[#F9FAF8] bg-white'
                       }`}
                     >
-                      <div className="flex items-center gap-3">
+                      {/* Left: Radio Circle & Letter Badge */}
+                      <div className="flex items-center gap-2.5 shrink-0 mt-0.5">
                         <div
                           className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
                             isChecked
@@ -119,26 +124,43 @@ export function McqQuizForm({
                               : 'border-[#D8E2D8]'
                           }`}
                         >
-                          {isChecked ? <div className="w-1.5 h-1.5 rounded-full bg-white"></div> : null}
+                          {isChecked ? (
+                            <div className="w-1.5 h-1.5 rounded-full bg-white"></div>
+                          ) : null}
                         </div>
-                        <input
-                          type="radio"
-                          name={`question-${q.id}`}
-                          value={optKey}
-                          checked={isChecked}
-                          onChange={() => onSelectAnswer(q.id, optKey)}
-                          className="sr-only"
-                          data-testid={`quiz-q${idx + 1}-opt-${optKey}`}
-                        />
-                        <span className="text-xs font-medium text-[#14241B]">
-                          <strong className={isChecked ? 'text-[#15803D]' : 'text-[#57534E]'}>
-                            {optKey}.
-                          </strong>{' '}
-                          {q.options[optKey]}
+
+                        <span
+                          className={`w-6 h-6 rounded-md font-mono text-xs font-bold flex items-center justify-center border transition-colors ${
+                            isChecked
+                              ? 'bg-[#15803D] text-white border-[#15803D]'
+                              : 'bg-[#F6F8F5] text-[#57534E] border-[#D8E2D8]'
+                          }`}
+                        >
+                          {optKey}
                         </span>
                       </div>
+
+                      <input
+                        type="radio"
+                        name={`question-${q.id}`}
+                        value={optKey}
+                        checked={isChecked}
+                        disabled={isLoading || isSubmitted}
+                        onChange={() => !isSubmitted && onSelectAnswer(q.id, optKey)}
+                        className="sr-only"
+                        data-testid={`quiz-q${idx + 1}-opt-${optKey}`}
+                      />
+
+                      {/* Middle: Option Text (Responsive, multiline, break-words) */}
+                      <div className="flex-1 min-w-0 text-xs sm:text-sm leading-relaxed text-[#14241B] break-words">
+                        {q.options[optKey]}
+                      </div>
+
+                      {/* Right: Check Indicator when Selected */}
                       {isChecked ? (
-                        <Check className="w-4 h-4 text-[#15803D] stroke-[2.5]" aria-hidden="true" />
+                        <div className="shrink-0 mt-0.5 ml-2">
+                          <Check className="w-4 h-4 text-[#15803D] stroke-[2.5]" aria-hidden="true" />
+                        </div>
                       ) : null}
                     </label>
                   )
@@ -149,29 +171,42 @@ export function McqQuizForm({
         })}
       </div>
 
-      {/* 3. Form Action Bar (Stitch SCR-04) */}
+      {/* 3. Form Action Bar (Stitch SCR-04 - Security Reassurance) */}
       <div className="bg-white border border-[#D8E2D8] rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
-        <div className="flex items-center gap-2 text-xs text-[#57534E] font-mono">
-          <Lock className="w-3.5 h-3.5 text-[#15803D]" aria-hidden="true" />
-          <span>
-            submission_id: <strong className="text-[#14241B]">{submissionId.slice(0, 13)}...</strong>
-          </span>
+        <div
+          className="flex items-center gap-2 text-xs text-[#15803D] font-medium bg-[#F0FDF4] px-3 py-1.5 rounded-lg border border-[#BBF7D0]"
+          title={`Mã kiểm soát giao dịch: ${submissionId}`}
+        >
+          <ShieldCheck className="w-4 h-4 text-[#15803D] shrink-0" aria-hidden="true" />
+          <span>Phiên làm bài được bảo vệ an toàn (Chống nộp trùng lặp)</span>
         </div>
 
         <button
           type="submit"
-          disabled={!isComplete || isLoading}
+          disabled={!isComplete || isLoading || isSubmitted}
           className="w-full sm:w-auto px-6 py-3 bg-[#15803D] hover:bg-[#166534] disabled:bg-[#D8E2D8] disabled:text-[#57534E] text-white text-xs font-bold rounded-lg shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-[0.98]"
           data-testid="submit-quiz-btn"
         >
-          <FileCheck2 className="w-4 h-4" aria-hidden="true" />
-          <span>
-            {isLoading
-              ? 'Đang chấm điểm trong ACID Transaction...'
-              : !isComplete
-                ? `Nộp bài kiểm tra (Chọn đủ ${totalQuestions}/${totalQuestions} câu)`
-                : 'Nộp bài kiểm tra'}
-          </span>
+          {isLoading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin shrink-0" aria-hidden="true" />
+              <span>Đang chấm điểm trong ACID Transaction...</span>
+            </>
+          ) : isSubmitted ? (
+            <>
+              <Check className="w-4 h-4 shrink-0" aria-hidden="true" />
+              <span>Đã nộp bài kiểm tra</span>
+            </>
+          ) : (
+            <>
+              <FileCheck2 className="w-4 h-4 shrink-0" aria-hidden="true" />
+              <span>
+                {!isComplete
+                  ? `Nộp bài kiểm tra (Chọn đủ ${totalQuestions}/${totalQuestions} câu)`
+                  : 'Nộp bài kiểm tra'}
+              </span>
+            </>
+          )}
         </button>
       </div>
     </form>
