@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: plumora-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-plumora_app}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-plumora_dev_pass_local_only}
+      POSTGRES_DB: ${DB_NAME:-plumora_dev}
+    ports:
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
+    volumes:
+      - plumora_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-plumora_app} -d ${DB_NAME:-plumora_dev}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: plumora-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - plumora_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  plumora_pgdata:
+  plumora_redisdata:
