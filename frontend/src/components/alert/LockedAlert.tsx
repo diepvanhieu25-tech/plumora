@@ -39,6 +39,7 @@ export function LockedAlert({
         type="button"
         onClick={onBackToRoadmap}
         className="plumora-btn-outline text-xs"
+        data-testid="back-to-roadmap-btn"
       >
         <ArrowLeft className="w-4 h-4" aria-hidden="true" />
         <span>Quay về Bản đồ &amp; Học bài tiên quyết</span>

@@ -13,7 +13,8 @@ import {
   apiRegister,
   apiSubmitAttempt,
 } from './api'
-import { Header, type ActiveScreen } from './components/common/Header'
+import { LockedAlert } from './components/alert/LockedAlert'
+import { Header } from './components/common/Header'
 import { Toast } from './components/common/Toast'
 import { ProvenanceDrawer } from './components/drawer/ProvenanceDrawer'
 import { PresetModal } from './components/modal/PresetModal'
@@ -22,6 +23,7 @@ import { LessonPage } from './pages/LessonPage'
 import { QuizPage } from './pages/QuizPage'
 import { RoadmapPage } from './pages/RoadmapPage'
 import type {
+  ActiveView,
   AttemptResult,
   ConceptDetail,
   DagNode,
@@ -36,9 +38,16 @@ function generateSubmissionId(): string {
   return '00000000-0000-4000-8000-000000009999'
 }
 
-export function App() {
-  const [user, setUser] = useState<LearnerUser | null>(null)
-  const [activeScreen, setActiveScreen] = useState<ActiveScreen>('scr01_auth')
+interface AppProps {
+  initialUser?: LearnerUser | null
+  initialView?: ActiveView
+}
+
+export function App({ initialUser = null, initialView }: AppProps = {}) {
+  const [user, setUser] = useState<LearnerUser | null>(initialUser)
+  const [activeView, setActiveView] = useState<ActiveView>(
+    initialView ?? (initialUser ? 'roadmap' : 'roadmap'),
+  )
   const [nodes, setNodes] = useState<DagNode[]>(FALLBACK_CONCEPTS_DAG)
   const [recommendation, setRecommendation] =
     useState<RecommendationPayload>(FALLBACK_RECOMMENDATION)
@@ -90,7 +99,7 @@ export function App() {
       setNodes(rm.nodes)
       setRecommendation(rec)
     } catch {
-      // Keep fallback data in unit test environments without live HTTP server
+      // Keep fallback data in test environments without live HTTP server
     }
   }
 
@@ -100,7 +109,6 @@ export function App() {
       const me = await apiGetMe()
       if (mounted && me) {
         setUser(me)
-        setActiveScreen('scr02_roadmap')
         await refreshRoadmapAndRecommendation()
       }
     })()
@@ -128,7 +136,7 @@ export function App() {
         setToastMessage(`Đã đăng ký và đăng nhập ${res.user.username}`)
       }
       await refreshRoadmapAndRecommendation()
-      setActiveScreen('scr02_roadmap')
+      setActiveView('roadmap')
     } catch (err) {
       setAuthError(
         err instanceof Error ? err.message : 'Xác thực không thành công',
@@ -148,7 +156,7 @@ export function App() {
       setUser(res.user)
       setToastMessage(`Đã đăng nhập tài khoản mẫu ${res.user.username}`)
       await refreshRoadmapAndRecommendation()
-      setActiveScreen('scr02_roadmap')
+      setActiveView('roadmap')
     } catch (err) {
       setAuthError(
         err instanceof Error ? err.message : 'Đăng nhập tài khoản mẫu thất bại',
@@ -163,7 +171,7 @@ export function App() {
       await apiLogout()
     } finally {
       setUser(null)
-      setActiveScreen('scr01_auth')
+      setActiveView('roadmap')
       setToastMessage('Đã đăng xuất khỏi hệ thống')
     }
   }
@@ -186,7 +194,7 @@ export function App() {
             message: result.message,
             missingPrerequisites: result.missingPrerequisites,
           })
-          setActiveScreen('scr08_locked')
+          setActiveView('locked')
         } else {
           setToastMessage(result.message)
         }
@@ -194,7 +202,7 @@ export function App() {
       }
       setCurrentConcept(result.data)
       setLockedErrorInfo(null)
-      setActiveScreen(targetScreen)
+      setActiveView(targetScreen === 'scr04_quiz' ? 'quiz' : 'lesson')
     } finally {
       setIsLoading(false)
     }
@@ -207,7 +215,7 @@ export function App() {
       await apiApplyPreset(pendingPreset.key)
       setToastMessage(`Đã áp dụng thành công hồ sơ ${pendingPreset.title}`)
       await refreshRoadmapAndRecommendation()
-      setActiveScreen('scr02_roadmap')
+      setActiveView('roadmap')
     } catch (err) {
       setToastMessage(
         err instanceof Error ? err.message : 'Không thể áp dụng hồ sơ mẫu',
@@ -243,26 +251,25 @@ export function App() {
     }
   }
 
-  return (
-    <main className="min-h-screen bg-[#F6F8F5] text-[#14241B] font-sans antialiased">
-      <Header
-        user={user}
-        activeScreen={activeScreen}
-        setActiveScreen={setActiveScreen}
-        onLogout={handleLogout}
-        isDrawerOpen={isDrawerOpen}
-        setIsDrawerOpen={setIsDrawerOpen}
-        masteredCount={masteredCount}
-      />
+  // ==========================================
+  // 1. UNAUTHENTICATED APP (Stitch SCR-01 Guard)
+  // ==========================================
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#F8FAF7] text-[#14241B] font-sans antialiased flex flex-col justify-between">
+        <Header
+          user={null}
+          activeView="roadmap"
+          onNavigate={() => {}}
+          onLogout={handleLogout}
+          isDrawerOpen={false}
+          setIsDrawerOpen={() => {}}
+          masteredCount={0}
+        />
 
-      <Toast
-        message={toastMessage}
-        onClose={() => setToastMessage(null)}
-      />
+        <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
 
-      <div className="max-w-7xl mx-auto p-6 space-y-8">
-        {/* SCR-01: Authentication */}
-        <div className={activeScreen === 'scr01_auth' ? 'block' : 'hidden'}>
+        <main className="flex-1 flex items-center justify-center p-4 sm:p-6 md:p-10">
           <AuthPage
             authMode={authMode}
             setAuthMode={setAuthMode}
@@ -277,86 +284,126 @@ export function App() {
             onSubmit={handleLoginSubmit}
             onQuickPickSeedAccount={handleQuickPickSeedAccount}
           />
-        </div>
+        </main>
 
-        {/* SCR-02 & SCR-07: Roadmap DAG & Recommendation */}
-        <div
-          className={
-            activeScreen === 'scr02_roadmap' || activeScreen === 'scr08_locked'
-              ? 'block'
-              : 'hidden'
-          }
-        >
+        {/* Global Botanical Footer Bar (Stitch SCR-01) */}
+        <footer className="w-full bg-white border-t border-[#D8E2D8] py-3.5 px-6 text-xs text-[#57534E] font-mono">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#15803D]"></span>
+              <span>Plumora Backend RL Engine v1.0.0 • SHA-256 Verified Checkpoints</span>
+            </div>
+            <div className="flex items-center gap-4 text-[#78716C] text-[11px]">
+              <span>Idempotency Engine Active</span>
+              <span>•</span>
+              <span>WCAG 2.1 AA Compliant</span>
+            </div>
+          </div>
+        </footer>
+      </div>
+    )
+  }
+
+  // ==========================================
+  // 2. AUTHENTICATED APP (Stitch SCR-02..06 Multi-view Router)
+  // ==========================================
+  return (
+    <div className="min-h-screen bg-[#F8FAF7] text-[#14241B] font-sans antialiased flex flex-col justify-between">
+      <Header
+        user={user}
+        activeView={activeView}
+        onNavigate={setActiveView}
+        onLogout={handleLogout}
+        isDrawerOpen={isDrawerOpen}
+        setIsDrawerOpen={setIsDrawerOpen}
+        masteredCount={masteredCount}
+      />
+
+      <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
+
+      {/* Main Workspace (Strictly 1 view rendered at a time) */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {activeView === 'roadmap' ? (
           <RoadmapPage
             nodes={nodes}
             recommendation={recommendation}
             masteredCount={masteredCount}
             isLoading={isLoading}
+            currentUsername={user.username}
             onSelectPreset={setPendingPreset}
             onOpenConcept={handleOpenConcept}
           />
-          {activeScreen === 'scr08_locked' ? (
-            <div className="mt-4">
-              <LessonPage
-                currentConcept={currentConcept}
-                lockedErrorInfo={lockedErrorInfo}
-                onGoToQuiz={() => setActiveScreen('scr04_quiz')}
-                onBackToRoadmap={() => setActiveScreen('scr02_roadmap')}
-              />
-            </div>
-          ) : null}
-        </div>
+        ) : null}
 
-        {/* SCR-03: Lesson Reader & SCR-04: MCQ Quiz */}
-        <div
-          className={
-            activeScreen === 'scr03_lesson' || activeScreen === 'scr04_quiz'
-              ? 'block'
-              : 'hidden'
-          }
-        >
+        {activeView === 'lesson' ? (
           <LessonPage
             currentConcept={currentConcept}
-            lockedErrorInfo={null}
-            onGoToQuiz={() => setActiveScreen('scr04_quiz')}
-            onBackToRoadmap={() => setActiveScreen('scr02_roadmap')}
+            lockedErrorInfo={lockedErrorInfo}
+            onGoToQuiz={() => setActiveView('quiz')}
+            onBackToRoadmap={() => setActiveView('roadmap')}
           />
-          <div className="mt-6">
-            <QuizPage
-              currentConcept={currentConcept}
-              submissionId={submissionId}
-              selectedAnswers={selectedAnswers}
-              onSelectAnswer={(qid, opt) =>
-                setSelectedAnswers((prev) => ({ ...prev, [qid]: opt }))
-              }
-              onSubmit={handleQuizSubmit}
-              isLoading={isLoading}
-              quizError={quizError}
-              attemptResult={attemptResult}
-              onRetry={() => {
-                setSelectedAnswers({})
-                setAttemptResult(null)
-                setSubmissionId(generateSubmissionId())
-              }}
-              onBackToRoadmap={() => setActiveScreen('scr02_roadmap')}
-            />
-          </div>
-        </div>
-      </div>
+        ) : null}
 
+        {activeView === 'quiz' ? (
+          <QuizPage
+            currentConcept={currentConcept}
+            submissionId={submissionId}
+            selectedAnswers={selectedAnswers}
+            onSelectAnswer={(qid, opt) =>
+              setSelectedAnswers((prev) => ({ ...prev, [qid]: opt }))
+            }
+            onSubmit={handleQuizSubmit}
+            isLoading={isLoading}
+            quizError={quizError}
+            attemptResult={attemptResult}
+            onRetry={() => {
+              setSelectedAnswers({})
+              setAttemptResult(null)
+              setSubmissionId(generateSubmissionId())
+            }}
+            onBackToRoadmap={() => setActiveView('roadmap')}
+            onBackToLesson={() => setActiveView('lesson')}
+          />
+        ) : null}
+
+        {activeView === 'locked' && lockedErrorInfo ? (
+          <LockedAlert
+            lockedErrorInfo={lockedErrorInfo}
+            onBackToRoadmap={() => setActiveView('roadmap')}
+          />
+        ) : null}
+      </main>
+
+      {/* Preset Modal (SCR-05) */}
       <PresetModal
         pendingPreset={pendingPreset}
         onCancel={() => setPendingPreset(null)}
         onConfirm={handleConfirmApplyPreset}
       />
 
+      {/* Provenance Drawer (SCR-06) */}
       <ProvenanceDrawer
         isDrawerOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         recommendation={recommendation}
         nodes={nodes}
       />
-    </main>
+
+      {/* Global Botanical Footer Bar */}
+      <footer className="w-full bg-white border-t border-[#D8E2D8] py-3.5 px-6 text-xs text-[#57534E] font-mono">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-[#15803D]"></span>
+            <span>Plumora Backend RL Engine v1.0.0 • SHA-256 Verified Checkpoints</span>
+          </div>
+          <div className="flex items-center gap-4 text-[#78716C] text-[11px]">
+            <span>Idempotency Engine Active</span>
+            <span>•</span>
+            <span>WCAG 2.1 AA Compliant</span>
+          </div>
+        </div>
+      </footer>
+    </div>
   )
 }
 

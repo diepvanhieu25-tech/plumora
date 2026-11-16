@@ -162,11 +162,17 @@ describe('PL-E2E-01 Golden Journey UI Flow & Strict Anti-Emoji Invariant (INV-UI
       expect(screen.getByTestId('scr08-locked-view')).toBeInTheDocument()
     })
 
+    // Return to roadmap view
+    fireEvent.click(screen.getByTestId('back-to-roadmap-btn'))
+
     // 4. Step 3 (SCR-03): Open recommended concept db-transactions
     fireEvent.click(screen.getByTestId('start-recommended-lesson-btn'))
     await waitFor(() => {
       expect(screen.getByTestId('lesson-markdown-body')).toHaveTextContent(/Atomicity/i)
     })
+
+    // Transition from SCR-03 Lesson to SCR-04 Quiz
+    fireEvent.click(screen.getByTestId('start-quiz-btn'))
 
     // 5. Step 4 (SCR-04): Answer 4 MCQ questions and submit
     const submitBtn = screen.getByTestId('submit-quiz-btn')

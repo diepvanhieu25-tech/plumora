@@ -87,3 +87,5 @@ export interface AttemptResult {
   state_version: number
   newly_unlocked_slugs: string[]
 }
+
+export type ActiveView = 'roadmap' | 'lesson' | 'quiz' | 'locked'

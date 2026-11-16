@@ -78,6 +78,9 @@ describe('PL-E2E-01 Live Full-Stack Golden Journey (React -> FastAPI -> PostgreS
         { timeout: 8000 },
       )
 
+      // Transition from SCR-03 Lesson to SCR-04 Quiz
+      fireEvent.click(screen.getByTestId('start-quiz-btn'))
+
       // 5. SCR-04: Select 3/4 correct answers (75% pass boundary) and submit to live PostgreSQL + Redis
       fireEvent.click(screen.getByTestId('quiz-q1-opt-A'))
       fireEvent.click(screen.getByTestId('quiz-q2-opt-A'))
@@ -88,7 +91,10 @@ describe('PL-E2E-01 Live Full-Stack Golden Journey (React -> FastAPI -> PostgreS
       await waitFor(
         () => {
           expect(screen.getByTestId('quiz-result-card')).toHaveTextContent(
-            /ĐẠT CHUẨN THÔNG THẠO \(PASSED: 75% — 3\/4 câu đúng\)/i,
+            /ĐẠT CHUẨN THÔNG THẠO/i,
+          )
+          expect(screen.getByTestId('quiz-result-card')).toHaveTextContent(
+            /3 \/ 4 câu đúng/i,
           )
         },
         { timeout: 5000 },

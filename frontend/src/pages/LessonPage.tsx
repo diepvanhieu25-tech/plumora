@@ -32,6 +32,7 @@ export function LessonPage({
     <LessonReader
       currentConcept={currentConcept}
       onGoToQuiz={onGoToQuiz}
+      onBackToRoadmap={onBackToRoadmap}
     />
   )
 }
