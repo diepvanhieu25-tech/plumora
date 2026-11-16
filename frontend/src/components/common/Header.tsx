@@ -1,4 +1,4 @@
-import { Activity, LogOut, Server, Sprout } from 'lucide-react'
+import { Activity, LogOut, Server } from 'lucide-react'
 import type { ActiveView, LearnerUser } from '../../types'
 
 interface HeaderProps {
@@ -26,8 +26,12 @@ export function Header({
         <div className="max-w-7xl mx-auto px-6 py-3.5 flex items-center justify-between">
           {/* Brand Cluster */}
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#F0FDF4] border border-[#16A34A] flex items-center justify-center text-[#15803D] shadow-2xs">
-              <Sprout className="w-5 h-5 text-[#15803D]" aria-hidden="true" />
+            <div className="w-9 h-9 rounded-xl bg-[#F0FDF4] border border-[#16A34A] flex items-center justify-center shadow-2xs overflow-hidden p-1">
+              <img
+                src="/Logo_Secondary.webp"
+                alt="Plumora Logo"
+                className="w-full h-full object-contain"
+              />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -76,8 +80,12 @@ export function Header({
           className="flex items-center gap-3 text-left cursor-pointer group"
           title="Quay về Bản đồ Lộ trình"
         >
-          <div className="w-9 h-9 rounded-xl bg-[#F0FDF4] border border-[#16A34A] flex items-center justify-center text-[#15803D] group-hover:bg-[#15803D] group-hover:text-white transition-colors duration-150 shadow-2xs">
-            <Sprout className="w-5 h-5 text-current" aria-hidden="true" />
+          <div className="w-9 h-9 rounded-xl bg-[#F0FDF4] border border-[#16A34A] flex items-center justify-center group-hover:border-[#15803D] group-hover:shadow-xs transition-all duration-150 shadow-2xs overflow-hidden p-1">
+            <img
+              src="/Logo_Secondary.webp"
+              alt="Plumora Logo"
+              className="w-full h-full object-contain"
+            />
           </div>
           <div>
             <div className="flex items-center gap-2">

@@ -77,14 +77,28 @@ export function AuthPage({
         {/* Left Column: Standard Authentication Form (PL-AUTH-01) */}
         <div className="lg:col-span-6 p-8 md:p-10 flex flex-col justify-between bg-white border-b lg:border-b-0 lg:border-r border-[#D8E2D8]">
           <div>
-            {/* Header Sub-cluster */}
-            <div className="flex items-center gap-2 mb-3">
-              <span className="p-1 rounded-md bg-[#F0FDF4] text-[#15803D] border border-[#BBF7D0]">
-                <ShieldCheck className="w-4 h-4 text-[#15803D]" aria-hidden="true" />
-              </span>
-              <span className="text-xs font-mono font-bold text-[#15803D] uppercase tracking-wider">
-                PL-AUTH-01 • XÁC THỰC PHIÊN
-              </span>
+            {/* Header Sub-cluster with Plumora Brand Logo */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-[#F0FDF4] border border-[#16A34A] flex items-center justify-center shadow-2xs overflow-hidden p-1 shrink-0">
+                <img
+                  src="/Logo_Secondary.webp"
+                  alt="Plumora Logo"
+                  className="w-full h-full object-contain"
+                />
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="p-0.5 rounded bg-[#F0FDF4] text-[#15803D]">
+                    <ShieldCheck className="w-3.5 h-3.5 text-[#15803D]" aria-hidden="true" />
+                  </span>
+                  <span className="text-[11px] font-mono font-bold text-[#15803D] uppercase tracking-wider">
+                    PL-AUTH-01 • XÁC THỰC PHIÊN
+                  </span>
+                </div>
+                <span className="text-xs text-[#57534E] font-medium block">
+                  Hệ thống Lộ trình Học Backend DQN
+                </span>
+              </div>
             </div>
 
             <h1 className="text-2xl md:text-3xl font-extrabold text-[#14241B] tracking-tight">
