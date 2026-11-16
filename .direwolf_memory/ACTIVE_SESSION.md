@@ -36,4 +36,10 @@
       - **Auth Page Branding (`AuthPage.tsx`):** Tích hợp cụm nhận diện logo Plumora `w-10 h-10 rounded-xl` vào đầu thẻ xác thực SCR-01 (ngay trên tiêu đề "Chào mừng trở lại").
       - **Favicon & Thẻ Tiêu đề (`index.html` & `favicon.svg`):** Thay thế toàn bộ favicon mặc định Vite màu tím bằng favicon Plumora đồng bộ (WebP, SVG nhúng, Apple Touch Icon).
       - **Kiểm thử & Bất biến:** 100% tuân thủ bất biến cấm Unicode Emoji (`INV-UI-01`). Toàn bộ test suite (`./scripts/ci_check.sh`) vượt qua 100%. Container Docker `plumora-frontend` đã được rebuild và xác minh trực quan qua 2 ảnh chụp trình duyệt Chromium CDP (`live_logo_scr01_unauthenticated.png` và `live_logo_scr02_authenticated.png`).
-- **Trạng thái:** Toàn bộ CI Suite (`./scripts/ci_check.sh`: Lint, Typecheck, Unit/Behavioral/Adversarial/E2E Tests, Frontend Build) vượt qua 100%. Cụm 4 container Docker (`plumora-backend`, `plumora-frontend`, `plumora-postgres`, `plumora-redis`) đã được build lại và xác minh vận hành trực tiếp trên các cổng 8000 và 3000. Commit trên nhánh `feat/mvp-slice-1`.
+   10. **`OPS-GITHUB-01` (Khởi tạo Repository & Đẩy Mã Nguồn lên GitHub):**
+      - **Thiết lập Remote Chính Thức:** Đã tạo repository Private mang tên `plumora` trên tài khoản GitHub cá nhân của người dùng `diepvanhieu25-tech` ([https://github.com/diepvanhieu25-tech/plumora](https://github.com/diepvanhieu25-tech/plumora)).
+      - **Cấu hình Xác thực:** Sử dụng `gh auth setup-git` tích hợp an toàn với token phiên sẵn có.
+      - **Cấu trúc Nhánh Trực Tuyến:**
+        - Nhánh `main` được tạo và đặt làm nhánh mặc định (`defaultBranchRef: main`).
+        - Đẩy đồng bộ cả 2 nhánh `main` và `feat/mvp-slice-1` lên GitHub `origin`.
+- **Trạng thái:** Toàn bộ CI Suite (`./scripts/ci_check.sh`: Lint, Typecheck, Unit/Behavioral/Adversarial/E2E Tests, Frontend Build) vượt qua 100%. Cụm 4 container Docker (`plumora-backend`, `plumora-frontend`, `plumora-postgres`, `plumora-redis`) vận hành ổn định. Mã nguồn đã được lưu trữ an toàn trên GitHub Private Repository `https://github.com/diepvanhieu25-tech/plumora`. Nhánh cục bộ: `feat/mvp-slice-1` và `main`.
