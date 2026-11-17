@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { AlertTriangle } from 'lucide-react'
 import {
   FALLBACK_CONCEPT_DETAIL,
   apiApplyPreset,
@@ -15,6 +16,7 @@ import { LockedAlert } from './components/alert/LockedAlert'
 import { Header } from './components/common/Header'
 import { Toast } from './components/common/Toast'
 import { ProvenanceDrawer } from './components/drawer/ProvenanceDrawer'
+import { AttemptHistoryModal } from './components/history/AttemptHistoryModal'
 import { PresetModal } from './components/modal/PresetModal'
 import { AuthPage } from './pages/AuthPage'
 import { LessonPage } from './pages/LessonPage'
@@ -27,6 +29,8 @@ import type {
   DagNode,
   LearnerUser,
   RecommendationPayload,
+  ToastNotification,
+  ToastType,
 } from './types'
 import { generateSubmissionId } from './utils/submission'
 
@@ -58,22 +62,32 @@ export function App({
     message: string
     missingPrerequisites: string[]
   } | null>(null)
+  const [conceptFetchError, setConceptFetchError] = useState<{
+    slug: string
+    targetScreen: 'scr03_lesson' | 'scr04_quiz'
+    message: string
+  } | null>(null)
 
   // Auth form state (SCR-01)
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
-  const [usernameInput, setUsernameInput] = useState('learner_foundation')
-  const [displayNameInput, setDisplayNameInput] = useState('Học viên Thực nghiệm')
-  const [passwordInput, setPasswordInput] = useState('PlumoraDemo#2026')
+  const [usernameInput, setUsernameInput] = useState('')
+  const [displayNameInput, setDisplayNameInput] = useState('')
+  const [passwordInput, setPasswordInput] = useState('')
   const [authError, setAuthError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [toast, setToast] = useState<ToastNotification | null>(null)
 
-  // Preset Modal (SCR-05) & Provenance Drawer (SCR-06)
+  // Modals & Drawers
   const [pendingPreset, setPendingPreset] = useState<{
     key: string
     title: string
   } | null>(null)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+
+  function showToast(message: string, type: ToastType = 'info'): void {
+    setToast({ message, type })
+  }
 
   // Quiz state (SCR-04)
   const [selectedAnswers, setSelectedAnswers] = useState<
@@ -132,7 +146,7 @@ export function App({
       if (authMode === 'login') {
         const res = await apiLogin(usernameInput.trim(), passwordInput)
         setUser(res.user)
-        setToastMessage(`Đã đăng nhập tài khoản ${res.user.username}`)
+        showToast(`Đăng nhập thành công với tài khoản ${res.user.username}`, 'success')
       } else {
         const res = await apiRegister(
           usernameInput.trim(),
@@ -140,7 +154,7 @@ export function App({
           passwordInput,
         )
         setUser(res.user)
-        setToastMessage(`Đã đăng ký và đăng nhập ${res.user.username}`)
+        showToast(`Đăng ký thành công! Chào mừng ${res.user.username} đến với Plumora.`, 'success')
       }
       await refreshRoadmapAndRecommendation()
       setActiveView('roadmap')
@@ -161,12 +175,12 @@ export function App({
     try {
       const res = await apiLogin(username, 'PlumoraDemo#2026')
       setUser(res.user)
-      setToastMessage(`Đã đăng nhập tài khoản mẫu ${res.user.username}`)
+      showToast(`Đã đăng nhập tài khoản ${res.user.username}`, 'info')
       await refreshRoadmapAndRecommendation()
       setActiveView('roadmap')
     } catch (err) {
       setAuthError(
-        err instanceof Error ? err.message : 'Đăng nhập tài khoản mẫu thất bại',
+        err instanceof Error ? err.message : 'Đăng nhập thất bại',
       )
     } finally {
       setIsLoading(false)
@@ -188,7 +202,7 @@ export function App({
       setRoadmapError(null)
       setLockedErrorInfo(null)
       setActiveView('roadmap')
-      setToastMessage('Đã đăng xuất khỏi hệ thống')
+      showToast('Đã đăng xuất an toàn khỏi hệ thống', 'info')
     }
   }
 
@@ -201,6 +215,7 @@ export function App({
     setAttemptResult(null)
     setSelectedAnswers({})
     setSubmissionId(generateSubmissionId())
+    setConceptFetchError(null)
     try {
       const result = await apiGetConceptDetail(slug)
       if (!result.ok) {
@@ -212,13 +227,22 @@ export function App({
           })
           setActiveView('locked')
         } else {
-          setToastMessage(result.message)
+          showToast(result.message, 'warning')
         }
         return
       }
       setCurrentConcept(result.data)
       setLockedErrorInfo(null)
       setActiveView(targetScreen === 'scr04_quiz' ? 'quiz' : 'lesson')
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : 'Lỗi kết nối khi tải nội dung bài học'
+      setConceptFetchError({
+        slug,
+        targetScreen,
+        message: msg,
+      })
+      showToast(`Không thể tải bài học '${slug}': ${msg}`, 'error')
     } finally {
       setIsLoading(false)
     }
@@ -229,12 +253,13 @@ export function App({
     setIsLoading(true)
     try {
       await apiApplyPreset(pendingPreset.key)
-      setToastMessage(`Đã áp dụng thành công hồ sơ ${pendingPreset.title}`)
+      showToast(`Đã áp dụng thành công hồ sơ ${pendingPreset.title}`, 'info')
       await refreshRoadmapAndRecommendation()
       setActiveView('roadmap')
     } catch (err) {
-      setToastMessage(
+      showToast(
         err instanceof Error ? err.message : 'Không thể áp dụng hồ sơ mẫu',
+        'error',
       )
     } finally {
       setIsLoading(false)
@@ -257,6 +282,11 @@ export function App({
         formattedAnswers,
       )
       setAttemptResult(res)
+      if (res.passed) {
+        showToast('Chúc mừng! Bạn đã đạt chuẩn thông thạo khái niệm (≥ 75%).', 'success')
+      } else {
+        showToast('Chưa đạt ngưỡng 75%. Bạn có thể xem lại bài học hoặc làm lại quiz bất cứ lúc nào.', 'warning')
+      }
       await refreshRoadmapAndRecommendation()
     } catch (err) {
       setQuizError(
@@ -283,7 +313,7 @@ export function App({
           masteredCount={0}
         />
 
-        <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
+        <Toast toast={toast} onClose={() => setToast(null)} />
 
         <main className="flex-1 flex items-center justify-center p-4 sm:p-6 md:p-10">
           <AuthPage
@@ -331,9 +361,56 @@ export function App({
         isDrawerOpen={isDrawerOpen}
         setIsDrawerOpen={setIsDrawerOpen}
         masteredCount={masteredCount}
+        onOpenHistory={() => setIsHistoryOpen(true)}
       />
 
-      <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
+      <Toast toast={toast} onClose={() => setToast(null)} />
+
+      {conceptFetchError && (
+        <div
+          className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-3 w-full"
+          data-testid="concept-fetch-error-banner"
+          role="alert"
+        >
+          <div className="bg-[#FEF2F2] border-2 border-[#EF4444] rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-[#FEE2E2] text-[#DC2626] flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-4 h-4" aria-hidden="true" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-[#991B1B]">
+                  Không thể tải bài học & bài kiểm tra
+                </h3>
+                <p className="text-xs text-[#B91C1C] mt-0.5">
+                  {conceptFetchError.message}. Vui lòng thử lại.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() =>
+                  handleOpenConcept(
+                    conceptFetchError.slug,
+                    conceptFetchError.targetScreen,
+                  )
+                }
+                data-testid="retry-fetch-concept-btn"
+                className="px-3.5 py-1.5 bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold rounded-lg transition-colors cursor-pointer"
+              >
+                Thử lại
+              </button>
+              <button
+                type="button"
+                onClick={() => setConceptFetchError(null)}
+                className="px-2.5 py-1.5 text-xs text-[#7F1D1D] hover:bg-[#FEE2E2] rounded-lg transition-colors cursor-pointer"
+              >
+                Bỏ qua
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Workspace (Strictly 1 view rendered at a time) */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -395,6 +472,12 @@ export function App({
         pendingPreset={pendingPreset}
         onCancel={() => setPendingPreset(null)}
         onConfirm={handleConfirmApplyPreset}
+      />
+
+      {/* Attempt History Modal */}
+      <AttemptHistoryModal
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
       />
 
       {/* Provenance Drawer (SCR-06) */}

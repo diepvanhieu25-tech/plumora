@@ -72,7 +72,7 @@ export function DagNodeCard({
 
         <div className="mt-4 pt-3 border-t border-[#FDE68A] flex items-center justify-between">
           <span className="text-xs text-[#78350F] font-medium">
-            Tối ưu cho mục tiêu mở khóa tầng tiếp theo
+            Phù hợp để tiếp tục mở khóa theo đồ thị DAG
           </span>
           <button
             type="button"

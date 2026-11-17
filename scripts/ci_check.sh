@@ -88,6 +88,7 @@ fi
 echo "=== [6/6] Real Browser E2E Audit & Negative Control Verification ==="
 # 6.1 Real Chromium E2E Audit (must exit 0 with allChecksPassed=true)
 node scripts/audit_mvp_hardening.cjs
+node scripts/audit_product_realism.cjs
 
 # 6.2 Negative Control Verification (must exit non-zero when conditions fail)
 echo "Running Negative-Control Audit probe (verifying failure detection)..."

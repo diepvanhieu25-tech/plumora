@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowDown } from 'lucide-react'
+import { ArrowDown, SlidersHorizontal } from 'lucide-react'
 import { AiRecommendationBanner } from '../components/roadmap/AiRecommendationBanner'
 import { DagNodeCard } from '../components/roadmap/DagNodeCard'
 import { DemoPresetToolbar } from '../components/roadmap/DemoPresetToolbar'
@@ -41,7 +41,7 @@ interface RoadmapPageProps {
   currentUsername?: string
   roadmapError?: string | null
   onRetryRoadmap?: () => void
-  onSelectPreset: (preset: { key: string; title: string }) => void
+  onSelectPreset?: (preset: { key: string; title: string }) => void
   onOpenConcept: (slug: string, targetScreen: 'scr03_lesson' | 'scr04_quiz') => void
 }
 
@@ -78,13 +78,31 @@ export function RoadmapPage({
       className="space-y-6"
       data-testid="scr02-roadmap-section"
     >
-      {/* Demo Presets Sub-bar */}
-      <DemoPresetToolbar
-        isLoading={isLoading}
-        onSelectPreset={onSelectPreset}
-        currentUsername={currentUsername}
-        masteredCount={masteredCount}
-      />
+      {/* Developer Presets (Separated from normal learner flow) */}
+      {onSelectPreset && (
+        <details
+          className="bg-white border-b border-[#D8E2D8] -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-2 text-xs"
+          data-testid="dev-preset-details"
+        >
+          <summary className="cursor-pointer font-medium text-[#57534E] hover:text-[#15803D] flex items-center justify-between py-1 select-none">
+            <div className="flex items-center gap-1.5">
+              <SlidersHorizontal className="w-3.5 h-3.5 text-[#15803D]" aria-hidden="true" />
+              <span>Công cụ Thử nghiệm: Hồ sơ mẫu (Demo Presets — Kiểm soát Server)</span>
+            </div>
+            <span className="text-[10px] bg-[#F6F8F5] text-[#57534E] px-1.5 py-0.5 rounded border border-[#D8E2D8]">
+              Thử nghiệm
+            </span>
+          </summary>
+          <div className="mt-2 pt-2 border-t border-[#F6F8F5]">
+            <DemoPresetToolbar
+              isLoading={isLoading}
+              onSelectPreset={onSelectPreset}
+              currentUsername={currentUsername}
+              masteredCount={masteredCount}
+            />
+          </div>
+        </details>
+      )}
 
       {/* Hero AI Recommendation Banner (or Error Banner if failed) */}
       <AiRecommendationBanner

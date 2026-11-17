@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-11-17T12:11:08.091Z",
+  "errors": [],
+  "checks": {
+    "unauthenticatedLanding": true,
+    "initialFreshMastery": "Đã thông thạo: 0 / 12 khái niệm (0%)",
+    "freshStateIsZero": true,
+    "activeUsernameMatches": true,
+    "sessionPersistedAcrossReload": true,
+    "lockedReasonExplained": true,
+    "recommendationGrounded": true,
+    "lessonRendered": true,
+    "quizPassed": true,
+    "updatedMastery": "Đã thông thạo: 1 / 12 khái niệm (8%)",
+    "masteryIncremented": true,
+    "historyModalRecorded": true,
+    "logoutTerminatedSession": true
+  },
+  "username": "real_1794917468896_868",
+  "allChecksPassed": true
+}

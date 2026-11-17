@@ -160,7 +160,7 @@ export function LessonReader({
                 <span className="text-[11px] font-semibold text-[#57534E] uppercase tracking-wider block mb-1.5">
                   Khái niệm tiền đề (Upstream):
                 </span>
-                {currentConcept.prerequisites.length > 0 ? (
+                {(currentConcept.prerequisites ?? []).length > 0 ? (
                   currentConcept.prerequisites.map((p) => (
                     <div
                       key={p}

@@ -48,11 +48,11 @@ def create_access_token(user_id: uuid.UUID, username: str) -> str:
 def set_auth_cookie(response: Response, token: str) -> None:
     """Set secure HttpOnly session cookie."""
     response.set_cookie(
-        key=settings.session_cookie_name,
+        key=settings.effective_session_cookie_name,
         value=token,
         httponly=True,
         samesite="lax",
-        secure=(settings.app_env == "production"),
+        secure=settings.cookie_secure,
         max_age=TOKEN_EXPIRE_HOURS * 3600,
         path="/",
     )
@@ -60,7 +60,11 @@ def set_auth_cookie(response: Response, token: str) -> None:
 
 def extract_current_user(request: Request, db: Session) -> UserModel | None:
     """Extract and verify authenticated UserModel from Cookie or Authorization Bearer header."""
-    token = request.cookies.get(settings.session_cookie_name)
+    token = (
+        request.cookies.get(settings.effective_session_cookie_name)
+        or request.cookies.get("plumora_session")
+        or request.cookies.get("__Host-plumora_session")
+    )
     if not token:
         auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("Bearer "):

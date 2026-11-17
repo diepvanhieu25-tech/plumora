@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-11-17T10:42:45.093Z",
+  "timestamp": "2026-11-17T12:11:10.463Z",
   "isNegativeControl": true,
   "errors": [],
   "checks": {
@@ -46,7 +46,7 @@
       "unlocked_preserved": true
     },
     "submissionIdReuseStatus": 409,
-    "fallbackBannerText": "KHUYẾN NGHỊ THEO QUY TẮC ĐỒ THỊ (TOPO FALLBACK)\nChế độ dự phòng\n[Tầng 2] CSDL Quan hệ (DQN POLICY: Khuyến nghị tối ưu nhất)\n\nDựa trên đồ thị tiên quyết DAG, quy tắc thứ tự tô-pô đề xuất đây là khái niệm phù hợp để học tiếp theo.\n\nMô hình: Quy tắc thứ tự Topo\nBộ đệm: Redis Cache\nTrạng thái: Sẵn sàng học\nBắt đầu bài học đề xuất\nMở khóa tiếp: Tầng 2 → Tầng 3",
+    "fallbackBannerText": "KHUYẾN NGHỊ THEO QUY TẮC ĐỒ THỊ (TOPO FALLBACK)\nChế độ dự phòng\n[Tầng 2] CSDL Quan hệ (DQN POLICY: Khuyến nghị tối ưu nhất)\n\nDựa trên đồ thị phụ thuộc (DAG), quy tắc thứ tự tô-pô ưu tiên bài học này trong số các bài đã đủ điều kiện tiên quyết.\n\nMô hình: Quy tắc thứ tự Topo\nBộ đệm: Redis Cache\nTrạng thái: Sẵn sàng học\nBắt đầu bài học đề xuất\nGợi ý mang tính định hướng. Bạn có thể tự do chọn bất kỳ bài học nào đã mở khóa trên lộ trình.",
     "fallbackLabelValid": false,
     "mobileOverflow": {
       "viewport": 390,
@@ -66,6 +66,6 @@
     "apiFailureSafe": true
   },
   "registrationStatus": 201,
-  "username": "audit_h_1794912165843_9550",
+  "username": "audit_h_1794917471135_5749",
   "allChecksPassed": false
 }

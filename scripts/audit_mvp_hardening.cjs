@@ -343,6 +343,10 @@ const isNegativeControl = process.argv.includes('--negative-control');
     });
 
     // 14.2 Preset Modal focus check, Tab loop & restore
+    const devPresetDetails = page.locator('[data-testid="dev-preset-details"]');
+    if ((await devPresetDetails.count()) > 0) {
+      await devPresetDetails.evaluate((d) => (d.open = true));
+    }
     const openPresetBtn = page.getByTestId('preset-btn-foundation_ready');
     await openPresetBtn.focus();
     await openPresetBtn.click();

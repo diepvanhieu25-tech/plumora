@@ -34,8 +34,25 @@ class Settings(BaseSettings):
     redis_state_ttl_seconds: int = 3600
 
     session_cookie_name: str = "__Host-plumora_session"
+    enable_dev_presets: bool = True
     rl_checkpoint_path: str = str(REPO_ROOT / "rl" / "artifacts" / "checkpoint.zip")
     rl_manifest_path: str = str(REPO_ROOT / "rl" / "artifacts" / "manifest.json")
+
+    @property
+    def cookie_secure(self) -> bool:
+        """Only require HTTPS Secure flag in production per RFC 6265bis."""
+        return self.app_env == "production"
+
+    @property
+    def effective_session_cookie_name(self) -> str:
+        """__Host- prefix is strictly required by browser standards to have Secure flag over HTTPS.
+
+        In development / local testing (HTTP), using '__Host-' causes browsers to reject the cookie.
+        We dynamically use '__Host-plumora_session' in production (HTTPS) and 'plumora_session' in dev/test.
+        """
+        if self.cookie_secure:
+            return "__Host-plumora_session"
+        return "plumora_session"
 
 
 def resolve_jwt_secret(app_settings: Settings | None = None) -> str:

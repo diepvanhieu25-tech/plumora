@@ -1,4 +1,4 @@
-import { Activity, LogOut } from 'lucide-react'
+import { Activity, History, LogOut } from 'lucide-react'
 import type { ActiveView, LearnerUser } from '../../types'
 
 interface HeaderProps {
@@ -9,6 +9,7 @@ interface HeaderProps {
   isDrawerOpen: boolean
   setIsDrawerOpen: (open: boolean) => void
   masteredCount: number
+  onOpenHistory?: () => void
 }
 
 export function Header({
@@ -18,6 +19,7 @@ export function Header({
   isDrawerOpen,
   setIsDrawerOpen,
   masteredCount,
+  onOpenHistory,
 }: HeaderProps) {
   // 1. Unauthenticated Minimal Header (Stitch SCR-01)
   if (!user) {
@@ -109,8 +111,21 @@ export function Header({
           </div>
         </div>
 
-        {/* Right Actions: Provenance, User Pill, Logout */}
-        <div className="flex items-center gap-1 sm:gap-3 shrink-0">
+        {/* Right Actions: History, Provenance, User Pill, Logout */}
+        <div className="flex items-center gap-1 sm:gap-2.5 shrink-0">
+          {onOpenHistory && (
+            <button
+              type="button"
+              onClick={onOpenHistory}
+              className="inline-flex items-center gap-1 px-1.5 py-1 sm:px-3 text-xs font-semibold text-[#15803D] bg-white border border-[#D8E2D8] rounded-lg hover:bg-[#F0FDF4] hover:border-[#15803D] transition-colors cursor-pointer"
+              data-testid="open-history-modal-btn"
+              aria-label="Xem lịch sử làm bài kiểm tra"
+            >
+              <History className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#15803D] shrink-0" aria-hidden="true" />
+              <span className="hidden sm:inline">Lịch sử bài làm</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => setIsDrawerOpen(!isDrawerOpen)}

@@ -89,3 +89,31 @@ export interface AttemptResult {
 }
 
 export type ActiveView = 'roadmap' | 'lesson' | 'quiz' | 'locked'
+
+export interface AttemptHistoryItem {
+  attempt_id: string
+  submission_id: string
+  concept_slug: string
+  concept_title: string
+  tier: number
+  correct_count: number
+  attempt_score: number
+  passed: boolean
+  mastery_before: number
+  mastery_after: number
+  newly_unlocked_slugs: string[]
+  state_version: number
+  created_at: string
+}
+
+export interface AttemptHistoryPayload {
+  attempts: AttemptHistoryItem[]
+  total_count: number
+}
+
+export type ToastType = 'success' | 'info' | 'warning' | 'error'
+
+export interface ToastNotification {
+  message: string
+  type: ToastType
+}

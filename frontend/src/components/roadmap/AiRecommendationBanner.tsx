@@ -116,18 +116,18 @@ export function AiRecommendationBanner({
 
   let badgeTitle = 'KHUYẾN NGHỊ TỪ MÔ HÌNH HỌC TĂNG CƯỜNG (DQN POLICY)'
   let explanationText =
-    'Dựa trên tiến độ học tập và đồ thị tiên quyết DAG, mô hình DQN đề xuất đây là khái niệm tiếp theo phù hợp để mở khóa các tầng kiến thức mới.'
+    'Dựa trên tiến độ học tập thực tế và các điều kiện tiên quyết đã đạt chuẩn (≥ 75%), mô hình DQN ưu tiên bài học này trong số các bài đủ điều kiện hiện tại.'
   let modelDisplayName = 'Học tăng cường DQN'
 
   if (isFallback) {
     badgeTitle = 'KHUYẾN NGHỊ THEO QUY TẮC ĐỒ THỊ (TOPO FALLBACK)'
     explanationText =
-      'Dựa trên đồ thị tiên quyết DAG, quy tắc thứ tự tô-pô đề xuất đây là khái niệm phù hợp để học tiếp theo.'
+      'Dựa trên đồ thị phụ thuộc (DAG), quy tắc thứ tự tô-pô ưu tiên bài học này trong số các bài đã đủ điều kiện tiên quyết.'
     modelDisplayName = 'Quy tắc thứ tự Topo'
   } else if (isMaskedQ) {
     badgeTitle = 'KHUYẾN NGHỊ TỪ MÔ HÌNH DQN (MASKED Q)'
     explanationText =
-      'Dựa trên tiến độ học tập và đồ thị tiên quyết DAG, mô hình DQN (lọc hành động hợp lệ) đề xuất đây là khái niệm tiếp theo phù hợp để mở khóa kiến thức mới.'
+      'Dựa trên tiến độ học tập và các điều kiện tiên quyết đã thông thạo, mô hình DQN (lọc hành động hợp lệ) ưu tiên bài học này để mở khóa kiến thức tiếp theo.'
     modelDisplayName = 'DQN (Lọc hành động hợp lệ)'
   }
 
@@ -201,7 +201,7 @@ export function AiRecommendationBanner({
           </div>
         </div>
 
-        {/* Start Recommended Lesson CTA */}
+        {/* Start Recommended Lesson CTA & Learner Autonomy Note */}
         <div className="shrink-0 flex flex-col items-start lg:items-end gap-2">
           <button
             type="button"
@@ -212,8 +212,8 @@ export function AiRecommendationBanner({
             <span>Bắt đầu bài học đề xuất</span>
             <Compass className="w-4 h-4" aria-hidden="true" />
           </button>
-          <span className="text-[11px] text-[#78350F] font-medium">
-            Mở khóa tiếp: Tầng {concept.tier} → Tầng {Math.min(concept.tier + 1, 4)}
+          <span className="text-[11px] text-[#78350F] font-medium text-right max-w-xs">
+            Gợi ý mang tính định hướng. Bạn có thể tự do chọn bất kỳ bài học nào đã mở khóa trên lộ trình.
           </span>
         </div>
       </div>

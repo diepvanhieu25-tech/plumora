@@ -1,4 +1,5 @@
 import type {
+  AttemptHistoryPayload,
   AttemptResult,
   ConceptDetail,
   DagNode,
@@ -386,4 +387,16 @@ export async function apiApplyPreset(presetKey: string): Promise<RoadmapPayload>
     throw new Error(data.message || 'Lỗi khi áp dụng Hồ sơ mẫu')
   }
   return data as RoadmapPayload
+}
+
+export async function apiGetAttemptHistory(limit: number = 50): Promise<AttemptHistoryPayload> {
+  const res = await fetch(`/api/v1/assessment/history?limit=${limit}`, {
+    headers: buildHeaders(),
+    credentials: 'include',
+  })
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data.message || 'Không thể tải lịch sử làm bài')
+  }
+  return data as AttemptHistoryPayload
 }

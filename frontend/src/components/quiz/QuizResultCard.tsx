@@ -160,6 +160,7 @@ export function QuizResultCard({
             type="button"
             onClick={onBackToRoadmap}
             className="w-full bg-[#15803D] hover:bg-[#166534] text-white font-bold py-3 px-4 rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all text-xs cursor-pointer active:scale-[0.98]"
+            data-testid="back-to-roadmap-after-quiz-btn"
           >
             <span>Quay về Lộ trình học tiếp</span>
             <ArrowRight className="w-4 h-4" aria-hidden="true" />
