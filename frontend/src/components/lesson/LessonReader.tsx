@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import type { ConceptDetail } from '../../types'
 import { MarkdownRenderer } from './MarkdownRenderer'
+import { CONCEPT_TITLE_MAP } from '../../constants/concepts'
 
 interface LessonReaderProps {
   currentConcept: ConceptDetail
@@ -25,7 +26,7 @@ export function LessonReader({
 
   return (
     <div className="space-y-6" data-testid="scr03-lesson-section">
-      {/* Sub-header Navigation & Tab Bar (Sticky Bar - Stitch SCR-03) */}
+      {/* Sub-header Navigation & Tab Bar */}
       <div className="bg-white border-b border-[#D8E2D8] -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-2.5 sticky top-[57px] z-20 shadow-2xs">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
           {/* Back button */}
@@ -46,7 +47,7 @@ export function LessonReader({
               className="bg-[#15803D] text-white rounded-lg px-4 py-1.5 text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-xs transition-all cursor-default"
             >
               <BookOpen className="w-4 h-4" aria-hidden="true" />
-              <span>1. Bài học Lý thuyết (Markdown)</span>
+              <span>1. Bài học Lý thuyết</span>
             </button>
             <button
               type="button"
@@ -55,7 +56,7 @@ export function LessonReader({
               data-testid="go-to-quiz-cta"
             >
               <FileCheck2 className="w-4 h-4 text-[#57534E]" aria-hidden="true" />
-              <span>2. Làm bài Quiz kiểm tra (4 câu)</span>
+              <span>2. Bài kiểm tra Quiz (4 câu)</span>
               <span className="w-1.5 h-1.5 rounded-full bg-[#D97706]"></span>
             </button>
           </div>
@@ -70,7 +71,7 @@ export function LessonReader({
         </div>
       </div>
 
-      {/* Two-Column Main Content Container (Stitch SCR-03) */}
+      {/* Two-Column Main Content Container */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Column: Markdown Reading Content (8 cols) */}
         <div className="lg:col-span-8 space-y-6">
@@ -80,7 +81,7 @@ export function LessonReader({
               <div className="flex flex-wrap items-center gap-2.5">
                 <span className="inline-flex items-center gap-1.5 font-mono text-xs font-semibold px-2.5 py-1 rounded-md bg-[#F6F8F5] text-[#3F5247] border border-[#D8E2D8]">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#57534E]"></span>
-                  Tầng {currentConcept.tier} • {currentConcept.slug}
+                  Tầng {currentConcept.tier} • Khái niệm #{currentConcept.action_id + 1}
                 </span>
 
                 <span className="font-mono text-xs font-semibold px-2.5 py-1 rounded-md bg-[#F0FDF4] text-[#15803D] border border-[#BBF7D0]">
@@ -89,7 +90,7 @@ export function LessonReader({
 
                 <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-md bg-[#FFFBEB] text-[#78350F] border border-[#FDE68A]">
                   <Compass className="w-3.5 h-3.5 text-[#D97706]" aria-hidden="true" />
-                  <span>AI ĐỀ XUẤT TIẾP THEO (DQN POLICY)</span>
+                  <span>KHÁI NIỆM TRONG LỘ TRÌNH HỌC</span>
                 </span>
               </div>
 
@@ -142,9 +143,9 @@ export function LessonReader({
           </article>
         </div>
 
-        {/* Right Column: Context Sidebar (4 cols - Stitch SCR-03) */}
+        {/* Right Column: Context Sidebar (4 cols) */}
         <aside className="lg:col-span-4 space-y-6">
-          {/* Card 1: Điều kiện Tiên quyết (Prerequisites) */}
+          {/* Card 1: Điều kiện Tiên quyết */}
           <div className="bg-white rounded-xl border border-[#D8E2D8] p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="font-bold text-sm text-[#14241B] flex items-center gap-2">
@@ -159,7 +160,7 @@ export function LessonReader({
                 <span className="text-[11px] font-semibold text-[#57534E] uppercase tracking-wider block mb-1.5">
                   Khái niệm tiền đề (Upstream):
                 </span>
-                {currentConcept.prerequisites.length > 0 ? (
+                {(currentConcept.prerequisites ?? []).length > 0 ? (
                   currentConcept.prerequisites.map((p) => (
                     <div
                       key={p}
@@ -167,13 +168,13 @@ export function LessonReader({
                     >
                       <CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0 mt-0.5" aria-hidden="true" />
                       <div>
-                        <span className="font-mono font-bold text-[#14532D]">{p}</span>
-                        <p className="text-[#3F5247] text-[11px]">Đạt chuẩn ≥ 75%</p>
+                        <span className="font-bold text-[#14532D]">{CONCEPT_TITLE_MAP[p] || p}</span>
+                        <p className="text-[#3F5247] text-[11px]">Đã đạt chuẩn ≥ 75%</p>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div className="p-3 rounded-lg bg-[#F6F8F5] text-xs text-[#57534E] font-mono">
+                  <div className="p-3 rounded-lg bg-[#F6F8F5] text-xs text-[#57534E]">
                     Khái niệm gốc (Root Node) • Không yêu cầu tiên quyết
                   </div>
                 )}
@@ -181,43 +182,43 @@ export function LessonReader({
             </div>
           </div>
 
-          {/* Card 2: Lý do DQN Khuyến nghị (Sunlit Apical Bud) */}
+          {/* Card 2: Vị trí & Khuyến nghị Lộ trình */}
           <div className="bg-[#FFFBEB] rounded-xl border border-[#D97706] p-5 shadow-sm space-y-3.5">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-[#FDE68A] flex items-center justify-center text-[#78350F]">
                 <Compass className="w-4 h-4" aria-hidden="true" />
               </div>
               <div>
-                <h3 className="font-bold text-sm text-[#78350F]">Khuyến nghị từ RL DQN</h3>
-                <p className="text-[11px] text-[#92400E]">Q-Learning Deep Reinforcement Learning</p>
+                <h3 className="font-bold text-sm text-[#78350F]">Vị trí trong Lộ trình Học</h3>
+                <p className="text-[11px] text-[#92400E]">Hệ thống Khuyến nghị Lộ trình Thích ứng</p>
               </div>
             </div>
 
-            <div className="bg-white/90 rounded-lg p-3 border border-[#FDE68A] font-mono text-[11px] space-y-1.5 text-[#14241B]">
+            <div className="bg-white/90 rounded-lg p-3 border border-[#FDE68A] text-xs space-y-1.5 text-[#14241B]">
               <div className="flex justify-between items-center py-0.5 border-b border-amber-100">
-                <span className="text-[#57534E]">policy_source</span>
-                <span className="font-bold text-[#78350F]">dqn</span>
+                <span className="text-[#57534E]">Cơ chế khuyến nghị:</span>
+                <span className="font-bold text-[#78350F]">Chính sách DQN / Quy tắc Topo</span>
               </div>
               <div className="flex justify-between items-center py-0.5 border-b border-amber-100">
-                <span className="text-[#57534E]">state_source</span>
-                <span className="font-medium">redis_cache</span>
+                <span className="text-[#57534E]">Không gian quan sát:</span>
+                <span className="font-medium text-[#0D9488]">Vector 24 Chiều (Trạng thái học tập)</span>
               </div>
               <div className="flex justify-between items-center py-0.5">
-                <span className="text-[#57534E]">checkpoint</span>
-                <span className="text-[#15803D] font-bold">SHA-256 Verified</span>
+                <span className="text-[#57534E]">Kiểm định trọng số:</span>
+                <span className="text-[#15803D] font-bold">Mã băm Checkpoint SHA-256</span>
               </div>
             </div>
 
             <p className="text-xs text-[#78350F] leading-relaxed">
-              Mô hình đánh giá việc hoàn thành khái niệm này sẽ giúp tối ưu hóa thời gian mở khóa các tầng tiếp theo trong lộ trình.
+              Hoàn thành bài học và đạt chuẩn trắc nghiệm ≥ 75% sẽ cập nhật trạng thái thông thạo và kích hoạt điều kiện mở khóa các khái niệm tiếp theo trong lộ trình.
             </p>
           </div>
 
-          {/* Card 3: Quy tắc Đánh giá Mastery (D-06) */}
+          {/* Card 3: Quy tắc Đánh giá Điểm Thông thạo */}
           <div className="bg-white rounded-xl border border-[#D8E2D8] p-5 shadow-sm space-y-3">
             <h3 className="font-bold text-sm text-[#14241B] flex items-center gap-2">
               <FileCheck2 className="w-4 h-4 text-[#15803D]" aria-hidden="true" />
-              <span>Quy tắc Đánh giá Mastery (D-06)</span>
+              <span>Quy tắc Đánh giá Điểm Thông thạo (Mastery)</span>
             </h3>
             <ul className="text-xs text-[#3F5247] space-y-2 leading-relaxed">
               <li className="flex items-start gap-2">
@@ -235,16 +236,12 @@ export function LessonReader({
               <li className="flex items-start gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#15803D] mt-1.5 shrink-0"></span>
                 <span>
-                  Không giới hạn số lần làm lại; hệ thống bảo lưu điểm số cao nhất{' '}
-                  <code className="font-mono text-[11px] bg-[#F6F8F5] px-1 py-0.5 rounded">
-                    max(old, score)
-                  </code>
-                  .
+                  Không giới hạn số lần làm lại; hệ thống luôn tự động bảo lưu điểm số cao nhất đã đạt được.
                 </span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#15803D] mt-1.5 shrink-0"></span>
-                <span>Ghi nhận tức thì qua ACID Transaction và cập nhật Redis Cache.</span>
+                <span>Ghi nhận tức thì và đồng bộ với bộ đệm trạng thái học tập.</span>
               </li>
             </ul>
           </div>

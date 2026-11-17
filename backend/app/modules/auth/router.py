@@ -7,6 +7,7 @@ import uuid
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.config import settings
 from app.db.models import DbSession, UserModel
@@ -48,10 +49,22 @@ def register_user(
         password_hash=hash_password(payload.password),
         state_version=1,
     )
-    db.add(user)
-    db.flush()
-    apply_preset_to_user_in_tx(db, user, "new_learner")
-    db.commit()
+    try:
+        db.add(user)
+        db.flush()
+        apply_preset_to_user_in_tx(db, user, "new_learner")
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return JSONResponse(
+            status_code=409,
+            content={
+                "error_code": "USERNAME_TAKEN",
+                "message": "Tên đăng nhập này đã tồn tại trong hệ thống.",
+                "details": {"username": payload.username},
+            },
+        )
+
     db.refresh(user)
     write_through_state_cache(db, user.id)
 
@@ -108,7 +121,9 @@ def logout_user(
             },
         )
     res = JSONResponse(status_code=200, content={"logged_out": True})
-    res.delete_cookie(key=settings.session_cookie_name, path="/")
+    res.delete_cookie(key=settings.effective_session_cookie_name, path="/")
+    res.delete_cookie(key="plumora_session", path="/")
+    res.delete_cookie(key="__Host-plumora_session", path="/")
     return res
 
 

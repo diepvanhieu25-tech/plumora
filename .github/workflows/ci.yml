@@ -2,7 +2,7 @@ name: Plumora Day-0 CI Pipeline
 
 on:
   push:
-    branches: [main, "feat/**"]
+    branches: [main, "feat/**", "fix/**"]
   pull_request:
     branches: [main]
 
@@ -67,15 +67,73 @@ jobs:
           cd ../rl && uv run mypy src tests
           cd ../frontend && npm run typecheck
 
-      - name: 3. Automated Smoke & Behavioral Tests
+      - name: 3. Unit & Mock Behavioral Tests
         env:
           DATABASE_URL: postgresql+psycopg://plumora_app:plumora_dev_pass_local_only@127.0.0.1:5432/plumora_dev
           REDIS_URL: redis://127.0.0.1:6379/0
         run: |
           cd backend && uv run pytest
           cd ../rl && uv run pytest
-          cd ../frontend && npm test -- --run
+          cd ../frontend && npm run test:unit
 
-      - name: 4. Build Verification
+      - name: 4. Frontend Production Build Verification
         run: |
           cd frontend && npm run build
+
+      - name: 5. Start Backend Server & Verify Health Probe
+        env:
+          DATABASE_URL: postgresql+psycopg://plumora_app:plumora_dev_pass_local_only@127.0.0.1:5432/plumora_dev
+          REDIS_URL: redis://127.0.0.1:6379/0
+          APP_ENV: development
+        run: |
+          cd backend
+          uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 &
+          echo "Waiting up to 30s for backend readiness at http://127.0.0.1:8000/api/v1/health..."
+          HEALTHY=0
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8000/api/v1/health > /dev/null 2>&1; then
+              echo "Backend is healthy after ${i}s."
+              HEALTHY=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$HEALTHY" -ne 1 ]; then
+            echo "FATAL: Backend failed to become healthy within 30s"
+            exit 1
+          fi
+
+      - name: 6. Live Fullstack Integration Test (jsdom)
+        run: |
+          cd frontend && npm run test:integration
+
+      - name: 7. Start Frontend & Run Real Browser E2E Audit
+        env:
+          FRONTEND_BASE_URL: http://127.0.0.1:3000
+          BACKEND_BASE_URL: http://127.0.0.1:8000
+        run: |
+          cd frontend
+          npx vite preview --host 127.0.0.1 --port 3000 &
+          echo "Waiting up to 20s for frontend readiness at http://127.0.0.1:3000..."
+          FE_HEALTHY=0
+          for i in $(seq 1 20); do
+            if curl -sf http://127.0.0.1:3000 > /dev/null 2>&1; then
+              echo "Frontend preview is healthy after ${i}s."
+              FE_HEALTHY=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$FE_HEALTHY" -ne 1 ]; then
+            echo "FATAL: Frontend preview failed to become healthy within 20s"
+            exit 1
+          fi
+          cd ..
+          node scripts/audit_mvp_hardening.cjs
+          echo "Running negative-control audit verification in CI..."
+          if node scripts/audit_mvp_hardening.cjs --negative-control > /dev/null 2>&1; then
+            echo "FATAL: Negative-control probe unexpectedly passed!"
+            exit 1
+          else
+            echo "Negative-control probe correctly failed with non-zero exit code as expected."
+          fi

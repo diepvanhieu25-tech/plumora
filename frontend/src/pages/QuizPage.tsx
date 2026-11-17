@@ -38,7 +38,7 @@ export function QuizPage({
 }: QuizPageProps) {
   return (
     <div className="space-y-6">
-      {/* Sub-header Navigation & Tab Bar (Sticky Bar - Stitch SCR-04) */}
+      {/* Sub-header Navigation & Tab Bar */}
       <div className="bg-white border-b border-[#D8E2D8] -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-2.5 sticky top-[57px] z-20 shadow-2xs">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
           {/* Return Button */}
@@ -60,7 +60,7 @@ export function QuizPage({
               className="text-[#3F5247] hover:text-[#14241B] hover:bg-white rounded-lg px-4 py-1.5 text-xs sm:text-sm font-medium flex items-center gap-2 transition-all cursor-pointer"
             >
               <BookOpen className="w-4 h-4 text-[#57534E]" aria-hidden="true" />
-              <span>1. Bài học Lý thuyết (Markdown)</span>
+              <span>1. Bài học Lý thuyết</span>
             </button>
             <button
               type="button"
@@ -72,15 +72,15 @@ export function QuizPage({
           </div>
 
           {/* Breadcrumb Info */}
-          <div className="hidden lg:flex items-center gap-2 text-xs font-mono text-[#57534E]">
-            <span className="font-bold text-[#14241B]">[{currentConcept.slug}]</span>
+          <div className="hidden lg:flex items-center gap-2 text-xs text-[#57534E]">
+            <span className="font-bold text-[#14241B]">{currentConcept.title}</span>
             <span>•</span>
-            <span>Ngưỡng đạt: ≥ 75%</span>
+            <span className="font-medium text-[#15803D]">Ngưỡng đạt: ≥ 75%</span>
           </div>
         </div>
       </div>
 
-      {/* Two-Column Main Workspace (Stitch SCR-04) */}
+      {/* Two-Column Main Workspace */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Column (8 cols): 4-Question MCQ Form */}
         <div className="lg:col-span-8">
@@ -139,10 +139,10 @@ export function QuizPage({
               <div className="bg-[#F0FDF4] rounded-xl border border-[#BBF7D0] p-4 text-xs text-[#14532D] space-y-2 shadow-2xs">
                 <div className="flex items-center gap-1.5 font-bold">
                   <ShieldCheck className="w-4 h-4 text-[#15803D]" aria-hidden="true" />
-                  <span>Bảo vệ Lũy đẳng Giao dịch</span>
+                  <span>Bảo vệ Tiến trình Làm bài</span>
                 </div>
                 <p className="text-[11px] leading-relaxed text-[#166534]">
-                  Mỗi lượt làm bài gắn liền với một <code>submission_id</code> độc nhất, chống trùng lặp dữ liệu và bảo toàn điểm cao nhất đã đạt được.
+                  Mỗi lượt làm bài được hệ thống mã hóa và kiểm soát giao dịch, chống nộp trùng lặp và tự động bảo toàn điểm cao nhất bạn đạt được.
                 </p>
               </div>
             </>

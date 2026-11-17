@@ -7,6 +7,7 @@ import {
   Lock,
 } from 'lucide-react'
 import type { DagNode } from '../../types'
+import { CONCEPT_TITLE_MAP } from '../../constants/concepts'
 
 interface DagNodeCardProps {
   node: DagNode
@@ -21,7 +22,14 @@ export function DagNodeCard({
 }: DagNodeCardProps) {
   const percent = Math.round(node.mastery_score * 100)
 
-  // 1. AI Recommended State (Stitch SCR-02 Sunlit Amber Card)
+  const prereqDisplay =
+    node.prerequisites.length > 0
+      ? node.prerequisites
+          .map((p) => CONCEPT_TITLE_MAP[p] || p)
+          .join(', ')
+      : 'Gốc (Root — Không cần tiên quyết)'
+
+  // 1. AI Recommended State
   if (isRecommended && node.status !== 'mastered') {
     return (
       <div
@@ -32,7 +40,10 @@ export function DagNodeCard({
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-[#FDE68A] text-[#78350F]">
+                <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-[#FDE68A] text-[#78350F]">
+                  Khái niệm #{node.action_id + 1}
+                </span>
+                <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-[#FEF3C7] text-[#78350F] border border-[#FDE68A]">
                   {node.slug}
                 </span>
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#D97706] text-white text-xs font-bold uppercase tracking-wider">
@@ -48,23 +59,20 @@ export function DagNodeCard({
           </div>
 
           <p className="text-xs text-[#78350F] mt-2 font-medium">
-            Khái niệm trọng tâm tiếp theo do DQN khuyến nghị dựa trên tiến độ học tập hiện tại.
+            Khái niệm trọng tâm tiếp theo do mô hình DQN đề xuất dựa trên tiến độ học tập hiện tại.
           </p>
 
-          <div className="mt-3 flex items-center justify-between text-xs font-mono text-[#78350F]">
-            <span>
-              Tiên quyết:{' '}
-              <strong className="text-[#15803D]">
-                {node.prerequisites.length > 0 ? node.prerequisites.join(', ') : 'Gốc (Root)'}
-              </strong>
-            </span>
-            <span className="text-[#D97706] font-bold">Ưu tiên: Tối ưu</span>
+          <div className="mt-3 text-xs text-[#78350F] space-y-1 bg-white/70 p-2.5 rounded-lg border border-[#FDE68A]">
+            <div>
+              <span className="font-medium text-[#92400E]">Tiên quyết: </span>
+              <strong className="text-[#15803D]">{prereqDisplay}</strong>
+            </div>
           </div>
         </div>
 
         <div className="mt-4 pt-3 border-t border-[#FDE68A] flex items-center justify-between">
           <span className="text-xs text-[#78350F] font-medium">
-            Khuyên học tiếp để mở khóa tầng tiếp theo
+            Phù hợp để tiếp tục mở khóa theo đồ thị DAG
           </span>
           <button
             type="button"
@@ -80,7 +88,7 @@ export function DagNodeCard({
     )
   }
 
-  // 2. Mastered State (Stitch SCR-02 Green Card)
+  // 2. Mastered State
   if (node.status === 'mastered') {
     return (
       <div
@@ -90,9 +98,14 @@ export function DagNodeCard({
         <div>
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-1">
-              <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-[#DCFCE7] text-[#14532D]">
-                {node.slug}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-[#DCFCE7] text-[#14532D]">
+                  Khái niệm #{node.action_id + 1}
+                </span>
+                <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-[#F0FDF4] text-[#14532D] border border-[#BBF7D0]">
+                  {node.slug}
+                </span>
+              </div>
               <h3 className="font-bold text-base text-[#14532D]">{node.title}</h3>
             </div>
             <div className="flex items-center gap-1 bg-[#DCFCE7] text-[#14532D] text-xs font-bold px-2.5 py-1 rounded-full border border-[#86EFAC]">
@@ -103,7 +116,7 @@ export function DagNodeCard({
 
           {/* Progress Bar with 75% tick mark */}
           <div className="mt-4 space-y-1">
-            <div className="flex justify-between text-xs font-mono text-[#166534]">
+            <div className="flex justify-between text-xs text-[#166534]">
               <span>Độ thông thạo: {percent}%</span>
               <span className="font-semibold text-[#15803D]">Đạt chuẩn ≥ 75%</span>
             </div>
@@ -143,7 +156,7 @@ export function DagNodeCard({
     )
   }
 
-  // 3. Unlocked State (Stitch SCR-02 Teal Card)
+  // 3. Unlocked State
   if (node.status === 'unlocked') {
     return (
       <div
@@ -153,9 +166,14 @@ export function DagNodeCard({
         <div>
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-1">
-              <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-[#CCFBF1] text-[#134E4A]">
-                {node.slug}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-[#CCFBF1] text-[#134E4A]">
+                  Khái niệm #{node.action_id + 1}
+                </span>
+                <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-[#F0FDFA] text-[#134E4A] border border-[#99F6E4]">
+                  {node.slug}
+                </span>
+              </div>
               <h3 className="font-bold text-base text-[#134E4A]">{node.title}</h3>
             </div>
             <div className="flex items-center gap-1 bg-[#CCFBF1] text-[#134E4A] text-xs font-bold px-2.5 py-1 rounded-full border border-[#5EEAD4]">
@@ -164,7 +182,7 @@ export function DagNodeCard({
           </div>
 
           <div className="mt-4 space-y-1">
-            <div className="flex justify-between text-xs font-mono text-[#0F766E]">
+            <div className="flex justify-between text-xs text-[#0F766E]">
               <span>Độ thông thạo: {percent}%</span>
               <span>Chuẩn ≥ 75%</span>
             </div>
@@ -180,18 +198,14 @@ export function DagNodeCard({
             </div>
           </div>
 
-          <div className="mt-3 text-xs font-mono text-[#0F766E]">
-            <span>
-              Tiên quyết:{' '}
-              <strong className="text-[#134E4A]">
-                {node.prerequisites.length > 0 ? node.prerequisites.join(', ') : 'Gốc (Root)'}
-              </strong>
-            </span>
+          <div className="mt-3 text-xs text-[#0F766E] bg-white/70 p-2 rounded-lg border border-[#99F6E4]">
+            <span className="font-medium text-[#134E4A]">Tiên quyết: </span>
+            <span>{prereqDisplay}</span>
           </div>
         </div>
 
         <div className="mt-4 pt-3 border-t border-[#99F6E4] flex items-center justify-between">
-          <span className="text-xs text-[#0F766E]">Sẵn sàng học</span>
+          <span className="text-xs text-[#0F766E]">Đã đủ điều kiện học</span>
           <button
             type="button"
             onClick={() => onOpenConcept(node.slug, 'scr03_lesson')}
@@ -206,7 +220,7 @@ export function DagNodeCard({
     )
   }
 
-  // 4. Locked State (Stitch SCR-02 Muted Card)
+  // 4. Locked State
   return (
     <div
       className="bg-[#F6F8F5] border border-[#D8E2D8] rounded-xl p-5 shadow-xs opacity-90 flex flex-col justify-between"
@@ -215,9 +229,14 @@ export function DagNodeCard({
       <div>
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
-            <span className="font-mono text-xs font-medium px-2 py-0.5 rounded bg-[#E7E5E4] text-[#57534E]">
-              {node.slug}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="font-mono text-xs font-medium px-2 py-0.5 rounded bg-[#E7E5E4] text-[#57534E]">
+                Khái niệm #{node.action_id + 1}
+              </span>
+              <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-white text-[#57534E] border border-[#D8E2D8]">
+                {node.slug}
+              </span>
+            </div>
             <h3 className="font-bold text-base text-[#57534E]">{node.title}</h3>
           </div>
           <div className="flex items-center gap-1 bg-[#E7E5E4] text-[#57534E] text-xs font-semibold px-2.5 py-1 rounded-full border border-[#D6D3D1]">
@@ -226,14 +245,12 @@ export function DagNodeCard({
           </div>
         </div>
 
-        <div className="mt-4 text-xs font-mono text-[#57534E] bg-white p-2.5 rounded-lg border border-[#D8E2D8] flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#A8A29E]"></span>
-          <span>
-            Cần đạt ≥ 75% ở:{' '}
-            <strong className="text-[#14241B]">
-              {node.prerequisites.join(', ')}
-            </strong>
-          </span>
+        <div className="mt-4 text-xs text-[#57534E] bg-white p-2.5 rounded-lg border border-[#D8E2D8] flex items-start gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#A8A29E] mt-1 shrink-0"></span>
+          <div>
+            <span className="font-medium text-[#78716C]">Cần đạt ≥ 75% ở: </span>
+            <strong className="text-[#14241B]">{prereqDisplay}</strong>
+          </div>
         </div>
       </div>
 

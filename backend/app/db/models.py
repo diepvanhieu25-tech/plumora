@@ -173,6 +173,12 @@ class QuizAttemptModel(Base):
         JSON().with_variant(JSONB(), "postgresql"),
         nullable=False,
     )
+    state_version: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+    newly_unlocked_json: Mapped[list[str] | None] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"),
+        nullable=True,
+        default=None,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

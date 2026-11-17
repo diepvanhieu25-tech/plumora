@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { App } from '../App'
+import { FALLBACK_CONCEPTS_DAG, FALLBACK_RECOMMENDATION } from '../api'
 
 const mockAuthUser = {
   id: '00000000-0000-4000-8000-000000000099',
@@ -19,7 +20,14 @@ describe('SLICE-01 Frontend Behavioral RED Suite (PL-AUTH-01, PL-CONTENT-01, PL-
   })
 
   it('PL-CONTENT-01 & PL-REC-01 (SCR-02): renders 12 Backend DAG nodes across 4 tiers and DQN Recommendation Banner', () => {
-    render(<App initialUser={mockAuthUser} initialView="roadmap" />)
+    render(
+      <App
+        initialUser={mockAuthUser}
+        initialView="roadmap"
+        initialNodes={FALLBACK_CONCEPTS_DAG}
+        initialRecommendation={FALLBACK_RECOMMENDATION}
+      />,
+    )
     expect(
       screen.getByText(/KHUYẾN NGHỊ TỪ MÔ HÌNH HỌC TĂNG CƯỜNG \(DQN POLICY\)/i),
     ).toBeInTheDocument()

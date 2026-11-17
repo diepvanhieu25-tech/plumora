@@ -3,11 +3,11 @@ import {
   ArrowRight,
   BookOpen,
   CheckCircle2,
-  Compass,
   RotateCcw,
   Sparkles,
 } from 'lucide-react'
 import type { AttemptResult } from '../../types'
+import { CONCEPT_TITLE_MAP } from '../../constants/concepts'
 
 interface QuizResultCardProps {
   attemptResult: AttemptResult | null
@@ -31,7 +31,7 @@ export function QuizResultCard({
 
   return (
     <div className="space-y-6 transition-all duration-300" data-testid="quiz-result-card">
-      {/* 1. Mastery Status Feedback Card (Stitch SCR-04) */}
+      {/* 1. Mastery Status Feedback Card */}
       <div
         role="region"
         aria-live="polite"
@@ -75,8 +75,8 @@ export function QuizResultCard({
         {/* Motivational Commentary */}
         <p className="text-xs sm:text-sm leading-relaxed">
           {isPassed
-            ? 'Chúc mừng! Bạn đã hoàn thành xuất sắc bài kiểm tra với điểm số trên ngưỡng 75%. Trạng thái thông thạo đã được ghi nhận vào cơ sở dữ liệu.'
-            : 'Đừng nản lòng! Bạn cần trả lời đúng tối thiểu 3 / 4 câu (75%) để đạt chuẩn thông thạo khái niệm này. Hãy xem lại kiến thức hoặc thử làm lại bài thi.'}
+            ? 'Chúc mừng! Bạn đã hoàn thành xuất sắc bài kiểm tra với điểm số trên ngưỡng 75%. Trạng thái thông thạo đã được ghi nhận vào hệ thống.'
+            : 'Đừng nản lòng! Bạn cần trả lời đúng tối thiểu 3 / 4 câu (75%) để đạt chuẩn thông thạo khái niệm này. Hãy xem lại bài đọc hoặc thử làm lại.'}
         </p>
 
         {/* Score Breakdown */}
@@ -110,11 +110,11 @@ export function QuizResultCard({
           </div>
         </div>
 
-        {/* Monotonic Mastery (D-06) */}
+        {/* Monotonic Mastery */}
         <div className="space-y-1.5 text-xs">
           <div className="flex items-center gap-1.5 font-semibold">
             <Sparkles className="w-3.5 h-3.5 text-[#15803D]" aria-hidden="true" />
-            <span>Quy tắc Bảo lưu Tiến trình cao nhất (D-06):</span>
+            <span>Bảo lưu Điểm số Cao nhất:</span>
           </div>
           <div className="bg-white/90 rounded-lg p-2.5 font-mono text-[11px] border border-black/5 flex items-center justify-between">
             <span className="text-[#57534E]">Trước: {masteryBefore}%</span>
@@ -125,17 +125,17 @@ export function QuizResultCard({
         {/* Newly Unlocked Concepts (if any) */}
         {attemptResult.newly_unlocked_slugs && attemptResult.newly_unlocked_slugs.length > 0 ? (
           <div className="bg-white rounded-xl p-3.5 border border-[#0D9488]/30 shadow-xs space-y-1.5">
-            <div className="flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-wider font-bold text-[#0D9488]">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#0D9488]">
               <Sparkles className="w-3.5 h-3.5 text-[#0D9488]" aria-hidden="true" />
-              <span>Khái niệm mới được mở khóa trên DAG:</span>
+              <span>Khái niệm mới được mở khóa:</span>
             </div>
             <div className="flex flex-wrap gap-1.5">
               {attemptResult.newly_unlocked_slugs.map((slug) => (
                 <span
                   key={slug}
-                  className="font-mono text-xs font-bold px-2.5 py-1 rounded-md bg-[#F0FDFA] text-[#0F766E] border border-[#99F6E4]"
+                  className="text-xs font-bold px-2.5 py-1 rounded-md bg-[#F0FDFA] text-[#0F766E] border border-[#99F6E4]"
                 >
-                  {slug}
+                  {CONCEPT_TITLE_MAP[slug] || slug}
                 </span>
               ))}
             </div>
@@ -145,89 +145,48 @@ export function QuizResultCard({
         {/* Data Persistence Confirmation */}
         <div className="text-[11px] text-[#57534E] flex items-center justify-between pt-1 border-t border-black/5">
           <span>Trạng thái lưu trữ:</span>
-          <span className="font-mono text-[#15803D] font-semibold">
-            Đã đồng bộ an toàn (Lũy đẳng bảo vệ)
+          <span className="text-[#15803D] font-semibold">
+            {attemptResult.idempotent_replay
+              ? 'Phát lại bài nộp cũ (Bảo lưu nguyên trạng)'
+              : 'Đã đồng bộ an toàn'}
           </span>
         </div>
       </div>
 
-      {/* 2. Action Suggestions Card */}
-      <div className="bg-white border border-[#D8E2D8] rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-[#FEF3C7] text-[#92400E] flex items-center justify-center shrink-0">
-            <Compass className="w-5 h-5 text-[#D97706]" aria-hidden="true" />
-          </div>
-          <div>
-            <span className="text-[10px] font-mono font-bold text-[#D97706] uppercase tracking-wider">
-              Bước Tiếp Theo
-            </span>
-            <h3 className="font-bold text-sm text-[#14241B]">
-              {isPassed ? 'Tiếp tục Lộ trình Học tập' : 'Lựa chọn Nâng cao Kết quả'}
-            </h3>
-          </div>
-        </div>
+      {/* 2. Action Buttons */}
+      <div className="space-y-3">
+        {isPassed ? (
+          <button
+            type="button"
+            onClick={onBackToRoadmap}
+            className="w-full bg-[#15803D] hover:bg-[#166534] text-white font-bold py-3 px-4 rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all text-xs cursor-pointer active:scale-[0.98]"
+            data-testid="back-to-roadmap-after-quiz-btn"
+          >
+            <span>Quay về Lộ trình học tiếp</span>
+            <ArrowRight className="w-4 h-4" aria-hidden="true" />
+          </button>
+        ) : null}
 
-        <p className="text-xs text-[#57534E] leading-relaxed">
-          {isPassed
-            ? 'Bạn đã đạt chuẩn thông thạo khái niệm này! Hãy nhận bài học khuyến nghị tiếp theo từ mô hình AI (DQN Policy).'
-            : 'Bạn có thể làm lại bài kiểm tra ngay để cải thiện điểm số, hoặc đọc lại lý thuyết bài học để củng cố kiến thức.'}
-        </p>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="w-full bg-white hover:bg-[#F6F8F5] text-[#3F5247] border border-[#D8E2D8] font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors text-xs cursor-pointer shadow-2xs"
+          data-testid="retry-quiz-btn"
+        >
+          <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+          <span>Làm lại bài kiểm tra</span>
+        </button>
 
-        <div className="space-y-2.5 pt-1">
-          {isPassed ? (
-            <>
-              <button
-                type="button"
-                onClick={onBackToRoadmap}
-                className="w-full py-3 px-4 bg-[#15803D] hover:bg-[#166534] text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-[0.98]"
-                data-testid="back-to-roadmap-after-quiz"
-              >
-                <span>Nhận bài khuyến nghị tiếp theo từ AI</span>
-                <ArrowRight className="w-4 h-4" aria-hidden="true" />
-              </button>
-
-              <button
-                type="button"
-                onClick={onRetry}
-                className="w-full py-2.5 px-3 bg-white hover:bg-[#F6F8F5] border border-[#D8E2D8] text-[#14241B] text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5 text-[#57534E]" aria-hidden="true" />
-                <span>Làm lại Quiz để nâng cao điểm</span>
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={onRetry}
-                className="w-full py-3 px-4 bg-[#15803D] hover:bg-[#166534] text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-[0.98]"
-              >
-                <RotateCcw className="w-4 h-4" aria-hidden="true" />
-                <span>Làm lại bài kiểm tra ngay</span>
-              </button>
-
-              {onBackToLesson ? (
-                <button
-                  type="button"
-                  onClick={onBackToLesson}
-                  className="w-full py-2.5 px-3 bg-white hover:bg-[#F6F8F5] border border-[#D8E2D8] text-[#14241B] text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <BookOpen className="w-3.5 h-3.5 text-[#15803D]" aria-hidden="true" />
-                  <span>Ôn lại lý thuyết bài học</span>
-                </button>
-              ) : null}
-
-              <button
-                type="button"
-                onClick={onBackToRoadmap}
-                className="w-full py-2 px-3 text-[#57534E] hover:text-[#14241B] text-xs font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                data-testid="back-to-roadmap-after-quiz"
-              >
-                <span>Quay về Bản đồ Lộ trình</span>
-              </button>
-            </>
-          )}
-        </div>
+        {onBackToLesson ? (
+          <button
+            type="button"
+            onClick={onBackToLesson}
+            className="w-full text-center text-xs text-[#57534E] hover:text-[#15803D] py-1 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+          >
+            <BookOpen className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>Đọc lại lý thuyết bài học</span>
+          </button>
+        ) : null}
       </div>
     </div>
   )

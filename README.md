@@ -8,8 +8,8 @@
 [![Python](https://img.shields.io/badge/Python-3.12-3B82F6?style=flat-square&logo=python&logoColor=white)](backend/pyproject.toml)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](frontend/package.json)
 [![Docker](https://img.shields.io/badge/Docker-Compose%20Ready-2496ED?style=flat-square&logo=docker&logoColor=white)](docker-compose.yml)
-[![WCAG](https://img.shields.io/badge/Accessibility-WCAG%202.1%20AA-0D9488?style=flat-square)](docs/ui-design-system.md)
-[![Gate 3](https://img.shields.io/badge/Gate%203-APPROVED-15803D?style=flat-square)](docs/verification/VERIFICATION_GATE3.md)
+[![Accessibility](https://img.shields.io/badge/Accessibility-Keyboard%20Accessible-0D9488?style=flat-square)](docs/ui-design-system.md)
+[![Gate 3](https://img.shields.io/badge/Gate%203-In%20Review-D97706?style=flat-square)](docs/verification/VERIFICATION_GATE3.md)
 
 ---
 

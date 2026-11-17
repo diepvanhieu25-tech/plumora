@@ -22,6 +22,7 @@ describe('PL-E2E-01 Live Full-Stack Golden Journey (React -> FastAPI -> PostgreS
       backendReachable = false
     }
     if (!backendReachable) {
+      expect(backendReachable, 'Backend at 127.0.0.1:8000 is required for live fullstack journey test').toBe(true)
       return
     }
     // Route relative /api/... fetches from jsdom to the live FastAPI server on 127.0.0.1:8000
@@ -66,7 +67,7 @@ describe('PL-E2E-01 Live Full-Stack Golden Journey (React -> FastAPI -> PostgreS
 
       // 3. SCR-02: Verify live DQN checkpoint recommends an eligible concept (e.g., db-transactions)
       const banner = screen.getByTestId('ai-recommendation-banner')
-      expect(banner).toHaveTextContent(/policy_source: dqn/i)
+      expect(banner).toHaveTextContent(/Học tăng cường DQN|DQN POLICY/i)
       expect(banner).toHaveTextContent(/e464fa638cee/i)
 
       // 4. SCR-03: Open /concepts/db-transactions to fetch real Markdown lesson & 4 MCQ questions from PostgreSQL
@@ -82,8 +83,8 @@ describe('PL-E2E-01 Live Full-Stack Golden Journey (React -> FastAPI -> PostgreS
       fireEvent.click(screen.getByTestId('start-quiz-btn'))
 
       // 5. SCR-04: Select 3/4 correct answers (75% pass boundary) and submit to live PostgreSQL + Redis
-      fireEvent.click(screen.getByTestId('quiz-q1-opt-A'))
-      fireEvent.click(screen.getByTestId('quiz-q2-opt-A'))
+      fireEvent.click(screen.getByTestId('quiz-q1-opt-B'))
+      fireEvent.click(screen.getByTestId('quiz-q2-opt-D'))
       fireEvent.click(screen.getByTestId('quiz-q3-opt-A'))
       fireEvent.click(screen.getByTestId('quiz-q4-opt-B'))
       fireEvent.click(screen.getByTestId('submit-quiz-btn'))

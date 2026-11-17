@@ -9,6 +9,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest",
+    "test:unit": "vitest run --exclude 'e2e/**'",
+    "test:integration": "vitest run e2e/live_fullstack_journey.spec.ts",
     "test:smoke": "vitest run src/__tests__/smoke.test.tsx",
     "test:red": "vitest run src/__tests__/red_slice1.test.tsx",
     "preview": "vite preview --host 127.0.0.1 --port 5173"
@@ -32,6 +34,7 @@
     "eslint-plugin-react-refresh": "^0.4.19",
     "globals": "^15.15.0",
     "jsdom": "^26.0.0",
+    "playwright": "^1.65.1",
     "tailwindcss": "^4.0.9",
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.25.0",
