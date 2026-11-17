@@ -35,10 +35,12 @@ const TIER_METADATA: Record<
 
 interface RoadmapPageProps {
   nodes: DagNode[]
-  recommendation: RecommendationPayload
+  recommendation: RecommendationPayload | null
   masteredCount: number
   isLoading: boolean
   currentUsername?: string
+  roadmapError?: string | null
+  onRetryRoadmap?: () => void
   onSelectPreset: (preset: { key: string; title: string }) => void
   onOpenConcept: (slug: string, targetScreen: 'scr03_lesson' | 'scr04_quiz') => void
 }
@@ -49,12 +51,14 @@ export function RoadmapPage({
   masteredCount,
   isLoading,
   currentUsername,
+  roadmapError,
+  onRetryRoadmap,
   onSelectPreset,
   onOpenConcept,
 }: RoadmapPageProps) {
   const [nodeFilter, setNodeFilter] = useState<NodeFilter>('all')
 
-  const recommendedSlug = recommendation.recommended_concept?.slug
+  const recommendedSlug = recommendation?.recommended_concept?.slug
 
   const counts = useMemo(() => {
     return {
@@ -74,7 +78,7 @@ export function RoadmapPage({
       className="space-y-6"
       data-testid="scr02-roadmap-section"
     >
-      {/* Demo Presets Sub-bar (Stitch SCR-02) */}
+      {/* Demo Presets Sub-bar */}
       <DemoPresetToolbar
         isLoading={isLoading}
         onSelectPreset={onSelectPreset}
@@ -82,10 +86,12 @@ export function RoadmapPage({
         masteredCount={masteredCount}
       />
 
-      {/* Hero AI Recommendation Banner (Stitch SCR-02 Sunlit Amber) */}
+      {/* Hero AI Recommendation Banner (or Error Banner if failed) */}
       <AiRecommendationBanner
         recommendation={recommendation}
         masteredCount={masteredCount}
+        errorMessage={roadmapError}
+        onRetry={onRetryRoadmap}
         onStartRecommended={(slug) => onOpenConcept(slug, 'scr03_lesson')}
       />
 
@@ -193,9 +199,9 @@ export function RoadmapPage({
               {/* Connector from previous tier */}
               {tierIdx > 0 && nodeFilter === 'all' ? (
                 <div className="flex items-center justify-center my-3">
-                  <div className="flex items-center gap-2 bg-white px-3.5 py-1 rounded-full border border-[#D8E2D8] text-xs text-[#57534E] font-mono shadow-2xs">
+                  <div className="flex items-center gap-2 bg-white px-3.5 py-1 rounded-full border border-[#D8E2D8] text-xs text-[#57534E] font-medium shadow-2xs">
                     <ArrowDown className="w-3.5 h-3.5 text-[#15803D]" aria-hidden="true" />
-                    <span>DAG Dependencies: Tầng {tierNum - 1} → Tầng {tierNum}</span>
+                    <span>Điều kiện Tiên quyết: Tầng {tierNum - 1} → Tầng {tierNum}</span>
                   </div>
                 </div>
               ) : null}

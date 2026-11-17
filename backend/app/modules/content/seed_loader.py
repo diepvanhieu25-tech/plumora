@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from pathlib import Path
 from typing import Any
@@ -10,6 +11,7 @@ from typing import Any
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
+from app.db.migrations import run_database_migrations
 from app.db.models import (
     Base,
     ConceptModel,
@@ -24,6 +26,8 @@ from app.modules.auth import (
     hash_password,
 )
 
+logger = logging.getLogger(__name__)
+
 SEED_FILE_PATH = Path(__file__).resolve().parents[2] / "seed" / "backend_12_concepts.json"
 
 SEED_USERS: tuple[tuple[str, str, str], ...] = (
@@ -34,8 +38,9 @@ SEED_USERS: tuple[tuple[str, str, str], ...] = (
 
 
 def init_db_and_seed() -> None:
-    """Create PostgreSQL schema if not exists and idempotently seed 12 concepts & 3 demo users."""
+    """Create PostgreSQL schema if not exists, run versioned migrations, and idempotently seed 12 concepts & 3 demo users."""
     Base.metadata.create_all(bind=engine)
+    run_database_migrations(engine)
     raw_seed = json.loads(SEED_FILE_PATH.read_text(encoding="utf-8"))
     content_version = str(raw_seed.get("content_version", "1.0.0"))
     concepts_data: list[dict[str, Any]] = raw_seed["concepts"]

@@ -1,94 +1,101 @@
-# Prompt làm việc cho Plumora
+# Các Mẫu Prompt Hay Dùng Cho Plumora
 
-Đây là mẫu giao việc của dự án. Chạy từ gốc repo; nếu đã ở plan mode, có thể bỏ prefix `/plan` lặp. Các file trong mẫu đều đã tồn tại; `<TASK-ID>` và `<AC-ID>` phải thay bằng nhiệm vụ thực đã duyệt.
+Tổng hợp các mẫu prompt cốt lõi, thường dùng nhất trong quá trình phát triển dự án Plumora. Chạy từ thư mục gốc `/home/diepvanhieu/workspace/plumora`. Thay thế các giá trị trong ngoặc nhọn `<...>` theo nhiệm vụ thực tế.
 
-## 1. Phiên đầu: kiểm tra ngữ cảnh rồi phân tích
+---
+
+## 1. Khởi động phiên & Làm rõ quyết định (`/plan /grill-me`)
+
+Dùng khi bắt đầu phân tích tính năng mới, kiểm tra ngữ cảnh và phỏng vấn giải quyết các quyết định còn bỏ ngỏ (Gate 1):
 
 ```text
 /plan /grill-me
 Dùng sdlc-plan. Đọc AGENTS.md, .direwolf_memory/ACTIVE_SESSION.md,
 docs/intent.md và docs/decisions.md; mở brief gốc khi cần đối chiếu.
 
-Trước tiên báo tên/đường dẫn bốn skills Direwolf bạn thực sự thấy,
-đọc entrypoint sdlc-plan và một reference của skill; phân biệt đọc file
-với việc runtime đã cung cấp discovery index.
-
-Plumora là đồ án quản lý và khuyến nghị lộ trình học dùng RL.
-Brief đã giới hạn Backend, MCQ và DQN; không mở rộng Giai đoạn 2–3.
-Hỏi từng câu về các quyết định O-01–08 chưa rõ, kèm đề xuất và lý do.
-Từ câu trả lời, cập nhật bản nháp intent/spec/design/plan.
-
-Chỉ phân tích và soạn tài liệu; chưa scaffold hoặc viết mã ứng dụng.
-Trình rõ những quyết định cần tôi duyệt và phần việc còn bị chặn.
-Không tự đổi model, permissions, hooks hoặc plugin.
+Trước tiên báo tên 4 skills Direwolf bạn thấy và tóm tắt ranh giới MVP Pha 1.
+Sau đó hỏi từng câu về các quyết định còn mở trong docs/decisions.md, kèm đề xuất và lý do.
+Chỉ phân tích và cập nhật tài liệu dự thảo; chưa viết mã ứng dụng khi chưa có phê duyệt.
 ```
 
-## 2. Chuyển một phần phân tích thành baseline
+---
 
-```text
-Dùng sdlc-plan. Đối chiếu câu trả lời đã xác nhận với brief và sổ quyết định.
-Chuẩn bị baseline cho lát cắt đầu tiên: AC, hợp đồng, phạm vi,
-thiết kế và kiểm chứng tương ứng; giữ phần chưa có quyết định blocked.
-Báo phiên bản/hash tài liệu cần tôi duyệt và tác động tiến độ.
-Chưa triển khai source behavior khi baseline chưa được tôi chấp thuận.
-```
+## 2. Triển khai tính năng tự chủ theo TDD (`/goal`)
 
-## 3. Thực hiện sau G1
+Dùng khi bắt đầu viết code cho một nhiệm vụ đã được phê duyệt tiêu chí nghiệm thu (Gate 2):
 
 ```text
 /goal
-Dùng sdlc-code để thực hiện <TASK-ID> theo <AC-ID> và baseline đã duyệt.
-Đọc hồ sơ nhiệm vụ để xác minh nguồn, quyền và phạm vi trước khi sửa.
-Ghi readiness: branch, Day-0 CI, dịch vụ healthy khi áp dụng và RED tests.
-Sau đó triển khai, chạy các kiểm tra đã chốt và ghi handoff đúng snapshot.
-Không giảm assertion, giả lập SUT hoặc đổi luật nghiệp vụ để đạt pass.
-Nếu thiếu quyết định hoặc bị chặn quyền, bàn giao BLOCKED và câu hỏi cụ thể.
-Không tự nhận G3 hoặc commit/push/merge/deploy.
+Dùng sdlc-code để thực hiện <TASK-ID> theo tiêu chí <AC-ID> và baseline đã duyệt.
+1. Xác minh branch và đảm bảo Docker (PostgreSQL 16 + Redis 7) đang healthy.
+2. Viết kiểm thử đỏ (RED behavioral tests) chứng minh tính năng chưa có.
+3. Triển khai mã nguồn vừa đủ để đưa test về GREEN; không fake SUT hay giảm assertion.
+4. Chạy kiểm tra toàn diện ./scripts/ci_check.sh đạt 100%.
+5. Lập hồ sơ bàn giao Gate 2 handoff với bảng mã băm SHA-256 các tệp đã sửa.
 ```
 
-## 4. Review trong phiên độc lập
+---
+
+## 3. Đánh giá độc lập 4 trục Gate 3 (`sdlc-review`)
+
+Dùng trong một phiên làm việc mới (cô lập ngữ cảnh) để thẩm định độc lập trước khi merge:
 
 ```text
-Dùng sdlc-review. Đây là review độc lập, không sửa implementation.
-Đọc yêu cầu/thiết kế gốc, phê duyệt và snapshot trong handoff;
-không kế thừa kết luận của implementer hoặc transcript triển khai.
-Kiểm tra bốn trục UI/UX, chất lượng mã, bảo mật và database;
-ghi lý do N/A. Với RL, đối chiếu training/checkpoint/evaluation/serving.
-Chạy kiểm tra áp dụng, ghi command/exit code và finding theo mức độ.
-Verdict chỉ áp dụng đúng snapshot; không cấp quyền merge hoặc deploy.
+Dùng sdlc-review. Đây là review độc lập trong phiên mới, tuyệt đối không sửa code.
+Đọc yêu cầu gốc trong docs/spec.md, hồ sơ handoff gần nhất và git status --short.
+
+Kiểm tra 4 trục:
+1. UI/UX: Design System Botanical Sprout, cấm Emoji (INV-UI-01), Auth Route Guard.
+2. Code Quality: Phân tầng module, Clean Code, chạy ./scripts/ci_check.sh.
+3. Security: JWT, bcrypt, CORS, SQL injection, kiểm tra qua scan_dependencies.
+4. Database: ACID Unit of Work, Redis 24 chiều, tính toàn vẹn dữ liệu.
+(Nếu có RL: Thẩm tra checkpoint SHA-256, tỷ lệ vi phạm tiên quyết = 0.00% và so sánh Baselines).
+
+Đưa ra kết luận chính thức: APPROVED hoặc REJECTED kèm danh sách findings cụ thể.
 ```
 
-## 5. Bàn giao Codex ↔ Antigravity
+---
+
+## 4. Đóng gói & Kịch bản chạy thử Demo Gate 4 (`sdlc-release`)
+
+Dùng khi chuẩn bị bàn giao sản phẩm, kiểm tra môi trường production và kịch bản bảo vệ:
 
 ```text
-Đọc AGENTS.md và .direwolf_memory/ACTIVE_SESSION.md, kiểm tra Git.
-Đối chiếu phiên bản thực tế với handoff; báo drift nếu có.
-Tiếp tục nhiệm vụ đang được phép từ bước tiếp theo đã ghi.
-Không kế thừa nhãn pass cho phiên bản khác, không tự mở rộng phạm vi.
+/goal
+Dùng sdlc-release. Đọc kết luận Gate 3 trong docs/verification/VERIFICATION_GATE3.md.
+1. Kiểm tra cấu hình docker-compose.yml khởi chạy đủ 4 containers (postgres, redis, backend, frontend).
+2. Soạn/cập nhật kịch bản chạy thử demo 5 phút trong docs/defense/DEMO_RUNBOOK.md.
+3. Lập hồ sơ phát hành Gate 4 trong docs/verification/RELEASE_GATE4.md.
+4. Chạy ./scripts/ci_check.sh xác nhận toàn bộ hệ thống sẵn sàng bàn giao.
 ```
 
-## 6. Khi đổi model (giữa phiên hoặc sang phiên mới)
+---
 
-### 6.1. Đổi model ngay trong cùng phiên hội thoại (qua `/model` hoặc Model Selector)
+## 5. Điều tra & Khắc phục lỗi CI nhanh (`/goal`)
+
+Dùng khi `./scripts/ci_check.sh` báo lỗi (Lint, Typecheck, Test, Build):
 
 ```text
-Tôi vừa chuyển sang model mới trong phiên này.
-Giữ nguyên model tôi vừa chọn; không tự đổi lại model, permissions, hooks hoặc plugin.
-Kiểm tra lại `git status --short`, đọc `.direwolf_memory/ACTIVE_SESSION.md` và `docs/decisions.md`
-để đồng bộ trạng thái file thực tế trên đĩa (phòng trường hợp lượt trước bị ngắt giữa chừng).
-Tóm tắt ngắn gọn: (1) Gate và nhiệm vụ `<TASK-ID>` đang chạy, (2) file nào đang sửa dở,
-rồi tiếp tục đúng bước đang thực hiện theo skill Direwolf hiện hành mà không làm lệch baseline đã duyệt.
+/goal
+Dùng sdlc-code. Script ./scripts/ci_check.sh đang bị lỗi (exit code != 0).
+1. Chạy ./scripts/ci_check.sh và phân tích chính xác bước bị gãy (ruff, mypy, pytest, eslint, tsc, vitest).
+2. Tìm nguyên nhân gốc rễ (Root Cause) và sửa đổi tối thiểu mã nguồn để khắc phục.
+3. Tuyệt đối không tắt test, không bỏ qua typecheck hoặc nới lỏng ràng buộc.
+4. Chạy lại ./scripts/ci_check.sh xác nhận toàn bộ pipeline đạt 100% GREEN.
 ```
 
-### 6.2. Đổi model khi mở phiên mới hoặc sau khi `/compact`
+---
+
+## 6. Nén ngữ cảnh & Đổi Model / Chuyển giao phiên
+
+Dùng khi phiên chat quá dài (`/compact`) hoặc khi đổi model / chuyển giữa Codex và Antigravity:
 
 ```text
-Đọc AGENTS.md, .direwolf_memory/ACTIVE_SESSION.md, docs/decisions.md và docs/plan.md.
-Chạy `git status --short` và đối chiếu trạng thái working tree với manifest/handoff gần nhất.
-Kế thừa đúng model và cài đặt hiện tại của tôi; không hardcode hay tự chuyển model khác.
-Nạp đúng skill Direwolf của pha hiện tại (`sdlc-plan`, `sdlc-code`, `sdlc-review` hoặc `sdlc-release`).
-Báo rõ trạng thái Gate (G1–G4), các phần đã duyệt, các phần còn BLOCKED,
-và tiếp tục thực hiện `<TASK-ID>` từ đúng bước tiếp theo trong ACTIVE_SESSION.md.
+/compact
+Đọc lại AGENTS.md, .direwolf_memory/ACTIVE_SESSION.md và chạy git status --short.
+Tóm tắt ngắn gọn:
+1. Gate hiện tại và nhiệm vụ <TASK-ID> đang làm dở.
+2. Danh sách các file đang sửa và trạng thái kiểm thử gần nhất.
+3. Bước tiếp theo cần làm ngay theo đúng baseline đã duyệt.
+Giữ nguyên model và thiết lập hiện tại; không tự ý mở rộng phạm vi.
 ```
-
-Khi kết thúc mỗi mốc, ghi kết quả quan sát, file thay đổi, điều chưa chạy và bước tiếp theo. Prompt là chỉ dẫn thực hiện; không thay quyền công cụ hoặc quyết định phê duyệt.

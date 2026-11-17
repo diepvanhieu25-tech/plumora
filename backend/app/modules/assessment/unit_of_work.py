@@ -36,8 +36,8 @@ class AttemptResultPayload:
     passed: bool
     mastery_before: float
     mastery_after: float
-    state_version: int
-    newly_unlocked_slugs: list[str]
+    state_version: int | None
+    newly_unlocked_slugs: list[str] | None
 
 
 def execute_quiz_attempt_uow(
@@ -48,9 +48,10 @@ def execute_quiz_attempt_uow(
     answers: list[AnswerItemRequest],
 ) -> tuple[int, dict[str, Any]]:
     """Execute ACID Unit of Work for Quiz attempt grading and state update."""
-    # Lock the user row for ACID serialization (SELECT ... FOR UPDATE)
+    # Lock the user row for ACID serialization (SELECT ... FOR UPDATE) and refresh identity map
     locked_user = db.scalar(select(UserModel).where(UserModel.id == user.id).with_for_update())
     assert locked_user is not None
+    db.refresh(locked_user)
 
     # 1. Idempotency check (INV-IDEMP-01)
     existing_attempt = db.scalar(
@@ -60,6 +61,20 @@ def execute_quiz_attempt_uow(
         )
     )
     if existing_attempt is not None:
+        if existing_attempt.concept_action_id != concept.action_id:
+            db.rollback()
+            return 409, {
+                "error_code": "SUBMISSION_ID_REUSED_DIFFERENT_CONCEPT",
+                "message": (
+                    f"submission_id '{sub_uuid}' đã được sử dụng cho khái niệm khác "
+                    f"(action_id={existing_attempt.concept_action_id}). Vui lòng tạo submission_id mới."
+                ),
+                "details": {
+                    "submission_id": str(sub_uuid),
+                    "original_concept_action_id": existing_attempt.concept_action_id,
+                    "attempted_concept_action_id": concept.action_id,
+                },
+            }
         return 200, {
             "attempt_id": str(existing_attempt.id),
             "submission_id": str(existing_attempt.submission_id),
@@ -69,8 +84,8 @@ def execute_quiz_attempt_uow(
             "passed": existing_attempt.passed,
             "mastery_before": existing_attempt.mastery_before,
             "mastery_after": existing_attempt.mastery_after,
-            "state_version": locked_user.state_version,
-            "newly_unlocked_slugs": [],
+            "state_version": existing_attempt.state_version,
+            "newly_unlocked_slugs": existing_attempt.newly_unlocked_json,
         }
 
     # 2. Prerequisite lock check (INV-DAG-01)
@@ -156,22 +171,6 @@ def execute_quiz_attempt_uow(
         mastery_row.is_mastered = mastery_after >= PASS_THRESHOLD
         mastery_row.updated_at = now
 
-    attempt_record = QuizAttemptModel(
-        id=uuid.uuid4(),
-        user_id=locked_user.id,
-        submission_id=sub_uuid,
-        concept_action_id=concept.action_id,
-        correct_count=correct_count,
-        attempt_score=attempt_score,
-        passed=passed,
-        mastery_before=mastery_before,
-        mastery_after=mastery_after,
-        answers_json=[
-            {"question_id": a.question_id, "selected_option": a.selected_option} for a in answers
-        ],
-        created_at=now,
-    )
-    db.add(attempt_record)
     locked_user.state_version += 1
     db.flush()
 
@@ -188,6 +187,24 @@ def execute_quiz_attempt_uow(
         ).all()
         newly_unlocked_slugs = [c.slug for c in unlocked_concepts]
 
+    attempt_record = QuizAttemptModel(
+        id=uuid.uuid4(),
+        user_id=locked_user.id,
+        submission_id=sub_uuid,
+        concept_action_id=concept.action_id,
+        correct_count=correct_count,
+        attempt_score=attempt_score,
+        passed=passed,
+        mastery_before=mastery_before,
+        mastery_after=mastery_after,
+        answers_json=[
+            {"question_id": a.question_id, "selected_option": a.selected_option} for a in answers
+        ],
+        state_version=locked_user.state_version,
+        newly_unlocked_json=newly_unlocked_slugs,
+        created_at=now,
+    )
+    db.add(attempt_record)
     db.commit()
     write_through_state_cache(db, locked_user.id)
 

@@ -84,8 +84,8 @@ export interface AttemptResult {
   passed: boolean
   mastery_before: number
   mastery_after: number
-  state_version: number
-  newly_unlocked_slugs: string[]
+  state_version: number | null
+  newly_unlocked_slugs: string[] | null
 }
 
 export type ActiveView = 'roadmap' | 'lesson' | 'quiz' | 'locked'

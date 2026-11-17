@@ -5,7 +5,10 @@ from __future__ import annotations
 import uuid
 
 from fastapi.testclient import TestClient
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
+from app.db.models import ConceptModel, QuizQuestionModel, engine
 from app.main import app
 
 
@@ -91,14 +94,25 @@ def test_pl_quiz_01_and_progress_01_boundary_75_and_idempotency() -> None:
     for q in questions:
         assert "correct_option_key" not in q
 
+    # Look up correct option keys from database for net-internet
+    with Session(engine) as db:
+        c0 = db.scalar(select(ConceptModel).where(ConceptModel.slug == "net-internet"))
+        assert c0 is not None
+        db_q = db.scalars(
+            select(QuizQuestionModel)
+            .where(QuizQuestionModel.concept_action_id == c0.action_id)
+            .order_by(QuizQuestionModel.display_order)
+        ).all()
+        correct_keys = [q.correct_option_key for q in db_q]
+        wrong_keys = ["A" if k != "A" else "B" for k in correct_keys]
+
     # Boundary 1: 2/4 correct (50% < 75% -> passed = False)
-    # In our seed bank, correct option for all 4 questions is 'A'
     sub_id_50 = str(uuid.uuid4())
     answers_50 = [
-        {"question_id": questions[0]["id"], "selected_option": "A"},
-        {"question_id": questions[1]["id"], "selected_option": "A"},
-        {"question_id": questions[2]["id"], "selected_option": "B"},
-        {"question_id": questions[3]["id"], "selected_option": "B"},
+        {"question_id": questions[0]["id"], "selected_option": correct_keys[0]},
+        {"question_id": questions[1]["id"], "selected_option": correct_keys[1]},
+        {"question_id": questions[2]["id"], "selected_option": wrong_keys[2]},
+        {"question_id": questions[3]["id"], "selected_option": wrong_keys[3]},
     ]
     res_50 = client.post(
         "/api/v1/concepts/net-internet/attempts",
@@ -114,10 +128,10 @@ def test_pl_quiz_01_and_progress_01_boundary_75_and_idempotency() -> None:
     # Boundary 2: 3/4 correct (75% >= 75% -> passed = True, unlocks web-http)
     sub_id_75 = str(uuid.uuid4())
     answers_75 = [
-        {"question_id": questions[0]["id"], "selected_option": "A"},
-        {"question_id": questions[1]["id"], "selected_option": "A"},
-        {"question_id": questions[2]["id"], "selected_option": "A"},
-        {"question_id": questions[3]["id"], "selected_option": "B"},
+        {"question_id": questions[0]["id"], "selected_option": correct_keys[0]},
+        {"question_id": questions[1]["id"], "selected_option": correct_keys[1]},
+        {"question_id": questions[2]["id"], "selected_option": correct_keys[2]},
+        {"question_id": questions[3]["id"], "selected_option": wrong_keys[3]},
     ]
     sub1 = client.post(
         "/api/v1/concepts/net-internet/attempts",
@@ -144,7 +158,9 @@ def test_pl_quiz_01_and_progress_01_boundary_75_and_idempotency() -> None:
 
     # High-Water Mark check (INV-MASTERY-01): retaking with 0/4 keeps mastery_after at 0.75
     sub_id_0 = str(uuid.uuid4())
-    answers_0 = [{"question_id": q["id"], "selected_option": "D"} for q in questions]
+    answers_0 = [
+        {"question_id": questions[i]["id"], "selected_option": wrong_keys[i]} for i in range(4)
+    ]
     res_0 = client.post(
         "/api/v1/concepts/net-internet/attempts",
         json={"submission_id": sub_id_0, "answers": answers_0},

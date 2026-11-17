@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  FALLBACK_CONCEPTS_DAG,
   FALLBACK_CONCEPT_DETAIL,
-  FALLBACK_RECOMMENDATION,
   apiApplyPreset,
   apiGetConceptDetail,
   apiGetMe,
@@ -30,29 +28,31 @@ import type {
   LearnerUser,
   RecommendationPayload,
 } from './types'
-
-function generateSubmissionId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID()
-  }
-  return '00000000-0000-4000-8000-000000009999'
-}
+import { generateSubmissionId } from './utils/submission'
 
 interface AppProps {
   initialUser?: LearnerUser | null
   initialView?: ActiveView
+  initialNodes?: DagNode[]
+  initialRecommendation?: RecommendationPayload | null
 }
 
-export function App({ initialUser = null, initialView }: AppProps = {}) {
+export function App({
+  initialUser = null,
+  initialView,
+  initialNodes = [],
+  initialRecommendation = null,
+}: AppProps = {}) {
   const [user, setUser] = useState<LearnerUser | null>(initialUser)
   const [activeView, setActiveView] = useState<ActiveView>(
     initialView ?? (initialUser ? 'roadmap' : 'roadmap'),
   )
-  const [nodes, setNodes] = useState<DagNode[]>(FALLBACK_CONCEPTS_DAG)
+  const [nodes, setNodes] = useState<DagNode[]>(initialNodes)
   const [recommendation, setRecommendation] =
-    useState<RecommendationPayload>(FALLBACK_RECOMMENDATION)
+    useState<RecommendationPayload | null>(initialRecommendation)
   const [currentConcept, setCurrentConcept] =
     useState<ConceptDetail>(FALLBACK_CONCEPT_DETAIL)
+  const [roadmapError, setRoadmapError] = useState<string | null>(null)
   const [lockedErrorInfo, setLockedErrorInfo] = useState<{
     slug: string
     message: string
@@ -91,6 +91,7 @@ export function App({ initialUser = null, initialView }: AppProps = {}) {
   )
 
   async function refreshRoadmapAndRecommendation(): Promise<void> {
+    setRoadmapError(null)
     try {
       const [rm, rec] = await Promise.all([
         apiGetRoadmap(),
@@ -98,8 +99,10 @@ export function App({ initialUser = null, initialView }: AppProps = {}) {
       ])
       setNodes(rm.nodes)
       setRecommendation(rec)
-    } catch {
-      // Keep fallback data in test environments without live HTTP server
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : 'Lỗi kết nối máy chủ khi tải lộ trình học tập'
+      setRoadmapError(msg)
     }
   }
 
@@ -107,15 +110,19 @@ export function App({ initialUser = null, initialView }: AppProps = {}) {
     let mounted = true
     ;(async () => {
       const me = await apiGetMe()
-      if (mounted && me) {
-        setUser(me)
-        await refreshRoadmapAndRecommendation()
+      if (mounted) {
+        if (me) {
+          setUser(me)
+          await refreshRoadmapAndRecommendation()
+        } else if (initialUser) {
+          await refreshRoadmapAndRecommendation()
+        }
       }
     })()
     return () => {
       mounted = false
     }
-  }, [])
+  }, [initialUser])
 
   async function handleLoginSubmit(e: React.FormEvent): Promise<void> {
     e.preventDefault()
@@ -171,6 +178,15 @@ export function App({ initialUser = null, initialView }: AppProps = {}) {
       await apiLogout()
     } finally {
       setUser(null)
+      setNodes([])
+      setRecommendation(null)
+      setCurrentConcept(FALLBACK_CONCEPT_DETAIL)
+      setSelectedAnswers({})
+      setSubmissionId(generateSubmissionId())
+      setAttemptResult(null)
+      setQuizError(null)
+      setRoadmapError(null)
+      setLockedErrorInfo(null)
       setActiveView('roadmap')
       setToastMessage('Đã đăng xuất khỏi hệ thống')
     }
@@ -256,7 +272,7 @@ export function App({ initialUser = null, initialView }: AppProps = {}) {
   // ==========================================
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#F8FAF7] text-[#14241B] font-sans antialiased flex flex-col justify-between">
+      <div className="min-h-screen bg-[#F8FAF7] text-[#14241B] font-sans antialiased flex flex-col justify-between overflow-x-hidden w-full">
         <Header
           user={null}
           activeView="roadmap"
@@ -295,8 +311,6 @@ export function App({ initialUser = null, initialView }: AppProps = {}) {
             </div>
             <div className="flex items-center gap-4 text-[#78716C] text-[11px]">
               <span>Idempotency Engine Active</span>
-              <span>•</span>
-              <span>WCAG 2.1 AA Compliant</span>
             </div>
           </div>
         </footer>
@@ -308,7 +322,7 @@ export function App({ initialUser = null, initialView }: AppProps = {}) {
   // 2. AUTHENTICATED APP (Stitch SCR-02..06 Multi-view Router)
   // ==========================================
   return (
-    <div className="min-h-screen bg-[#F8FAF7] text-[#14241B] font-sans antialiased flex flex-col justify-between">
+    <div className="min-h-screen bg-[#F8FAF7] text-[#14241B] font-sans antialiased flex flex-col justify-between overflow-x-hidden w-full">
       <Header
         user={user}
         activeView={activeView}
@@ -327,6 +341,8 @@ export function App({ initialUser = null, initialView }: AppProps = {}) {
           <RoadmapPage
             nodes={nodes}
             recommendation={recommendation}
+            roadmapError={roadmapError}
+            onRetryRoadmap={refreshRoadmapAndRecommendation}
             masteredCount={masteredCount}
             isLoading={isLoading}
             currentUsername={user.username}
@@ -398,8 +414,6 @@ export function App({ initialUser = null, initialView }: AppProps = {}) {
           </div>
           <div className="flex items-center gap-4 text-[#78716C] text-[11px]">
             <span>Idempotency Engine Active</span>
-            <span>•</span>
-            <span>WCAG 2.1 AA Compliant</span>
           </div>
         </div>
       </footer>

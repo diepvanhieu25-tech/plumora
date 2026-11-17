@@ -2,7 +2,7 @@
 
 > **Đề tài:** Khuyến nghị Lộ trình Học Cá nhân hóa Thích ứng bằng Học Tăng cường Sâu (DQN)  
 > **Dự án:** Plumora (MVP Giai đoạn 1 — Lát cắt 12 Khái niệm Backend DAG)  
-> **Phiên bản:** `v1.0.0` (Căn cứ Gate 1 Baseline `v1.0.0` & Nghiệm thu Gate 3 `APPROVED`)  
+> **Phiên bản:** `v1.0.0` (Căn cứ Gate 1 Baseline `v1.0.0` & Gate 3: In Review)
 > **Tài liệu tham chiếu:** [docs/research/RL_PLAN.md](../research/RL_PLAN.md), [.agents/rules/rl-evidence.md](../../.agents/rules/rl-evidence.md), [docs/verification/HANDOFF_RL_01.md](../verification/HANDOFF_RL_01.md).
 
 ---
@@ -74,10 +74,17 @@ $$
 
 ### 3.1. Mô Phỏng Năng Lực Học Viên & Động Lực Tiếp Thu
 - Mỗi episode khởi tạo một học viên ảo với năng lực học tập ngẫu nhiên: $\alpha \sim \text{Uniform}(0.35, 0.75)$.
-- Xác suất trả lời đúng từng câu hỏi trắc nghiệm khi học bài $a$ phụ thuộc vào mức độ thông thạo hiện có $m_a$ và năng lực $\alpha$:
+- Độ khó của từng tầng: $\text{tier\_difficulty} = 0.08 + 0.07 \cdot (\text{tier} - 1)$.
+- Điểm trung bình tiên quyết $\overline{m}_{\text{prereqs}}$ lấy theo các khái niệm phụ thuộc trực tiếp (mặc định $0.85$ nếu là khái niệm gốc).
+- Tải trọng nhận thức do phân tán giữa các chủ đề đang dở dang: $\text{cognitive\_load\_penalty} = 0.14 \cdot N_{\text{unfinished}}$, với $N_{\text{unfinished}}$ là số khái niệm khác đang có $0.0 < m_j < 0.75$.
+- Năng lực cơ bản:
+$$
+\text{base\_competence} = \begin{cases} 0.24 & \text{nếu } m_a = 0.0 \\ 0.52 + 0.55 \cdot m_a & \text{nếu } m_a > 0.0 \end{cases}
+$$
+- Xác suất trả lời đúng từng câu hỏi trắc nghiệm khi học bài $a$ (`effective_p`) được xác định chính xác theo `simulator.py`:
 
 $$
-p_{\text{correct}} = \text{clip}\left(\alpha + 0.35 \cdot m_a + 0.10 \cdot \overline{m}_{\text{prereqs}}, 0.05, 0.95\right)
+p_{\text{correct}} = \text{clip}\left(\text{base\_competence} + 0.42 \cdot \alpha \cdot (1.0 - \text{tier\_difficulty}) + 0.12 \cdot \overline{m}_{\text{prereqs}} - \text{cognitive\_load\_penalty}, 0.18, 0.96\right)
 $$
 
 - Điểm bài kiểm tra 4 câu được lấy mẫu theo phân phối nhị thức: $k \sim \text{Binomial}(4, p_{\text{correct}})$.
@@ -142,24 +149,24 @@ Bảng số liệu thống kê đầy đủ trên 500 episodes held-out benchmar
 
 ## 7. Phân Tích Khoa Học & Ý Nghĩa Thực Tiễn
 
-### 7.1. Khả Năng Tự Học Cấu Trúc DAG Tuyệt Đối Của DQN
-- Chỉ số `invalid_action_rate = 0.00%` của phiên bản `DQN_unmasked` chứng minh rằng sau 100.000 bước huấn luyện, mạng nơ-ron đã học được cấu trúc phân cấp đồ thị DAG mà **hoàn toàn không cần áp dụng mặt nạ lọc cưỡng bức (Action Masking)**.
-- Khi người học ở trạng thái bất kỳ, các hành động chọn bài đang khóa (`Locked`) đều có giá trị $Q(s, a)$ âm sâu do bị hàm thưởng phạt $-5.0$, khiến thuật toán tự động loại bỏ việc đề xuất các bài học này.
+### 7.1. Khả Năng Tự Học Cấu Trúc DAG Của DQN
+- Chỉ số `invalid_action_rate = 0.00%` của phiên bản `DQN_unmasked` chứng minh rằng sau 100.000 bước huấn luyện, mạng nơ-ron đã học được cấu trúc phân cấp đồ thị DAG mà **hoàn toàn không cần áp dụng mặt nạ lọc cưỡng bức (Action Masking)** trong mẫu đánh giá.
+- Trong 500 tập đánh giá thử nghiệm với seed = 2026, mô hình không chọn bất kỳ hành động không hợp lệ nào (`invalid_action_rate = 0.00%`). Đối với các trạng thái ghi nhận trong phân phối đánh giá, giá trị $Q(s, a)$ ước tính cho các bài học đang khóa (`Locked`) đều thấp hơn đáng kể so với các bài hợp lệ do chịu ảnh hưởng từ hình phạt $-5.0$ trong quá trình huấn luyện.
 
 ### 7.2. So Sánh DQN Với Thuật Toán Ngẫu Nhiên Hợp Lệ ($B_2$)
-- So với $B_2$, DQN đạt phần thưởng trung bình cao hơn rõ rệt ($98.2700$ vs $97.5510$, kiểm định $t$-test có $p < 0.01$).
-- Số bước hoàn thành khóa học giảm từ $19.20$ xuống $17.88$ bước. Lý do: Thuật toán ngẫu nhiên $B_2$ thường nhảy qua lại giữa nhiều bài học đang mở khóa trên cùng một tầng, dẫn đến việc phân tán nỗ lực của người học; trong khi DQN học được chính sách tập trung học dứt điểm từng khái niệm để kích hoạt điều kiện mở khóa các tầng tiếp theo.
+- So với $B_2$, DQN đạt phần thưởng trung bình cao hơn rõ rệt ($98.2700$ vs $97.5510$, chênh lệch $\Delta = +0.7190$ điểm thưởng).
+- Số bước hoàn thành khóa học giảm từ $19.20$ xuống $17.88$ bước (nhanh hơn $6.9\%$). Lý do: Thuật toán ngẫu nhiên $B_2$ thường nhảy qua lại giữa nhiều bài học đang mở khóa trên cùng một tầng, làm tăng tải trọng nhận thức $\text{cognitive\_load\_penalty}$; trong khi DQN học được chính sách tập trung học dứt điểm từng khái niệm để kích hoạt điều kiện mở khóa các tầng tiếp theo.
 
-### 7.3. So Sánh DQN Với Thuật Toán Chuyên Gia Tham Lam ($B_3$)
-- DQN đạt kết quả tương đương tiệm cận với $B_3$ về số bước ($17.88$ vs $17.86$) và nhỉnh hơn nhẹ về phần thưởng ($98.2700$ vs $98.2690$).
-- Về mặt lý thuyết đồ thị và toán học tối ưu, trên một DAG 12 node với hàm cập nhật thông thạo đơn điệu $\max(m, s)$, nghiệm tham lam cục bộ $B_3$ gần như trùng với nghiệm tối ưu toàn cục. Việc DQN tự tìm ra chính sách có hiệu năng tương đương nghiệm tối ưu của chuyên gia mà không cần cài đặt luật thủ công khẳng định tính đúng đắn và khả năng mở rộng của thuật toán khi không gian bài học tăng lên hàng trăm khái niệm.
+### 7.3. So Sánh DQN Với Thuật Toán Chuyên Gia Tham Lam ($B_3$) & Fixed Curriculum ($B_1$)
+- DQN đạt kết quả tương đương tiệm cận với $B_3$ về số bước ($17.88$ vs $17.86$) và nhỉnh hơn nhẹ về phần thưởng ($98.2700$ vs $98.2690$), đồng thời tương đương Fixed Curriculum ($17.93$).
+- Trong phạm vi 500 tập thử nghiệm (`eval_seed = 2026`), thuật toán DQN đạt số bước tương đương với thuật toán tham lam của chuyên gia $B_3$ ($17.88$ so với $17.86$) và nhỉnh hơn nhẹ về phần thưởng mô phỏng ($98.2700$ so với $98.2690$). Kết quả thực nghiệm này cho thấy chính sách DQN đã học được hành vi đề xuất tương đồng với chuyên gia trên không gian 12 khái niệm mô phỏng mà không cần cài đặt luật thủ công.
 
 ---
 
 ## 8. Thảo Luận Trung Thực Khoa Học Về Giới Hạn Của Mô Phỏng (Simulator Limitations)
 
 Tuân thủ nghiêm ngặt quy tắc đạo đức nghiên cứu [rl-evidence.md](../../.agents/rules/rl-evidence.md), nhóm nghiên cứu khẳng định:
-1. **Không đồng nhất kết quả Simulator với bằng chứng cải thiện học tập thực tế:** Kết quả trên chứng minh mô hình DQN hội tụ toán học và phần mềm vận hành tin cậy trong môi trường `Gymnasium`; nó **chưa phải là bằng chứng lâm sàng chứng minh học viên người thật sẽ học nhanh hơn khi dùng hệ thống**.
+1. **Không đồng nhất kết quả Simulator với bằng chứng cải thiện học tập thực tế:** Kết quả trên phản ánh hiệu năng của chính sách trong môi trường giả lập `Gymnasium` (500 episodes với seed = 2026); nó **hoàn toàn không đại diện và chưa phải là bằng chứng thực nghiệm lâm sàng chứng minh học viên người thật sẽ học nhanh hơn khi dùng hệ thống**.
 2. **Giới hạn của Phân phối Nhị thức & Bộ nhớ Lý tưởng:** Trong `StudentSimulatorEnv`, học viên ảo có năng lực $\alpha$ không đổi và không có hiện tượng quên kiến thức theo thời gian. Trong thực tế, trí nhớ con người suy giảm theo đường cong lãng quên Ebbinghaus và tâm lý thi cử có độ nhiễu nhận thức.
 3. **Định hướng Mở rộng Giai đoạn 2 & 3:** Kết quả này là cơ sở vững chắc để nhóm tích hợp thuật toán Lặp lại Ngắt quãng (Spaced Repetition), kiểm thử A/B với người học thật, và triển khai Học tăng cường Trực tuyến (Online RL) có cập nhật tham số theo thời gian thực.
 

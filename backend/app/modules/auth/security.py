@@ -15,7 +15,7 @@ from app.config import resolve_jwt_secret, settings
 from app.db.models import UserModel
 
 password_hasher = PasswordHasher()
-JWT_SECRET = resolve_jwt_secret()
+JWT_SECRET = resolve_jwt_secret(settings)
 JWT_ALGORITHM = "HS256"
 TOKEN_EXPIRE_HOURS = 12
 

@@ -1,3 +1,5 @@
+import { useFocusTrap } from '../../utils/useFocusTrap'
+
 interface PresetModalProps {
   pendingPreset: { key: string; title: string } | null
   onCancel: () => void
@@ -9,10 +11,13 @@ export function PresetModal({
   onCancel,
   onConfirm,
 }: PresetModalProps) {
+  const containerRef = useFocusTrap(Boolean(pendingPreset), onCancel)
+
   if (!pendingPreset) return null
 
   return (
     <div
+      ref={containerRef}
       role="dialog"
       aria-modal="true"
       aria-labelledby="scr05-modal-title"
@@ -25,7 +30,7 @@ export function PresetModal({
         </h2>
         <p className="text-xs text-[#3F5247]">
           Thao tác này sẽ đặt lại tiến độ 12 khái niệm của tài khoản hiện tại theo{' '}
-          <strong>{pendingPreset.title}</strong> trong 1 giao dịch ACID trên PostgreSQL và đồng bộ sang Redis.
+          <strong>{pendingPreset.title}</strong> để phục vụ quá trình học tập và đánh giá thử nghiệm.
         </p>
         <div className="flex justify-end gap-2">
           <button

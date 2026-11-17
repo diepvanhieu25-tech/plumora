@@ -1,0 +1,71 @@
+{
+  "timestamp": "2026-11-17T10:21:42.308Z",
+  "isNegativeControl": true,
+  "errors": [],
+  "checks": {
+    "unauthRoadmapAbsent": true,
+    "freshAccountMastery": "Đã thông thạo: 0 / 12 khái niệm (0%)",
+    "initialRecommendation": {
+      "status": "active",
+      "policy_source": "dqn",
+      "state_source": "redis_cache",
+      "concept": "os-basics"
+    },
+    "allAAttemptResult": {
+      "correct_count": 1,
+      "attempt_score": 0.25,
+      "passed": false
+    },
+    "passAttemptResult": {
+      "correct_count": 4,
+      "attempt_score": 1,
+      "passed": true,
+      "state_version": 3,
+      "newly_unlocked_slugs": [
+        "db-relational"
+      ]
+    },
+    "persistedMastery": "Đã thông thạo: 1 / 12 khái niệm (8%)",
+    "interleavedAttemptResult": {
+      "status": 200,
+      "passed": true,
+      "state_version": 4,
+      "higherThanA": true
+    },
+    "idempotencyReplay": {
+      "idempotent_replay": true,
+      "state_version": 3,
+      "original_state_version": 3,
+      "state_version_preserved": true,
+      "newly_unlocked_slugs": [
+        "db-relational"
+      ],
+      "original_unlocked_slugs": [
+        "db-relational"
+      ],
+      "unlocked_preserved": true
+    },
+    "submissionIdReuseStatus": 409,
+    "fallbackBannerText": "KHUYẾN NGHỊ THEO QUY TẮC ĐỒ THỊ (TOPO FALLBACK)\nChế độ dự phòng\n[Tầng 2] CSDL Quan hệ (DQN POLICY: Khuyến nghị tối ưu nhất)\n\nDựa trên đồ thị tiên quyết DAG, quy tắc thứ tự tô-pô đề xuất đây là khái niệm phù hợp để học tiếp theo.\n\nMô hình: Quy tắc thứ tự Topo\nBộ đệm: Redis Cache\nTrạng thái: Sẵn sàng học\nBắt đầu bài học đề xuất\nMở khóa tiếp: Tầng 2 → Tầng 3",
+    "fallbackLabelValid": false,
+    "mobileOverflow": {
+      "viewport": 390,
+      "scrollWidth": 390,
+      "noOverflow": true
+    },
+    "mobileClipping": {
+      "clippedCount": 0,
+      "clipped": []
+    },
+    "mobileDrawerButtonVisible": true,
+    "drawerInitialFocusInside": true,
+    "drawerFocusRestored": true,
+    "modalInitialFocusInside": true,
+    "modalTabTrapped": true,
+    "modalFocusRestored": true,
+    "apiFailureSafe": true
+  },
+  "registrationStatus": 201,
+  "username": "audit_h_1794910903084_9255",
+  "allChecksPassed": false
+}
