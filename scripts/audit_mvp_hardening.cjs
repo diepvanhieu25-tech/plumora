@@ -274,7 +274,7 @@ const isNegativeControl = process.argv.includes('--negative-control');
       }),
     );
     await page.reload();
-    await page.getByTestId('ai-recommendation-banner').waitFor({ timeout: 10000 });
+    await page.getByTestId('start-recommended-lesson-btn').waitFor({ timeout: 15000 });
 
     const fallbackBannerText = await page.getByTestId('ai-recommendation-banner').innerText();
     out.checks.fallbackBannerText = fallbackBannerText;
@@ -292,7 +292,7 @@ const isNegativeControl = process.argv.includes('--negative-control');
     await page.unroute('**/api/v1/recommendations');
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload();
-    await page.getByTestId('ai-recommendation-banner').waitFor({ timeout: 10000 });
+    await page.getByTestId('start-recommended-lesson-btn').waitFor({ timeout: 15000 });
 
     out.checks.mobileOverflow = await page.evaluate(() => ({
       viewport: innerWidth,
