@@ -20,13 +20,13 @@ const fs = require('fs');
 const path = require('path');
 
 function resolvePlaywright() {
-  try {
-    return require('playwright').chromium;
-  } catch {}
-  const home = process.env.HOME || require('os').homedir();
   const candidatePackages = [
     process.env.PLAYWRIGHT_PACKAGE_PATH,
+    path.join(__dirname, '../frontend/node_modules/playwright'),
+    'playwright',
   ].filter(Boolean);
+
+  const home = process.env.HOME || require('os').homedir();
 
   const goCache = path.join(home, '.cache/ms-playwright-go');
   if (fs.existsSync(goCache)) {
@@ -92,6 +92,7 @@ const isNegativeControl = process.argv.includes('--negative-control');
 
   const launchOptions = {
     headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
   };
   if (executablePath) {
     launchOptions.executablePath = executablePath;
