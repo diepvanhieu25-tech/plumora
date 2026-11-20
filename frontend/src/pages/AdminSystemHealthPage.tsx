@@ -2,12 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   Activity,
   AlertTriangle,
+  BarChart3,
   CheckCircle2,
   Database,
+  FileText,
   Layers,
   Lock,
   RefreshCw,
-  Server,
   ShieldCheck,
   Zap,
 } from 'lucide-react'
@@ -18,34 +19,57 @@ interface AdminSystemHealthPageProps {
   onNavigate: (view: ActiveView) => void
 }
 
-const SERVICE_META: Record<
-  string,
-  { label: string; port: string; schema: string; role: string }
-> = {
-  auth: {
+const SERVICE_META: Array<{
+  key: string
+  order: string
+  label: string
+  port: string
+  schema: string
+  role: string
+  outboxEvent: string
+}> = [
+  {
+    key: 'auth',
+    order: '1',
     label: 'user-auth-service',
     port: '8001',
     schema: 'auth_svc',
-    role: 'Argon2id + Session & RBAC',
+    role: 'Argon2id + HttpOnly Session & RBAC',
+    outboxEvent: 'UserRegisteredEvent',
   },
-  content_kg: {
+  {
+    key: 'content_kg',
+    order: '2',
     label: 'content-kg-service',
     port: '8002',
     schema: 'content_svc',
-    role: 'Kahn DAG + Multi-Domain KG',
+    role: 'Kahn Topological DAG (Multi-Domain)',
+    outboxEvent: 'DomainGraphPublishedEvent',
   },
-  assessment_grader: {
+  {
+    key: 'assessment_grader',
+    order: '3',
     label: 'assessment-grader-service',
     port: '8003',
     schema: 'assess_svc',
     role: 'Sandbox Worker + Rubric Grader',
+    outboxEvent: 'CompetencyUpdatedEvent',
   },
-  recommendation_ai: {
+  {
+    key: 'recommendation_ai',
+    order: '4',
     label: 'recommendation-ai-service',
     port: '8004',
     schema: 'rec_ai_svc',
     role: 'Masked GNN-PPO + Policy Guardrail',
+    outboxEvent: 'CandidateModelReadyEvent',
   },
+]
+
+function isServiceHealthy(status: string | undefined): boolean {
+  if (!status) return false
+  const s = status.toLowerCase()
+  return s === 'healthy' || s === 'ok' || s === 'up' || s === 'monolith_embedded'
 }
 
 export function AdminSystemHealthPage({ onNavigate }: AdminSystemHealthPageProps) {
@@ -76,212 +100,318 @@ export function AdminSystemHealthPage({ onNavigate }: AdminSystemHealthPageProps
   }, [load])
 
   const serviceEntries = health ? Object.entries(health.services) : []
-  const healthyCount = serviceEntries.filter(([, st]) => st.toLowerCase() === 'healthy' || st.toLowerCase() === 'ok' || st.toLowerCase() === 'up').length
+  const healthyCount = serviceEntries.filter(([, st]) => isServiceHealthy(st)).length
+  const totalServices = Math.max(serviceEntries.length, SERVICE_META.length)
 
   return (
     <section
-      className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 space-y-6"
+      className="w-full px-4 sm:px-6 lg:px-10 py-6 space-y-8 max-w-[1720px] mx-auto"
       data-testid="scr20-admin-health"
     >
-      {/* Header */}
-      <div className="bg-white p-5 rounded-2xl border border-[#D8E2D8] shadow-2xs flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#15803D] uppercase tracking-wider">
-            <Server className="w-4 h-4" aria-hidden="true" />
-            Cổng Admin — Giám sát 4 Microservices, Outbox &amp; Redis Streams (SCR-20)
-          </span>
-          <h1 className="text-xl font-extrabold text-[#14241B] mt-1">
-            Sức khỏe Cụm Dịch vụ Phân tán &amp; Hạ tầng
-          </h1>
+      {/* Section 1: Breadcrumb & Page Header (Stitch SCR-20) */}
+      <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-6 pb-6 border-b border-surface-container-high">
+        <div className="space-y-2">
+          <nav
+            aria-label="Breadcrumbs"
+            className="flex items-center gap-2 text-xs font-label text-on-surface-variant flex-wrap"
+          >
+            <span>Quản trị Hệ thống</span>
+            <span className="text-outline-variant font-mono">/</span>
+            <span>Kiến trúc Phân tán</span>
+            <span className="text-outline-variant font-mono">/</span>
+            <span className="text-primary font-medium">
+              Cụm 4 Microservices &amp; Outbox Health (SCR-20)
+            </span>
+          </nav>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl lg:text-3xl font-headline font-bold text-on-surface tracking-tight">
+              Giám sát Cụm 4 Microservices, Transactional Outbox &amp; Hạ tầng K8s
+            </h1>
+            {health && (
+              <span
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-medium ${
+                  healthyCount === totalServices
+                    ? 'bg-primary-container text-on-primary-container'
+                    : 'bg-[#FFFBEB] text-[#92400E]'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                {healthyCount}/{totalServices} Ready
+              </span>
+            )}
+          </div>
+
+          <p className="text-sm text-on-surface-variant font-body max-w-4xl">
+            Kiểm soát tính độc lập Database Schema, Độ trễ Redis Streams Event Bus, Idempotency và Trạng thái hạ tầng theo chuẩn Kiến trúc Phân tán Plumora.
+          </p>
           {lastUpdated && (
-            <p className="text-xs text-[#57534E] mt-0.5 font-mono">
+            <p className="text-xs text-on-surface-variant font-mono">
               Cập nhật lúc {lastUpdated} • Độ trễ API thực tế: {latencyMs ?? 0} ms
             </p>
           )}
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        {/* Right Header Action Group */}
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           <button
             type="button"
             onClick={() => onNavigate('admin_online_rl')}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-[#D8E2D8] bg-[#F6F8F5] text-[#14241B] hover:border-[#15803D] cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 min-h-[44px] sm:min-h-[38px] rounded-lg bg-surface-container-lowest border border-outline-variant/40 text-xs font-label font-semibold text-on-surface hover:border-primary cursor-pointer"
           >
-            <Activity className="w-3.5 h-3.5 text-[#15803D]" aria-hidden="true" />
+            <Activity className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
             Online RL Monitor
           </button>
           <button
             type="button"
             onClick={() => onNavigate('admin_registry')}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-[#D8E2D8] bg-[#F6F8F5] text-[#14241B] hover:border-[#15803D] cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 min-h-[44px] sm:min-h-[38px] rounded-lg bg-surface-container-lowest border border-outline-variant/40 text-xs font-label font-semibold text-on-surface hover:border-primary cursor-pointer"
           >
-            <ShieldCheck className="w-3.5 h-3.5 text-[#15803D]" aria-hidden="true" />
+            <ShieldCheck className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
             Safety Gate
           </button>
           <button
             type="button"
-            disabled={loading}
             onClick={() => void load()}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-[#15803D] hover:bg-[#166534] disabled:opacity-50 text-white cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 min-h-[44px] sm:min-h-[38px] rounded-lg bg-primary hover:bg-primary-dim text-on-primary font-medium text-xs shadow-sm transition-all cursor-pointer"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
-            Làm mới Trạng thái Cụm Dịch vụ
+            <RefreshCw className="w-4 h-4" aria-hidden="true" />
+            <span>Làm mới Trạng thái</span>
           </button>
         </div>
       </div>
 
-      {loading && !health && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-32 rounded-2xl bg-white border border-[#D8E2D8] animate-pulse" />
-          ))}
-        </div>
-      )}
-
-      {error && (
+      {/* Error State */}
+      {error && !loading && (
         <div
           role="alert"
-          className="p-4 rounded-xl bg-[#FEF2F2] border border-[#FECACA] text-xs font-bold text-[#991B1B] flex items-center justify-between gap-2"
+          className="p-4 rounded-xl bg-[#FEF2F2] border border-[#FECACA] text-xs font-bold text-[#991B1B] flex flex-wrap items-center justify-between gap-3"
         >
-          <span className="inline-flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
-            {error}
-          </span>
+            <span>{error}</span>
+          </div>
           <button
             type="button"
             onClick={() => void load()}
-            className="px-3 py-1 rounded-lg bg-white border border-[#FECACA] text-[#991B1B] cursor-pointer"
+            className="px-3 py-1.5 rounded-lg bg-white border border-[#FECACA] text-[#991B1B] hover:bg-[#FEE2E2] cursor-pointer"
           >
             Thử lại
           </button>
         </div>
       )}
 
-      {health && (
-        <>
-          {/* 4 Top Overview Key Metric Cards (100% Real Data) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="p-5 rounded-2xl bg-white border border-[#D8E2D8] shadow-2xs flex flex-col justify-between gap-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-[#57534E]">
-                  Microservices Online
-                </span>
-                <Server className="w-4 h-4 text-[#15803D]" aria-hidden="true" />
-              </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-extrabold text-[#14241B] font-mono">
-                  {healthyCount} / {serviceEntries.length}
-                </span>
-                <span className="text-xs font-bold text-[#15803D]">
-                  {health.schemas_isolated ? 'Schema Isolated' : 'Shared'}
-                </span>
-              </div>
-            </div>
+      {/* Loading Skeleton */}
+      {loading && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {[0, 1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="h-36 rounded-xl bg-surface-container-lowest border border-outline-variant/20 animate-pulse"
+            />
+          ))}
+        </div>
+      )}
 
-            <div className="p-5 rounded-2xl bg-white border border-[#D8E2D8] shadow-2xs flex flex-col justify-between gap-3">
+      {/* Section 2: Top Overview Key Metric Cards */}
+      {!loading && health && (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {/* Card 1 */}
+            <div className="p-5 rounded-xl bg-surface-container-lowest shadow-sm border border-outline-variant/15 flex flex-col justify-between space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-[#57534E]">
-                  Độ trễ Redis Streams
+                <span className="text-xs font-label uppercase tracking-wider text-on-surface-variant">
+                  Tổng số Microservices
                 </span>
-                <Zap className="w-4 h-4 text-[#0D9488]" aria-hidden="true" />
+                <div className="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary">
+                  <Layers className="w-4 h-4" aria-hidden="true" />
+                </div>
               </div>
-              <div className="flex items-baseline gap-2">
+              <div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-headline font-bold text-on-surface tracking-tight">
+                    {healthyCount} / {totalServices}
+                  </span>
+                  <span className="text-xs font-semibold text-primary">Active</span>
+                </div>
+                <p className="text-xs text-on-surface-variant mt-1">
+                  Trạng thái kết nối các module dịch vụ
+                </p>
+              </div>
+              <div className="pt-3 border-t border-surface-container flex items-center justify-between text-[11px] font-mono">
+                <span className="text-on-surface-variant">Multi-Schema</span>
                 <span
-                  className={`text-2xl font-extrabold font-mono ${
-                    health.redis_stream_lag_ms > 500 ? 'text-[#B45309]' : 'text-[#0F766E]'
+                  className={`px-2 py-0.5 rounded font-semibold ${
+                    health.schemas_isolated
+                      ? 'bg-primary-container text-on-primary-container'
+                      : 'bg-[#FFFBEB] text-[#92400E]'
                   }`}
                 >
-                  {health.redis_stream_lag_ms} ms
+                  {health.schemas_isolated ? 'Schema Isolated' : 'Unverified'}
                 </span>
-                <span className="text-xs text-[#57534E]">Mục tiêu &lt; 500ms</span>
               </div>
             </div>
 
-            <div className="p-5 rounded-2xl bg-white border border-[#D8E2D8] shadow-2xs flex flex-col justify-between gap-3">
+            {/* Card 2 */}
+            <div className="p-5 rounded-xl bg-surface-container-lowest shadow-sm border border-outline-variant/15 flex flex-col justify-between space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-[#57534E]">
-                  Hàng đợi Outbox
+                <span className="text-xs font-label uppercase tracking-wider text-on-surface-variant">
+                  Độ trễ Redis Streams
                 </span>
-                <Layers className="w-4 h-4 text-[#15803D]" aria-hidden="true" />
+                <div className="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-secondary">
+                  <Zap className="w-4 h-4" aria-hidden="true" />
+                </div>
               </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-extrabold text-[#14241B] font-mono">
-                  {health.outbox_pending_count}
+              <div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-headline font-bold text-secondary tracking-tight">
+                    {health.redis_stream_lag_ms}ms
+                  </span>
+                  <span className="text-xs font-semibold text-secondary">Consumer Lag</span>
+                </div>
+                <p className="text-xs text-on-surface-variant mt-1">
+                  {health.redis_connected
+                    ? 'Redis 7 đã kết nối ổn định'
+                    : 'Redis mất kết nối — chạy fallback'}
+                </p>
+              </div>
+              <div className="pt-3 border-t border-surface-container flex items-center justify-between text-[11px] font-mono">
+                <span className="text-on-surface-variant">Realtime Event Bus</span>
+                <span
+                  className={`px-2 py-0.5 rounded font-semibold ${
+                    health.redis_connected
+                      ? 'bg-secondary-container text-on-secondary-container'
+                      : 'bg-[#FEE2E2] text-[#991B1B]'
+                  }`}
+                >
+                  {health.redis_connected ? 'Connected' : 'Disconnected'}
                 </span>
-                <span className="text-xs text-[#57534E]">bản ghi chờ</span>
               </div>
             </div>
 
-            <div className="p-5 rounded-2xl bg-white border border-[#D8E2D8] shadow-2xs flex flex-col justify-between gap-3">
+            {/* Card 3 */}
+            <div className="p-5 rounded-xl bg-surface-container-lowest shadow-sm border border-outline-variant/15 flex flex-col justify-between space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-[#57534E]">
-                  Graph Cache Hit Rate
+                <span className="text-xs font-label uppercase tracking-wider text-on-surface-variant">
+                  Hàng đợi Outbox Tồn đọng
                 </span>
-                <Database className="w-4 h-4 text-[#D97706]" aria-hidden="true" />
+                <div className="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary">
+                  <FileText className="w-4 h-4" aria-hidden="true" />
+                </div>
               </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-extrabold text-[#15803D] font-mono">
-                  {Math.round(health.graph_cache_hit_rate * 100)}%
+              <div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-headline font-bold text-on-surface tracking-tight">
+                    {health.outbox_pending_count}
+                  </span>
+                  <span className="text-xs font-semibold text-primary">bản ghi</span>
+                </div>
+                <p className="text-xs text-on-surface-variant mt-1">
+                  Transactional Outbox đồng bộ sự kiện
+                </p>
+              </div>
+              <div className="pt-3 border-t border-surface-container flex items-center justify-between text-[11px] font-mono">
+                <span className="text-on-surface-variant">Invariant Rule</span>
+                <span className="px-2 py-0.5 rounded bg-primary-container text-on-primary-container font-semibold">
+                  INV-OUTBOX-01
                 </span>
-                <span className="text-xs text-[#57534E]">
-                  {health.redis_connected ? 'Redis Connected' : 'Disconnected'}
+              </div>
+            </div>
+
+            {/* Card 4 */}
+            <div className="p-5 rounded-xl bg-surface-container-lowest shadow-sm border border-outline-variant/15 flex flex-col justify-between space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-label uppercase tracking-wider text-on-surface-variant">
+                  Cache Hit Graph-State
+                </span>
+                <div className="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-tertiary">
+                  <BarChart3 className="w-4 h-4" aria-hidden="true" />
+                </div>
+              </div>
+              <div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-headline font-bold text-on-surface tracking-tight">
+                    {(health.graph_cache_hit_rate * 100).toFixed(1)}%
+                  </span>
+                  <span className="text-xs font-semibold text-tertiary">Cache Rate</span>
+                </div>
+                <p className="text-xs text-on-surface-variant mt-1">
+                  Tỷ lệ trúng bộ nhớ đệm Redis Graph State
+                </p>
+              </div>
+              <div className="pt-3 border-t border-surface-container flex items-center justify-between text-[11px] font-mono">
+                <span className="text-on-surface-variant">API Latency</span>
+                <span className="px-2 py-0.5 rounded bg-surface-container-high text-on-surface font-semibold">
+                  {latencyMs ?? 0}ms
                 </span>
               </div>
             </div>
           </div>
 
-          {/* 4 Microservices Health & Schema Ownership Cards */}
-          <div className="space-y-3">
+          {/* Section 3: 4 Microservices Health & Schema Ownership Cards */}
+          <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-extrabold text-[#14241B]">
-                Trạng thái Cụm 4 Microservices &amp; Schema Ownership
-              </h2>
-              <span className="text-xs font-mono text-[#57534E]">
-                Strict Database Isolation • Không Cross-Schema JOIN
-              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-lg font-headline font-bold text-on-surface">
+                  Trạng thái Cụm 4 Microservices &amp; Schema Ownership
+                </h2>
+                <span className="text-xs font-mono text-on-surface-variant">
+                  (Strict Database Isolation • Không Cross-Schema JOIN)
+                </span>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {serviceEntries.map(([svc, st]) => {
-                const meta = SERVICE_META[svc] ?? {
-                  label: svc,
-                  port: '—',
-                  schema: svc,
-                  role: 'Microservice',
-                }
-                const isUp = ['healthy', 'ok', 'up'].includes(st.toLowerCase())
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+              {SERVICE_META.map((svc) => {
+                const rawStatus = health.services[svc.key] ?? 'unknown'
+                const ok = isServiceHealthy(rawStatus)
                 return (
                   <div
-                    key={svc}
-                    className="bg-white p-5 rounded-2xl border border-[#D8E2D8] shadow-2xs flex flex-col justify-between gap-3.5"
+                    key={svc.key}
+                    className="p-5 rounded-xl bg-surface-container-lowest shadow-sm border border-outline-variant/15 flex flex-col justify-between space-y-4"
                   >
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-[#F6F8F5] border border-[#D8E2D8] text-[#57534E]">
-                          Port {meta.port}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-surface-container text-on-surface-variant">
+                          Port {svc.port}
                         </span>
                         <span
-                          className={`inline-flex items-center gap-1 text-[11px] font-mono font-bold px-2 py-0.5 rounded-full border ${
-                            isUp
-                              ? 'bg-[#F0FDF4] text-[#15803D] border-[#86EFAC]'
-                              : 'bg-[#FEF2F2] text-[#991B1B] border-[#FECACA]'
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-mono font-medium ${
+                            ok
+                              ? 'bg-primary-container text-on-primary-container'
+                              : 'bg-[#FEE2E2] text-[#991B1B]'
                           }`}
                         >
-                          <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
-                          {st.toUpperCase()}
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              ok ? 'bg-primary animate-pulse' : 'bg-[#9F1239]'
+                            }`}
+                          />
+                          {rawStatus.toUpperCase()}
                         </span>
                       </div>
-                      <h3 className="text-sm font-extrabold text-[#14241B] font-mono">
-                        {meta.label}
-                      </h3>
-                      <p className="text-xs text-[#57534E]">{meta.role}</p>
+                      <div>
+                        <h3 className="text-base font-headline font-bold text-on-surface">
+                          {svc.order}. {svc.label}
+                        </h3>
+                        <p className="text-xs font-body text-on-surface-variant mt-0.5">
+                          {svc.role}
+                        </p>
+                      </div>
                     </div>
 
-                    <div className="p-2.5 rounded-xl bg-[#F6F8F5] border border-[#D8E2D8] flex items-center justify-between text-xs font-mono">
-                      <span className="text-[#57534E]">DB Schema:</span>
-                      <span className="text-[#15803D] font-bold inline-flex items-center gap-1">
-                        <Lock className="w-3 h-3" aria-hidden="true" />
-                        {meta.schema}
-                      </span>
+                    <div className="p-3 rounded-lg bg-surface-container-low space-y-2">
+                      <div className="flex items-center justify-between text-xs gap-2">
+                        <span className="text-on-surface-variant font-label">DB Schema:</span>
+                        <span className="font-mono text-primary font-semibold flex items-center gap-1">
+                          <Lock className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                          {svc.schema}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="text-[11px] font-mono text-on-surface-variant truncate">
+                      <span className="text-on-surface font-medium">Outbox:</span> {svc.outboxEvent}
                     </div>
                   </div>
                 )
@@ -289,48 +419,127 @@ export function AdminSystemHealthPage({ onNavigate }: AdminSystemHealthPageProps
             </div>
           </div>
 
-          {/* Deep Telemetry Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white p-5 rounded-2xl border border-[#D8E2D8] space-y-2.5 shadow-2xs">
-              <div className="text-xs font-bold uppercase tracking-wider text-[#57534E]">
-                PostgreSQL 16 Schema Isolation &amp; Transactional Outbox
+          {/* Section 4: Transactional Outbox & Infrastructure Summary */}
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+            <div className="xl:col-span-7 p-6 rounded-xl bg-surface-container-lowest shadow-sm border border-outline-variant/15 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-surface-container">
+                <div>
+                  <h2 className="text-base font-headline font-bold text-on-surface">
+                    Bảng Giám sát Transactional Outbox &amp; Redis Streams Event Bus
+                  </h2>
+                  <p className="text-xs text-on-surface-variant mt-0.5">
+                    Bảo toàn tính nhất quán eventual consistency giữa các dịch vụ (No Distributed 2PC).
+                  </p>
+                </div>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface-container text-xs font-mono text-on-surface shrink-0">
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      health.redis_connected ? 'bg-primary' : 'bg-[#9F1239]'
+                    }`}
+                  />
+                  Redis 7 Streams
+                </span>
               </div>
-              <div className="text-sm font-extrabold text-[#15803D]">
-                {health.schemas_isolated
-                  ? '4 Schema Cô lập: auth_svc, content_svc, assess_svc, rec_ai_svc'
-                  : 'Chưa cô lập'}
-              </div>
-              <div className="text-xs text-[#3F5247] font-mono">
-                Outbox Pending Events: <strong>{health.outbox_pending_count}</strong> • INV-OUTBOX-01
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="text-[11px] font-mono text-on-surface-variant border-b border-surface-container uppercase">
+                      <th className="py-3 px-3">Sự kiện &amp; Luồng đi</th>
+                      <th className="py-3 px-2 text-center">Pending Outbox</th>
+                      <th className="py-3 px-2 text-center">Stream Lag</th>
+                      <th className="py-3 px-3 text-right">Trạng thái</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-surface-container text-xs font-mono">
+                    <tr className="hover:bg-surface-container-low transition-colors">
+                      <td className="py-3.5 px-3">
+                        <div className="font-bold text-on-surface">CompetencyUpdatedEvent</div>
+                        <div className="text-[11px] text-on-surface-variant flex items-center gap-1 mt-0.5">
+                          <span className="text-primary font-medium">assess_svc</span>
+                          <span>-&gt;</span>
+                          <span className="text-secondary font-medium">rec_ai_svc</span>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-2 text-center">
+                        <span className="px-2 py-0.5 rounded bg-surface-container text-on-surface font-semibold">
+                          {health.outbox_pending_count}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-2 text-center text-primary font-semibold">
+                        {health.redis_stream_lag_ms}ms
+                      </td>
+                      <td className="py-3.5 px-3 text-right">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-primary-container text-on-primary-container font-semibold text-[11px]">
+                          <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
+                          Active
+                        </span>
+                      </td>
+                    </tr>
+                    <tr className="hover:bg-surface-container-low transition-colors">
+                      <td className="py-3.5 px-3">
+                        <div className="font-bold text-on-surface">DomainGraphPublishedEvent</div>
+                        <div className="text-[11px] text-on-surface-variant flex items-center gap-1 mt-0.5">
+                          <span className="text-primary font-medium">content_svc</span>
+                          <span>-&gt;</span>
+                          <span className="text-secondary font-medium">rec_ai_svc</span>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-2 text-center">
+                        <span className="px-2 py-0.5 rounded bg-surface-container text-on-surface font-semibold">
+                          0
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-2 text-center text-primary font-semibold">
+                        {health.redis_stream_lag_ms}ms
+                      </td>
+                      <td className="py-3.5 px-3 text-right">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-secondary-container text-on-secondary-container font-semibold text-[11px]">
+                          <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
+                          Synced
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
 
-            <div className="bg-white p-5 rounded-2xl border border-[#D8E2D8] space-y-2.5 shadow-2xs">
-              <div className="text-xs font-bold uppercase tracking-wider text-[#57534E]">
-                Redis 7 Streams &amp; Graph-State Cache
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-[#3F5247]">Redis Streams Lag (mục tiêu &lt; 500ms):</span>
-                <strong
-                  className={`font-mono ${
-                    health.redis_stream_lag_ms > 500 ? 'text-[#B45309]' : 'text-[#15803D]'
-                  }`}
-                >
-                  {health.redis_stream_lag_ms} ms
-                </strong>
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-[#3F5247]">Graph Cache Hit Rate:</span>
-                  <strong className="text-[#15803D] font-mono">
-                    {Math.round(health.graph_cache_hit_rate * 100)}%
-                  </strong>
+            <div className="xl:col-span-5 p-6 rounded-xl bg-surface-container-lowest shadow-sm border border-outline-variant/15 space-y-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                  <Database className="w-4 h-4" aria-hidden="true" />
                 </div>
-                <div className="w-full h-2 rounded-full bg-[#F1F5F9] overflow-hidden">
-                  <div
-                    className="h-full bg-[#15803D] rounded-full"
-                    style={{ width: `${Math.round(health.graph_cache_hit_rate * 100)}%` }}
-                  />
+                <div>
+                  <h2 className="text-base font-headline font-bold text-on-surface">
+                    Cô lập Schema &amp; Hạ tầng Kubernetes
+                  </h2>
+                  <p className="text-xs text-on-surface-variant">
+                    Khai báo sẵn trong <code className="font-mono">k8s/</code> &amp; Docker Compose profiles
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2.5 text-xs font-mono bg-surface-container-low p-4 rounded-xl">
+                <div className="flex justify-between items-center py-1">
+                  <span className="text-on-surface-variant font-label">4-Schema Isolation:</span>
+                  <span className="font-bold text-primary">
+                    {health.schemas_isolated ? 'Verified (4 schemas)' : 'Degraded'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-1">
+                  <span className="text-on-surface-variant font-label">Redis State Cache:</span>
+                  <span className="font-bold text-on-surface">
+                    {health.redis_connected ? 'Connected' : 'Fallback'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-1">
+                  <span className="text-on-surface-variant font-label">Sandbox Network Policy:</span>
+                  <span className="font-bold text-on-surface">k8s/network-policy.yaml</span>
+                </div>
+                <div className="flex justify-between items-center py-1">
+                  <span className="text-on-surface-variant font-label">Auto-scaling (HPA):</span>
+                  <span className="font-bold text-on-surface">k8s/hpa.yaml</span>
                 </div>
               </div>
             </div>
