@@ -12,6 +12,7 @@ export type ActiveView =
   | 'domains'
   | 'placement'
   | 'domain_roadmap'
+  | 'playbook'
   | 'depth_probe'
   | 'code_sandbox'
   | 'expert_domains'

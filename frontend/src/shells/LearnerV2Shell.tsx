@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import { AdaptivePlacementPage } from '../pages/AdaptivePlacementPage'
 import { CodeSandboxPage } from '../pages/CodeSandboxPage'
 import { DepthProbePage } from '../pages/DepthProbePage'
+import { LessonPlaybookPage } from '../pages/LessonPlaybookPage'
 import { MultiDomainHubPage } from '../pages/MultiDomainHubPage'
 import { MultiDomainRoadmapPage } from '../pages/MultiDomainRoadmapPage'
-import type { ActiveView } from '../types'
+import type { ActiveView, DomainRoadmapNode } from '../types'
 
 interface LearnerV2ShellProps {
   activeView: ActiveView
@@ -21,6 +22,7 @@ export function LearnerV2Shell({
 }: LearnerV2ShellProps) {
   const [activeDomainSlug, setActiveDomainSlug] = useState<string>(routeDomainSlug || 'backend')
   const [activeConceptSlug, setActiveConceptSlug] = useState<string>(routeConceptSlug || 'net-internet')
+  const [playbookNode, setPlaybookNode] = useState<DomainRoadmapNode | null>(null)
   const [sessionMode, setSessionMode] = useState<'depth_probe' | 'spaced_review'>('depth_probe')
 
   useEffect(() => {
@@ -64,6 +66,12 @@ export function LearnerV2Shell({
       <MultiDomainRoadmapPage
         domainSlug={activeDomainSlug}
         onBackToHub={() => onNavigate('domains')}
+        onOpenPlaybook={(dSlug, node) => {
+          setActiveDomainSlug(dSlug)
+          setActiveConceptSlug(node.slug)
+          setPlaybookNode(node)
+          onNavigate('playbook', { domainSlug: dSlug, conceptSlug: node.slug })
+        }}
         onStartDepthProbe={(dSlug, cSlug) => {
           setActiveDomainSlug(dSlug)
           setActiveConceptSlug(cSlug)
@@ -80,6 +88,26 @@ export function LearnerV2Shell({
           setActiveConceptSlug(cSlug)
           setSessionMode('spaced_review')
           onNavigate('depth_probe', { domainSlug: dSlug, conceptSlug: cSlug })
+        }}
+      />
+    )
+  }
+
+  if (activeView === 'playbook') {
+    return (
+      <LessonPlaybookPage
+        domainSlug={activeDomainSlug}
+        conceptSlug={activeConceptSlug}
+        initialNode={playbookNode}
+        onBackToRoadmap={() => onNavigate('domain_roadmap', { domainSlug: activeDomainSlug })}
+        onStartDepthProbe={(cSlug) => {
+          setActiveConceptSlug(cSlug)
+          setSessionMode('depth_probe')
+          onNavigate('depth_probe', { domainSlug: activeDomainSlug, conceptSlug: cSlug })
+        }}
+        onStartCodeSandbox={(cSlug) => {
+          setActiveConceptSlug(cSlug)
+          onNavigate('code_sandbox', { domainSlug: activeDomainSlug, conceptSlug: cSlug })
         }}
       />
     )

@@ -21,13 +21,13 @@ import {
   Zap,
 } from 'lucide-react'
 import { apiGetDomainRoadmap, apiGetV2Recommendation } from '../api'
-import { LessonPlaybookModal } from '../components/LessonPlaybookModal'
 import { MultiDomainKgNodeCard } from '../components/MultiDomainKgNodeCard'
 import type { DomainRoadmapNode, DomainRoadmapResponse, V2RecommendationResponse } from '../types'
 
 interface MultiDomainRoadmapPageProps {
   domainSlug: string
   onBackToHub: () => void
+  onOpenPlaybook: (domainSlug: string, node: DomainRoadmapNode) => void
   onStartDepthProbe: (domainSlug: string, conceptSlug: string) => void
   onStartCodeSandbox: (domainSlug: string, conceptSlug: string) => void
   onStartReview: (domainSlug: string, conceptSlug: string) => void
@@ -62,6 +62,7 @@ const MODE_LABELS: Record<string, { title: string; desc: string }> = {
 export function MultiDomainRoadmapPage({
   domainSlug,
   onBackToHub,
+  onOpenPlaybook,
   onStartDepthProbe,
   onStartCodeSandbox,
   onStartReview,
@@ -71,7 +72,6 @@ export function MultiDomainRoadmapPage({
   const [filterMode, setFilterMode] = useState<'all' | 'recommended' | 'review' | 'shared'>('all')
   const [simDays, setSimDays] = useState<number>(0)
   const [showRlDetails, setShowRlDetails] = useState(false)
-  const [playbookNode, setPlaybookNode] = useState<DomainRoadmapNode | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -431,7 +431,7 @@ export function MultiDomainRoadmapPage({
                       {recommendedNode && (
                         <button
                           type="button"
-                          onClick={() => setPlaybookNode(recommendedNode)}
+                          onClick={() => onOpenPlaybook(domainSlug, recommendedNode)}
                           className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white border border-primary/30 text-primary hover:bg-primary-container/20 font-label font-bold text-xs shadow-2xs transition-all cursor-pointer"
                         >
                           <BookOpen className="w-4 h-4" aria-hidden="true" />
@@ -717,7 +717,7 @@ export function MultiDomainRoadmapPage({
                         key={node.slug}
                         node={node}
                         isRecommended={node.slug === recommendedSlug}
-                        onOpenPlaybook={(n) => setPlaybookNode(n)}
+                        onOpenPlaybook={(n) => onOpenPlaybook(domainSlug, n)}
                         onStartDepthProbe={(slug) => onStartDepthProbe(domainSlug, slug)}
                         onStartCodeSandbox={(slug) => onStartCodeSandbox(domainSlug, slug)}
                         onStartReview={(slug) => onStartReview(domainSlug, slug)}
@@ -730,13 +730,6 @@ export function MultiDomainRoadmapPage({
           </div>
         </>
       )}
-
-      <LessonPlaybookModal
-        node={playbookNode}
-        onClose={() => setPlaybookNode(null)}
-        onStartDepthProbe={(slug) => onStartDepthProbe(domainSlug, slug)}
-        onStartCodeSandbox={(slug) => onStartCodeSandbox(domainSlug, slug)}
-      />
     </section>
   )
 }

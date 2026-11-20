@@ -22,7 +22,7 @@ interface MultiDomainKgNodeCardProps {
   onStartReview: (slug: string) => void
 }
 
-function getDepthBadge(depthNorm: number) {
+function getDepthBadge(depthNorm: number, isEligible: boolean) {
   if (depthNorm >= 1.0) {
     return {
       label: 'Mastery 100%',
@@ -56,7 +56,7 @@ function getDepthBadge(depthNorm: number) {
     }
   }
   return {
-    label: 'Chưa kiểm chứng (0%)',
+    label: isEligible ? 'Sẵn sàng học (0%)' : 'Chưa mở khóa',
     bg: 'bg-surface-container text-on-surface-variant',
     bar: 'bg-outline-variant',
     Icon: Layers,
@@ -71,7 +71,7 @@ export function MultiDomainKgNodeCard({
   onStartCodeSandbox,
   onStartReview,
 }: MultiDomainKgNodeCardProps) {
-  const badge = getDepthBadge(node.depth_level_norm)
+  const badge = getDepthBadge(node.depth_level_norm, node.is_eligible)
   const BadgeIcon = badge.Icon
   const depthPct = Math.round(node.depth_level_norm * 100)
   const retentionPct = Math.round(node.retention_ebbinghaus * 100)

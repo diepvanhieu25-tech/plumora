@@ -115,6 +115,7 @@ export function Header({ user, portal = 'learner', activeView, onNavigate, onLog
                 activeView === 'domains' ||
                 activeView === 'placement' ||
                 activeView === 'domain_roadmap' ||
+                activeView === 'playbook' ||
                 activeView === 'depth_probe' ||
                 activeView === 'code_sandbox'
                   ? 'text-[#14532D] bg-[#DCFCE7] border-[#16A34A]'

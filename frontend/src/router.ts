@@ -78,6 +78,17 @@ export function parseRoute(pathname: string): ParsedRoute {
     }
   }
 
+  const playbookMatch = clean.match(/^\/concepts\/([^/]+)\/playbook$/)
+  if (playbookMatch) {
+    return {
+      portal: 'learner',
+      view: 'playbook',
+      isLoginPath: false,
+      isRegisterPath: false,
+      conceptSlug: decodeURIComponent(playbookMatch[1]),
+    }
+  }
+
   const depthMatch = clean.match(/^\/concepts\/([^/]+)\/depth-probe$/)
   if (depthMatch) {
     return {
@@ -121,6 +132,8 @@ export function pathForView(
       return `/domains/${domain}/placement`
     case 'domain_roadmap':
       return `/domains/${domain}/roadmap`
+    case 'playbook':
+      return `/concepts/${concept}/playbook`
     case 'depth_probe':
       return `/concepts/${concept}/depth-probe`
     case 'code_sandbox':
