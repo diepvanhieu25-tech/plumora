@@ -75,29 +75,50 @@ flowchart LR
 
 ---
 
-## 3. Kiến trúc Kỹ thuật Đang Vận hành
+## 3. Sơ đồ System Design Hệ thống Hiện tại
+
+Chi tiết đầy đủ bộ sơ đồ C4 Container, Deployment Topology (`Docker` & `Kubernetes`), ERD 4 Schema độc lập và Sequence Diagrams xem tại [docs/design.md](docs/design.md).
 
 ```mermaid
-flowchart TD
-    UI[React 19 + TypeScript + Tailwind CSS v4] -->|HTTP JSON / HttpOnly Cookie| API[FastAPI API :8000]
+flowchart TB
+    User([Nguoi dung: Hoc vien / Chuyen gia / Quan tri]) -->|HTTP :3000| Nginx[Nginx Edge + Security Headers / CSP]
 
-    subgraph Bounded_Contexts [4 Bounded Contexts]
-        Auth[Auth: Argon2id + JWT jti Revocation + RBAC 403]
-        Content[Content KG: 31 Concepts + Kahn DAG Validator]
-        Assess[Assessment: 5-Depth SM + Code Sandbox + Rubric + Outbox]
-        Rec[Recommendation: GNN-PPO Serving + Guardrail + Safe Online RL]
+    subgraph Frontend_SPA [React 19 + TypeScript + Tailwind CSS v4]
+        P1[Learner Portal: /login, /domains, /placement, /roadmap, /playbook, /depth-probe, /code-sandbox]
+        P2[Expert Portal: /expert/login, /expert/domains, /questions, /code-challenges]
+        P3[Admin Portal: /admin/login, /online-rl, /model-registry, /system-health]
     end
 
-    API --> Auth & Content & Assess & Rec
-    Auth & Content & Assess & Rec --> PG[(PostgreSQL 16: auth_svc, content_svc, assess_svc, rec_ai_svc)]
-    Assess -->|Transactional Outbox| RD[(Redis 7: State Cache, Revoked JTI, Streams)]
-    Rec <-->|Graph State Cache| RD
-    Rec -->|Inference| CKPT[gnn_ppo_v2_base.zip]
+    Nginx -->|Static SPA + Proxy /api| GW[FastAPI API Gateway / Monolith :8000]
+
+    subgraph Services_Layer [4 Bounded Contexts / Microservices]
+        S1[user-auth-service :8001<br/>Argon2id + JWT jti + RBAC 403]
+        S2[content-kg-service :8002<br/>31 Concepts + Kahn DAG Validator]
+        S3[assessment-grader-service :8003<br/>Placement + 5-Depth SM + Sandbox 128MB/3s + Rubric]
+        S4[recommendation-ai-service :8004<br/>GNN-PPO 3-Layer + Guardrail + Ebbinghaus + Safe Online RL]
+    end
+
+    GW --> S1 & S2 & S3 & S4
+
+    subgraph Data_and_Event_Bus [Persistence, Cache & Event Streaming]
+        PG[(PostgreSQL 16<br/>Schemas: auth_svc, content_svc, assess_svc, rec_ai_svc<br/>SELECT FOR UPDATE + outbox_events)]
+        RD[(Redis 7<br/>Graph State Cache + Revoked JTI + Redis Streams)]
+        CKPT[RL Model Registry<br/>gnn_ppo_v2_base.zip + Candidate Checkpoints]
+    end
+
+    S1 --> PG
+    S1 <-->|JTI Blocklist| RD
+    S2 --> PG
+    S3 -->|ACID Tx + Outbox| PG
+    S3 -->|Publish CompetencyUpdatedEvent| RD
+    S4 <-->|Read/Write Graph Observation| RD
+    S4 -->|Fallback & Registry| PG
+    S4 -->|Load & Evaluate| CKPT
 ```
 
 - **PostgreSQL 16:** Lưu trữ toàn bộ dữ liệu nghiệp vụ, tách 4 schema (`auth_svc`, `content_svc`, `assess_svc`, `rec_ai_svc`), bảo toàn giao dịch bằng `SELECT ... FOR UPDATE` và chống nộp trùng qua `submission_id`.
 - **Redis 7:** Lưu cache trạng thái đồ thị, danh sách thu hồi JWT (`jti`) sau đăng xuất và luồng sự kiện `Redis Streams` từ `Transactional Outbox`.
-- **Chế độ Chạy Hỗ trợ:** Hỗ trợ chạy cụm Monolith tiêu chuẩn (`docker compose up -d --build`) hoặc cụm 4 Microservices + API Gateway (`docker compose --profile microservices up -d --build`) cùng manifests Kubernetes (`k8s/`).
+- **Chế độ Triển khai:** Hỗ trợ chạy cụm Monolith tiêu chuẩn (`docker compose up -d --build`) hoặc cụm 4 Microservices + API Gateway (`docker compose --profile microservices up -d --build`) cùng manifests Kubernetes (`k8s/` với `HPA` và `NetworkPolicy`).
 
 ---
 
