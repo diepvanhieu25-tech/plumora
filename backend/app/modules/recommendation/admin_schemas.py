@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -39,3 +40,4 @@ class OnlineRlStatusResponse(BaseModel):
     kl_target_max: float
     active_model: ModelRegistryItemOut | None
     models: list[ModelRegistryItemOut]
+    benchmark_report: dict[str, Any] | None = None

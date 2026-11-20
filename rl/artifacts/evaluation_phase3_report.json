@@ -1,7 +1,7 @@
 {
   "eval_seed": 2026,
   "episodes": 500,
-  "checkpoint_sha256": "9977d5f606427d0eb25970b1ce8cf23fa0232e2d7ff0fe392e80d2413d534201",
+  "checkpoint_sha256": "1a074299ef8edfad6a64c9c58f2eb35e664bbaa56c04054f043efb03c7a7d861",
   "selected_seed": 101,
   "scenario_a_known_domains": {
     "heuristic_b1": {
@@ -36,20 +36,40 @@
     },
     "dqn_mlp_unmasked": {
       "episodes": 500,
-      "mean_reward": -151.5628,
-      "std_reward": 5.5413,
-      "median_reward": -152.0689,
-      "iqr_reward": 7.2148,
+      "mean_reward": -147.1474,
+      "std_reward": 9.9234,
+      "median_reward": -150.0523,
+      "iqr_reward": 14.5475,
+      "invalid_action_rate": 0.0,
+      "masked_violation_rate": 0.0,
+      "completion_rate": 0.0
+    },
+    "dqn_mlp_masked": {
+      "episodes": 500,
+      "mean_reward": 24.2939,
+      "std_reward": 5.6534,
+      "median_reward": 24.4314,
+      "iqr_reward": 7.6123,
       "invalid_action_rate": 0.0,
       "masked_violation_rate": 0.0,
       "completion_rate": 0.0
     },
     "ppo_mlp_unmasked": {
       "episodes": 500,
-      "mean_reward": -157.688,
-      "std_reward": 6.8729,
-      "median_reward": -157.25,
-      "iqr_reward": 10.75,
+      "mean_reward": -165.642,
+      "std_reward": 2.9386,
+      "median_reward": -165.75,
+      "iqr_reward": 4.5,
+      "invalid_action_rate": 0.0,
+      "masked_violation_rate": 0.0,
+      "completion_rate": 0.0
+    },
+    "ppo_mlp_masked": {
+      "episodes": 500,
+      "mean_reward": 29.3585,
+      "std_reward": 5.9072,
+      "median_reward": 30.0355,
+      "iqr_reward": 7.807,
       "invalid_action_rate": 0.0,
       "masked_violation_rate": 0.0,
       "completion_rate": 0.0
@@ -108,20 +128,40 @@
     },
     "dqn_mlp_unmasked": {
       "episodes": 500,
-      "mean_reward": -148.2334,
-      "std_reward": 4.9309,
-      "median_reward": -149.2008,
-      "iqr_reward": 6.9818,
+      "mean_reward": -149.7889,
+      "std_reward": 4.4135,
+      "median_reward": -150.1847,
+      "iqr_reward": 5.0733,
+      "invalid_action_rate": 0.0,
+      "masked_violation_rate": 0.0,
+      "completion_rate": 0.0
+    },
+    "dqn_mlp_masked": {
+      "episodes": 500,
+      "mean_reward": 22.3804,
+      "std_reward": 5.0033,
+      "median_reward": 22.2336,
+      "iqr_reward": 7.0383,
       "invalid_action_rate": 0.0,
       "masked_violation_rate": 0.0,
       "completion_rate": 0.0
     },
     "ppo_mlp_unmasked": {
       "episodes": 500,
-      "mean_reward": -148.975,
-      "std_reward": 4.2991,
-      "median_reward": -148.95,
+      "mean_reward": -165.642,
+      "std_reward": 2.9386,
+      "median_reward": -165.75,
       "iqr_reward": 4.5,
+      "invalid_action_rate": 0.0,
+      "masked_violation_rate": 0.0,
+      "completion_rate": 0.0
+    },
+    "ppo_mlp_masked": {
+      "episodes": 500,
+      "mean_reward": 29.6099,
+      "std_reward": 5.849,
+      "median_reward": 30.066,
+      "iqr_reward": 7.0966,
       "invalid_action_rate": 0.0,
       "masked_violation_rate": 0.0,
       "completion_rate": 0.0

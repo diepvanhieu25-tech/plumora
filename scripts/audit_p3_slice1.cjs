@@ -185,8 +185,11 @@ async function main() {
     await page.goto(`${baseUrl}/expert/domains`, { waitUntil: 'domcontentloaded' });
     await page.getByTestId('forbidden-403-page').waitFor({ state: 'visible', timeout: 10000 });
 
-    // Logout learner
-    await page.getByTestId('logout-btn').click();
+    // Logout learner (wait for redirect/auth clear before switching portal)
+    await Promise.all([
+      page.waitForURL(/\/login/, { timeout: 10000 }),
+      page.getByTestId('logout-btn').click(),
+    ]);
 
     // 7. Verify Admin Portal (/admin/login): no register tab, 403 on learner, 200 on admin_demo -> SCR-18..20
     await page.goto(`${baseUrl}/admin/login`, { waitUntil: 'domcontentloaded' });
@@ -207,7 +210,10 @@ async function main() {
     await page.getByTestId('scr19-admin-registry').waitFor({ state: 'visible', timeout: 10000 });
     await page.getByTestId('nav-admin-health-btn').click();
     await page.getByTestId('scr20-admin-health').waitFor({ state: 'visible', timeout: 10000 });
-    await page.getByTestId('logout-btn').click();
+    await Promise.all([
+      page.waitForURL(/\/login/, { timeout: 10000 }),
+      page.getByTestId('logout-btn').click(),
+    ]);
 
     // 8. Verify Expert Portal (/expert/login): no register tab, 200 on expert_demo -> SCR-15..17
     await page.goto(`${baseUrl}/expert/login`, { waitUntil: 'domcontentloaded' });

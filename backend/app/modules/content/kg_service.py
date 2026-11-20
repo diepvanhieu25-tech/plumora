@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -31,6 +33,10 @@ from app.modules.content.schemas_v2 import (
     DomainRoadmapResponse,
     DomainsListResponse,
     DomainUserSummary,
+)
+from app.modules.events.internal_client import (
+    assessment_service_url,
+    fetch_user_competencies_internal,
 )
 
 
@@ -85,12 +91,37 @@ def sync_mvp_mastery_to_v2_competency(db: Session, user_id: uuid.UUID) -> None:
         db.commit()
 
 
+def _competency_from_dict(user_id: uuid.UUID, item: dict[str, Any]) -> UserNodeCompetencyModel:
+    lp_raw = item.get("last_practiced_at")
+    lp_dt = datetime.fromisoformat(str(lp_raw)) if lp_raw else None
+    return UserNodeCompetencyModel(
+        user_id=user_id,
+        concept_slug=str(item["concept_slug"]),
+        depth_level_norm=float(item["depth_level_norm"]),
+        peak_depth_level_norm=float(item["peak_depth_level_norm"]),
+        depth_label=str(item["depth_label"]),
+        confidence=float(item["confidence"]),
+        stability_s=float(item["stability_s"]),
+        last_practiced_at=lp_dt,
+        code_practice_score=float(item.get("code_practice_score", 0.0)),
+    )
+
+
 def _load_user_competencies(db: Session, user_id: uuid.UUID) -> dict[str, UserNodeCompetencyModel]:
-    sync_mvp_mastery_to_v2_competency(db, user_id)
-    rows = db.scalars(
-        select(UserNodeCompetencyModel).where(UserNodeCompetencyModel.user_id == user_id)
-    ).all()
-    return {r.concept_slug: r for r in rows}
+    if assessment_service_url():
+        items = fetch_user_competencies_internal(user_id)
+        if items is not None:
+            return {str(it["concept_slug"]): _competency_from_dict(user_id, it) for it in items}
+    try:
+        sync_mvp_mastery_to_v2_competency(db, user_id)
+        rows = db.scalars(
+            select(UserNodeCompetencyModel).where(UserNodeCompetencyModel.user_id == user_id)
+        ).all()
+        return {r.concept_slug: r for r in rows}
+    except SQLAlchemyError:
+        db.rollback()
+        items = fetch_user_competencies_internal(user_id) or []
+        return {str(it["concept_slug"]): _competency_from_dict(user_id, it) for it in items}
 
 
 def list_domains_for_user(db: Session, user_id: uuid.UUID) -> DomainsListResponse:
@@ -103,18 +134,25 @@ def list_domains_for_user(db: Session, user_id: uuid.UUID) -> DomainsListRespons
     ).all()
     comp_map = _load_user_competencies(db, user_id)
 
-    completed_placements = set(
-        db.scalars(
-            select(AssessmentSessionModel.domain_slug)
-            .distinct()
-            .where(
-                AssessmentSessionModel.user_id == user_id,
-                AssessmentSessionModel.session_mode == "placement",
-                AssessmentSessionModel.status == "completed",
+    if assessment_service_url():
+        completed_placements = set()
+    else:
+        try:
+            completed_placements = set(
+                db.scalars(
+                    select(AssessmentSessionModel.domain_slug)
+                    .distinct()
+                    .where(
+                        AssessmentSessionModel.user_id == user_id,
+                        AssessmentSessionModel.session_mode == "placement",
+                        AssessmentSessionModel.status == "completed",
+                    )
+                    .limit(100)
+                ).all()
             )
-            .limit(100)
-        ).all()
-    )
+        except SQLAlchemyError:
+            db.rollback()
+            completed_placements = set()
 
     domain_slugs = [d.slug for d in domains]
     all_nodes = (

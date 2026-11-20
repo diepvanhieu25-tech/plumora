@@ -3,10 +3,18 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import func, select
 
-from app.db.models import DbSession, UserModel
+from app.db.models import (
+    AssessmentSessionModel,
+    DbSession,
+    OutboxEventModel,
+    UserModel,
+    UserNodeCompetencyModel,
+)
 from app.modules.assessment.schemas_v2 import (
     AssessmentStartRequest,
     AssessmentStartResponse,
@@ -30,6 +38,7 @@ from app.modules.assessment.service_v2 import (
     submit_placement_answer,
 )
 from app.modules.auth import extract_current_user
+from app.modules.auth.security import require_internal_service
 
 router = APIRouter(prefix="/api/v2", tags=["assessment_v2"])
 
@@ -135,6 +144,57 @@ def post_code_sandbox_submit(
     """Execute user code in Isolated Code Sandbox Worker (SCR-13)."""
     user = _require_user(request, db)
     return submit_code_sandbox(db, user, slug, payload)
+
+
+@router.get("/internal/users/{user_id}/competencies", dependencies=[Depends(require_internal_service)])
+def get_user_competencies_internal(user_id: uuid.UUID, db: DbSession) -> dict[str, Any]:
+    """Internal endpoint returning user competencies for content/recommendation services."""
+    rows = db.scalars(
+        select(UserNodeCompetencyModel).where(UserNodeCompetencyModel.user_id == user_id)
+    ).all()
+    completed_placements = list(
+        db.scalars(
+            select(AssessmentSessionModel.domain_slug)
+            .distinct()
+            .where(
+                AssessmentSessionModel.user_id == user_id,
+                AssessmentSessionModel.session_mode == "placement",
+                AssessmentSessionModel.status == "completed",
+            )
+            .limit(100)
+        ).all()
+    )
+    return {
+        "user_id": str(user_id),
+        "completed_placement_domains": completed_placements,
+        "competencies": [
+            {
+                "concept_slug": r.concept_slug,
+                "depth_level_norm": r.depth_level_norm,
+                "peak_depth_level_norm": r.peak_depth_level_norm,
+                "depth_label": r.depth_label,
+                "confidence": r.confidence,
+                "stability_s": r.stability_s,
+                "last_practiced_at": r.last_practiced_at.isoformat() if r.last_practiced_at else None,
+                "code_practice_score": r.code_practice_score,
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.get("/internal/outbox/pending-count", dependencies=[Depends(require_internal_service)])
+def get_outbox_pending_count_internal(db: DbSession) -> dict[str, int]:
+    """Internal endpoint returning pending outbox event count for system health."""
+    cnt = int(
+        db.scalar(
+            select(func.count())
+            .select_from(OutboxEventModel)
+            .where(OutboxEventModel.published_at.is_(None))
+        )
+        or 0
+    )
+    return {"pending_count": cnt}
 
 
 @router.post(

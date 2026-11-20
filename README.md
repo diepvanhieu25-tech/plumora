@@ -8,8 +8,7 @@
 *Adaptive Personalized Learning Path Platform — Inspired by the Plumule*
 
 [![Day-0 CI](https://img.shields.io/badge/CI-Passing-15803D?style=flat-square&logo=githubactions&logoColor=white)](.github/workflows/ci.yml)
-[![Gate 3](https://img.shields.io/badge/Gate%203-APPROVED-15803D?style=flat-square)](docs/verification/VERIFICATION_GATE3_POST_POLISH.md)
-[![Version](https://img.shields.io/badge/Release-v2.0.0-0D9488?style=flat-square)](docs/verification/RELEASE_GATE4_PHASE3.md)
+[![Version](https://img.shields.io/badge/Release-v2.0.0-0D9488?style=flat-square)](docs/decisions.md)
 [![Python](https://img.shields.io/badge/Python-3.12-3B82F6?style=flat-square&logo=python&logoColor=white)](backend/pyproject.toml)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](frontend/package.json)
 [![Docker](https://img.shields.io/badge/Docker-Compose%20Ready-2496ED?style=flat-square&logo=docker&logoColor=white)](docker-compose.yml)
@@ -180,5 +179,5 @@ Checkpoint `rl/artifacts/gnn_ppo_v2_base.zip` (`SHA-256 = 9977d5f606427d0eb25970
 ```
 
 - **Đặc tả & Thiết kế:** [Intent](docs/intent.md) | [Spec](docs/spec.md) | [Design](docs/design.md) | [UI Design System](docs/ui-design-system.md) | [Decisions](docs/decisions.md)
-- **Kiểm định & Phát hành:** [Gate 3 Round 2 (APPROVED)](docs/verification/VERIFICATION_GATE3_POST_POLISH.md) | [Gate 4 Release](docs/verification/RELEASE_GATE4_PHASE3.md) | [Load & Consistency Report](docs/verification/P3_SLICE_4_LOAD_AND_CONSISTENCY_REPORT.md)
+- **Phân tích & Thực nghiệm RL:** [Phase 3 Analysis](docs/proposals/PHASE3_ANALYSIS.md) | [RL Plan](docs/research/RL_PLAN.md) | [RL Experimental Report](docs/defense/RL_EXPERIMENTAL_REPORT.md)
 - **Hướng dẫn Test & Demo:** [Manual Testing Script](docs/verification/MANUAL_SYSTEM_TESTING_SCRIPT.md) | [Demo Runbook](docs/defense/DEMO_RUNBOOK.md)

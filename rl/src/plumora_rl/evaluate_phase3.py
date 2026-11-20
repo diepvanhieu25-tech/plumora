@@ -92,6 +92,35 @@ def _summarize_episodes(rewards: list[float], invalid_steps: int, total_steps: i
     }
 
 
+def apply_policy_guardrail(
+    env: MultiDomainStudentSimulatorEnv,
+    obs: dict[str, np.ndarray],
+    raw_logits: np.ndarray,
+) -> tuple[int, int]:
+    """Shared Policy Guardrail used identically across DQN-MLP, PPO-MLP, and GNN-PPO masked branches."""
+    feats = obs["node_features"]
+    n_nodes = feats.shape[0]
+    review_nodes = [i for i in range(n_nodes) if feats[i, 4] > 0.5]
+    if review_nodes:
+        return (review_nodes[0], 3)
+
+    mask = env.get_action_mask()
+    for i in range(n_nodes):
+        if feats[i, 0] >= 0.50:
+            mask[i, 0] = False
+        if feats[i, 0] >= 1.0 and feats[i, 2] >= 0.85:
+            mask[i, 1] = False
+        if feats[i, 6] >= 1.0 and feats[i, 0] >= 1.0:
+            mask[i, 2] = False
+        if feats[i, 2] >= 0.85:
+            mask[i, 3] = False
+    if not np.any(mask):
+        mask = env.get_action_mask()
+    masked_logits = np.where(mask, raw_logits, -1e9)
+    act_idx = int(np.argmax(masked_logits.reshape(-1)))
+    return (act_idx // NUM_MODES, act_idx % NUM_MODES)
+
+
 def evaluate_policy(
     policy_name: str,
     domains: tuple[str, ...],
@@ -129,22 +158,24 @@ def evaluate_policy(
                 padded[:n_nodes] = obs["node_features"]
                 flat_obs = padded.reshape(-1)
                 if masked:
-                    # Evaluate Q/policy over valid actions only
-                    mask = env.get_action_mask()
-                    valid_acts = [
-                        v * NUM_MODES + m
-                        for v in range(n_nodes)
-                        for m in range(NUM_MODES)
-                        if mask[v, m]
-                    ]
-                    act_raw, _ = sb3_model.predict(flat_obs, deterministic=True)
-                    act_int = int(act_raw)
-                    if act_int not in valid_acts and valid_acts:
-                        act_int = valid_acts[0]
+                    if hasattr(sb3_model, "policy"):
+                        obs_t, _ = sb3_model.policy.obs_to_tensor(flat_obs)
+                        with torch.no_grad():
+                            if policy_name == "dqn_mlp":
+                                q_vals = sb3_model.q_net(obs_t).cpu().numpy().reshape(-1)[: n_nodes * NUM_MODES]
+                                raw_logits = q_vals.reshape(n_nodes, NUM_MODES)
+                            else:
+                                dist = sb3_model.policy.get_distribution(obs_t)
+                                raw_logits = dist.distribution.logits.cpu().numpy().reshape(-1)[: n_nodes * NUM_MODES].reshape(n_nodes, NUM_MODES)
+                        action = apply_policy_guardrail(env, obs, raw_logits)
+                    else:
+                        act_raw, _ = sb3_model.predict(flat_obs, deterministic=True)
+                        act_int = int(act_raw)
+                        action = (act_int // NUM_MODES, act_int % NUM_MODES)
                 else:
                     act_raw, _ = sb3_model.predict(flat_obs, deterministic=True)
                     act_int = int(act_raw)
-                action = (act_int // NUM_MODES, act_int % NUM_MODES)
+                    action = (act_int // NUM_MODES, act_int % NUM_MODES)
             else:
                 assert gnn_model is not None
                 with torch.no_grad():
@@ -154,29 +185,7 @@ def evaluate_policy(
                         torch.from_numpy(obs["adj_out"]),
                     )
                     if masked:
-                        # Policy Guardrail: mask ineligible nodes & prioritize Needs Review
-                        feats = obs["node_features"]
-                        review_nodes = [i for i in range(n_nodes) if feats[i, 4] > 0.5]
-                        if review_nodes:
-                            action = (review_nodes[0], 3)
-                        else:
-                            # Guardrail masks locked & already-completed nodes
-                            mask = env.get_action_mask()
-                            for i in range(n_nodes):
-                                if feats[i, 0] >= 0.50:
-                                    mask[i, 0] = False
-                                if feats[i, 0] >= 1.0 and feats[i, 2] >= 0.85:
-                                    mask[i, 1] = False
-                                if feats[i, 6] >= 1.0 and feats[i, 0] >= 1.0:
-                                    mask[i, 2] = False
-                                if feats[i, 2] >= 0.85:
-                                    mask[i, 3] = False
-                            if not np.any(mask):
-                                mask = env.get_action_mask()
-                            mask_t = torch.from_numpy(mask)
-                            masked_logits = logits.masked_fill(~mask_t, -1e9)
-                            act_idx = int(torch.argmax(masked_logits.reshape(-1)).item())
-                            action = (act_idx // NUM_MODES, act_idx % NUM_MODES)
+                        action = apply_policy_guardrail(env, obs, logits.cpu().numpy())
                     else:
                         act_idx = int(torch.argmax(logits.reshape(-1)).item())
                         action = (act_idx // NUM_MODES, act_idx % NUM_MODES)
@@ -221,13 +230,29 @@ def run_training_and_evaluation(episodes: int = EVAL_EPISODES, eval_seed: int = 
 
     assert best_model is not None
 
-    # Train MLP baselines on equivalent budget for fair 4-way comparison
-    flat_env = PaddedFlatEnvWrapper(MultiDomainStudentSimulatorEnv(domain_slug=None, seed=best_seed, max_steps=60))
-    dqn_mlp = DQN("MlpPolicy", flat_env, seed=best_seed, verbose=0)
-    dqn_mlp.learn(total_timesteps=6000)
+    # Train MLP baselines across TRAIN_SEEDS with equivalent seed selection budget on VAL_SEED
+    best_dqn_mlp: DQN | None = None
+    best_dqn_val = -1e9
+    best_ppo_mlp: PPO | None = None
+    best_ppo_val = -1e9
+    for s in TRAIN_SEEDS:
+        flat_env = PaddedFlatEnvWrapper(MultiDomainStudentSimulatorEnv(domain_slug=None, seed=s, max_steps=60))
+        cand_dqn = DQN("MlpPolicy", flat_env, seed=s, verbose=0)
+        cand_dqn.learn(total_timesteps=6000)
+        dqn_val_res = evaluate_policy("dqn_mlp", TRAIN_DOMAINS, VAL_SEED, 60, sb3_model=cand_dqn, masked=True)
+        if dqn_val_res["mean_reward"] > best_dqn_val:
+            best_dqn_val = dqn_val_res["mean_reward"]
+            best_dqn_mlp = cand_dqn
 
-    ppo_mlp = PPO("MlpPolicy", flat_env, seed=best_seed, verbose=0)
-    ppo_mlp.learn(total_timesteps=6000)
+        cand_ppo = PPO("MlpPolicy", flat_env, seed=s, verbose=0)
+        cand_ppo.learn(total_timesteps=6000)
+        ppo_val_res = evaluate_policy("ppo_mlp", TRAIN_DOMAINS, VAL_SEED, 60, sb3_model=cand_ppo, masked=True)
+        if ppo_val_res["mean_reward"] > best_ppo_val:
+            best_ppo_val = ppo_val_res["mean_reward"]
+            best_ppo_mlp = cand_ppo
+
+    dqn_mlp = best_dqn_mlp
+    ppo_mlp = best_ppo_mlp
 
     # Export GNN-PPO checkpoint
     ckpt_path = ARTIFACTS_DIR / "gnn_ppo_v2_base.zip"
@@ -263,7 +288,9 @@ def run_training_and_evaluation(episodes: int = EVAL_EPISODES, eval_seed: int = 
         "heuristic_b2": evaluate_policy("heuristic_b2", TRAIN_DOMAINS, eval_seed, episodes),
         "heuristic_b3": evaluate_policy("heuristic_b3", TRAIN_DOMAINS, eval_seed, episodes),
         "dqn_mlp_unmasked": evaluate_policy("dqn_mlp", TRAIN_DOMAINS, eval_seed, episodes, sb3_model=dqn_mlp, masked=False),
+        "dqn_mlp_masked": evaluate_policy("dqn_mlp", TRAIN_DOMAINS, eval_seed, episodes, sb3_model=dqn_mlp, masked=True),
         "ppo_mlp_unmasked": evaluate_policy("ppo_mlp", TRAIN_DOMAINS, eval_seed, episodes, sb3_model=ppo_mlp, masked=False),
+        "ppo_mlp_masked": evaluate_policy("ppo_mlp", TRAIN_DOMAINS, eval_seed, episodes, sb3_model=ppo_mlp, masked=True),
         "gnn_ppo_unmasked": evaluate_policy("gnn_ppo", TRAIN_DOMAINS, eval_seed, episodes, gnn_model=best_model, masked=False),
         "gnn_ppo_masked": evaluate_policy("gnn_ppo", TRAIN_DOMAINS, eval_seed, episodes, gnn_model=best_model, masked=True),
     }
@@ -274,7 +301,9 @@ def run_training_and_evaluation(episodes: int = EVAL_EPISODES, eval_seed: int = 
         "heuristic_b2": evaluate_policy("heuristic_b2", heldout, eval_seed, episodes),
         "heuristic_b3": evaluate_policy("heuristic_b3", heldout, eval_seed, episodes),
         "dqn_mlp_unmasked": evaluate_policy("dqn_mlp", heldout, eval_seed, episodes, sb3_model=dqn_mlp, masked=False),
+        "dqn_mlp_masked": evaluate_policy("dqn_mlp", heldout, eval_seed, episodes, sb3_model=dqn_mlp, masked=True),
         "ppo_mlp_unmasked": evaluate_policy("ppo_mlp", heldout, eval_seed, episodes, sb3_model=ppo_mlp, masked=False),
+        "ppo_mlp_masked": evaluate_policy("ppo_mlp", heldout, eval_seed, episodes, sb3_model=ppo_mlp, masked=True),
         "gnn_ppo_unmasked": evaluate_policy("gnn_ppo", heldout, eval_seed, episodes, gnn_model=best_model, masked=False),
         "gnn_ppo_masked": evaluate_policy("gnn_ppo", heldout, eval_seed, episodes, gnn_model=best_model, masked=True),
     }

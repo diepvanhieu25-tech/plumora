@@ -3,7 +3,7 @@
 > **Đề tài:** Khuyến nghị Lộ trình Học Cá nhân hóa Thích ứng bằng Học Tăng cường Sâu (DQN)  
 > **Dự án:** Plumora (MVP Giai đoạn 1 — Lát cắt 12 Khái niệm Backend DAG)  
 > **Phiên bản:** `v1.0.0` (Căn cứ Gate 1 Baseline `v1.0.0` & Gate 3: In Review)
-> **Tài liệu tham chiếu:** [docs/research/RL_PLAN.md](../research/RL_PLAN.md), [.agents/rules/rl-evidence.md](../../.agents/rules/rl-evidence.md), [docs/verification/HANDOFF_RL_01.md](../verification/HANDOFF_RL_01.md).
+> **Tài liệu tham chiếu:** [docs/research/RL_PLAN.md](../research/RL_PLAN.md), [.agents/rules/rl-evidence.md](../../.agents/rules/rl-evidence.md).
 
 ---
 
@@ -184,10 +184,10 @@ cd /home/diepvanhieu/workspace/plumora/rl
 PYTHONPATH=src uv run python -m plumora_rl.train
 ```
 
-Toàn bộ báo cáo kết quả sẽ được ghi đè và so sánh trực tiếp với [evaluation_report.json](file:///home/diepvanhieu/workspace/plumora/rl/artifacts/evaluation_report.json) và [manifest.json](file:///home/diepvanhieu/workspace/plumora/rl/artifacts/manifest.json). Checkpoint sinh ra tại `rl/artifacts/checkpoint.zip` có thể được kiểm tra mã băm bằng:
+Toàn bộ báo cáo kết quả Giai đoạn 3 được đối chiếu trực tiếp với [evaluation_phase3_report.json](../../rl/artifacts/evaluation_phase3_report.json) và [manifest_phase3.json](../../rl/artifacts/manifest_phase3.json). Checkpoint `GNN-PPO` tại `rl/artifacts/gnn_ppo_v2_base.zip` có thể được kiểm tra mã băm bằng:
 ```bash
-sha256sum rl/artifacts/checkpoint.zip
-# Kết quả mong đợi: e464fa638cee04fda6a386ffb6cdf24d9190d0f1167feb56d4da0063499a6b6b
+sha256sum rl/artifacts/gnn_ppo_v2_base.zip
+# Kết quả mong đợi: 9977d5f606427d0eb25970b1ce8cf23fa0232e2d7ff0fe392e80d2413d534201
 ```
 
 ---
@@ -213,11 +213,21 @@ sha256sum rl/artifacts/checkpoint.zip
 | **`GNN-PPO (Unmasked)`** | **$\mathbf{66.6476 \pm 8.7348}$**<br>$67.5242\ (12.3104)$ / **`37.2%`** | **$\mathbf{67.3580 \pm 9.7991}$**<br>$65.8537\ (16.1586)$ / **`39.2%`** | **`0.0%`** / `0.0%` |
 | **`GNN-PPO (Guardrail Masked)`** | **$\mathbf{61.7239 \pm 9.0600}$**<br>$60.8482\ (12.9301)$ / **`34.6%`** | **$\mathbf{62.0429 \pm 9.9426}$**<br>$60.6248\ (15.5398)$ / **`35.2%`** | `0.0%` / **`0.0%`** |
 
-### 10.3. Tái Lập Thực Nghiệm Giai Đoạn 3
+### 10.3. Tái Lập Thực Nghiệm Giai Đoạn 3 (Lịch sử 500 episodes)
 ```bash
 cd /home/diepvanhieu/workspace/plumora/rl
 PYTHONPATH=src uv run python -m plumora_rl.evaluate_phase3 --eval-seed 2026 --episodes 500
 sha256sum artifacts/gnn_ppo_v2_base.zip
-# Kết quả: 9977d5f606427d0eb25970b1ce8cf23fa0232e2d7ff0fe392e80d2413d534201
+# Kết quả lịch sử: 9977d5f606427d0eb25970b1ce8cf23fa0232e2d7ff0fe392e80d2413d534201
 ```
+
+### 10.4. Kết Quả Tái Chạy Đối Sánh Công Bằng Cùng `Policy Guardrail` (`2026-11-20`, `500` episodes)
+- **Checkpoint hiện tại (`rl/artifacts/gnn_ppo_v2_base.zip`):** `SHA-256 = 1a074299ef8edfad6a64c9c58f2eb35e664bbaa56c04054f043efb03c7a7d861` (`selected_seed = 101`, `eval_seed = 2026`, `episodes = 500`).
+- **Cải tiến phương pháp (`F09`):** `DQN-MLP` và `PPO-MLP` được chọn hạt giống trên `val_seed = 999` qua `train_seeds = [101, 202, 303]` tương đương `GNN-PPO`, và cả 3 kiến trúc dùng chung hàm `apply_policy_guardrail()`.
+- **Kết quả (`evaluation_phase3_report.json`):**
+  - `Heuristic B3`: Known `58.1104 ± 7.8744` | Transfer `58.1649 ± 7.6597`
+  - `DQN-MLP (Masked)`: Known `24.2939 ± 5.6534` | Transfer `22.3804 ± 5.0033` (`Unmasked`: `-147.15` / `-149.79`)
+  - `PPO-MLP (Masked)`: Known `29.3585 ± 5.9072` | Transfer `29.6099 ± 5.8490` (`Unmasked`: `-165.64` / `-165.64`)
+  - `GNN-PPO (Masked)`: Known **`61.7239 ± 9.0600`** | Transfer **`62.0429 ± 9.9426`** (`Unmasked`: `66.65` / `67.36`)
+
 *(Ghi chú trung thực theo `.agents/rules/rl-evidence.md`: Toàn bộ số liệu trên thu được trên Simulator mô phỏng giả định động học học viên và đường cong Ebbinghaus, chưa phải bằng chứng lâm sàng trên người học thật.)*

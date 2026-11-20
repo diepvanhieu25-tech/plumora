@@ -174,12 +174,17 @@ def test_inv_online_rl_01_safety_gate_blocks_bad_candidate_and_allows_rollback()
                         eval_metrics_json={"invalid_action_rate_unmasked": 0.12},
                     )
                 )
+                import hashlib
+
+                from app.modules.recommendation.admin_service import BASE_CKPT_PATH
+
+                real_sha = hashlib.sha256(BASE_CKPT_PATH.read_bytes()).hexdigest()
                 db.add(
                     ModelRegistryModel(
                         id=passed_id,
                         version_tag=f"cand-passed-{uuid.uuid4().hex[:6]}",
                         checkpoint_path="rl/artifacts/gnn_ppo_v2_base.zip",
-                        checkpoint_sha256="1" * 64,
+                        checkpoint_sha256=real_sha,
                         kl_divergence=0.01,
                         gate_verdict="PASSED",
                         is_active=False,

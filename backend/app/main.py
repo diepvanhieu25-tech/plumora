@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
+import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 import redis
@@ -16,11 +18,13 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.config import settings
+from app.db.models import SessionLocal
 from app.modules.assessment.router_v2 import router as assessment_v2_router
 from app.modules.auth import router as auth_router
 from app.modules.content import init_db_and_seed
 from app.modules.content.router_expert import router as expert_v2_router
 from app.modules.content.router_v2 import router as content_kg_router
+from app.modules.events.outbox import run_outbox_relay_and_consume_once
 from app.modules.recommendation.router_admin import router as admin_v2_router
 
 _DB_INITIALIZED = False
@@ -34,11 +38,29 @@ def ensure_db_initialized() -> None:
         _DB_INITIALIZED = True
 
 
+async def _outbox_background_worker() -> None:
+    """Periodically relay outbox events to Redis Streams and consume CompetencyUpdatedEvent."""
+    log = logging.getLogger(__name__)
+    while True:
+        try:
+            with SessionLocal() as db:
+                run_outbox_relay_and_consume_once(db)
+        except Exception as exc:  # noqa: BLE001
+            log.debug("Outbox worker iteration skipped: %s", exc)
+        await asyncio.sleep(2.0)
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    """Initialize PostgreSQL schema and seed 12 concepts + 3 demo users on startup."""
+    """Initialize PostgreSQL schema, seed data, and run background outbox/stream worker."""
     ensure_db_initialized()
-    yield
+    worker_task = asyncio.create_task(_outbox_background_worker())
+    try:
+        yield
+    finally:
+        worker_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await worker_task
 
 
 app = FastAPI(

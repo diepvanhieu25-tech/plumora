@@ -13,14 +13,10 @@
 | [Quyết định](decisions.md) | Sổ quyết định (`D-01`–`D-26`) và biên bản phê duyệt + Manifest `SHA-256` Gate 1 (`v1.0.0` & `v2.0.0`) |
 | [Kế hoạch](plan.md) | Task DAG MVP (`BOOT-01`..`DEFENSE-01` đã hoàn thành) & 4 lát cắt Giai đoạn 3 (`P3-SLICE-1` đang `ready`..`P3-SLICE-4`), kèm Ma trận Luận điểm Bảo vệ; **Gate 1 Baseline (`v2.0.0` — APPROVED)** |
 | [Kế hoạch RL](research/RL_PLAN.md) | Hợp đồng `Student Simulator` 24 chiều (`DQN` `v1.0.0`) và mở rộng Đa lĩnh vực 8 chiều/node, `GNN-PPO` 3 lớp PyTorch Tensor, đối sánh 4 cấp + *Zero-shot Transfer* (`heldout_data_eng_graph` 10 node) & `Safe Micro-batch Online RL`; **Gate 1 Baseline (`v2.0.0` — APPROVED)** |
-| [Antigravity CLI](ANTIGRAVITY_GUIDE.md) | Tác dụng, cơ chế, cách dùng và nguồn chính thức Google |
-| [Prompt](prompts.md) | Mẫu giao việc theo từng giai đoạn |
 | [Workflow](engineering/WORKFLOW.md) | Quy tắc kỹ thuật và mẫu bằng chứng |
-| [Môi trường & Readiness](environment.md) | Hồ sơ môi trường cục bộ, Docker Compose (`PostgreSQL 16` + `Redis 7`), Day-0 CI và phân loại test `SMOKE GREEN` vs `PRODUCT RED` (`ENV-01`) |
-| [Kiểm chứng bootstrap](verification/BOOTSTRAP.md) | Phạm vi, kết quả kiểm tra, giới hạn và snapshot |
-| [Bàn giao ENV-01](verification/HANDOFF_ENV_01.md) | Hồ sơ bàn giao nhiệm vụ `ENV-01` (Gate 2 Readiness, lệnh kiểm chứng, RED tests và manifest `SHA-256`) |
-| [Bàn giao RL-01](verification/HANDOFF_RL_01.md) | Hồ sơ bàn giao nhiệm vụ `RL-01` (`PL-RL-01`: Simulator 24 chiều, huấn luyện `DQN` đa hạt giống, đánh giá 500 episodes với `B1`/`B2`/`B3`, checkpoint `SHA-256` và phân tích giới hạn) |
-| [Bàn giao SLICE-01](verification/HANDOFF_SLICE_01.md) | Hồ sơ bàn giao nhiệm vụ `SLICE-01` (`PL-AUTH-01`..`PL-E2E-01`: FastAPI Modular Monolith, PostgreSQL SSoT, Redis 24-dim Cache, DQN Serving, React SPA `SCR-01`..`SCR-08` và kiểm thử E2E/Adversarial) |
+| [Kiểm thử thủ công](verification/MANUAL_SYSTEM_TESTING_SCRIPT.md) | Kịch bản kiểm thử hệ thống thực tế theo vai trò (`learner`, `expert`, `admin`) |
+| [Kịch bản Demo](defense/DEMO_RUNBOOK.md) | Kịch bản trình diễn & bảo vệ đồ án |
+| [Báo cáo Thực nghiệm RL](defense/RL_EXPERIMENTAL_REPORT.md) | Kết quả huấn luyện, ablation và đối chứng mô hình `GNN-PPO` trong simulator |
 | [Phiên hiện tại](../.direwolf_memory/ACTIVE_SESSION.md) | Trạng thái ngắn để tiếp nối công việc |
 
 Không coi sự tồn tại của tài liệu, nhãn DRAFT hay kết quả kiểm tra file là phê duyệt yêu cầu, thành công ứng dụng hoặc hiệu quả RL.

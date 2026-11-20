@@ -73,14 +73,22 @@ def _redis_key(user_id: uuid.UUID) -> str:
     return f"plumora:state:{user_id}"
 
 
+_REDIS_POOLS: dict[str, redis.ConnectionPool] = {}
+
+
 def _open_redis_client(redis_url_override: str | None = None) -> redis.Redis:
     url = redis_url_override or settings.redis_url
-    return redis.Redis.from_url(
-        url,
-        socket_connect_timeout=0.2,
-        socket_timeout=0.2,
-        decode_responses=True,
-    )
+    pool = _REDIS_POOLS.get(url)
+    if pool is None:
+        pool = redis.ConnectionPool.from_url(
+            url,
+            max_connections=64,
+            socket_connect_timeout=0.2,
+            socket_timeout=0.2,
+            decode_responses=True,
+        )
+        _REDIS_POOLS[url] = pool
+    return redis.Redis(connection_pool=pool)
 
 
 def write_through_state_cache(
@@ -202,8 +210,10 @@ def get_or_cache_graph_snapshot(
                 and isinstance(cached_snap, list)
                 and len(cached_snap) == len(computed_snapshot)
             ):
+                client.incr("plumora:metrics:kg_cache_hits")
                 return cached_snap, "redis_cache"
 
+        client.incr("plumora:metrics:kg_cache_misses")
         client.set(
             key,
             json.dumps({"state_version": state_version, "snapshot": computed_snapshot}),

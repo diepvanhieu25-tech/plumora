@@ -7,7 +7,6 @@ import json
 import re
 import resource
 import shutil
-import sqlite3
 import subprocess
 import sys
 import time
@@ -229,7 +228,7 @@ class IsolatedSandboxWorkerAdapter(CodeSandboxPort):
         if lang == "python":
             return self._run_python(source_code, test_cases, effective_timeout_ms, memory_limit_mb)
         if lang == "sql":
-            return self._run_sql(source_code, test_cases, effective_timeout_ms)
+            return self._run_sql(source_code, test_cases, effective_timeout_ms, memory_limit_mb)
         if lang == "javascript":
             return self._run_javascript(
                 source_code, test_cases, effective_timeout_ms, memory_limit_mb
@@ -260,11 +259,17 @@ class IsolatedSandboxWorkerAdapter(CodeSandboxPort):
             "        if isinstance(actual, tuple):\n"
             "            actual = list(actual)\n"
             "        passed = (actual == tc['expected'])\n"
-            "        results.append({'name': tc['name'], 'passed': passed, 'actual': actual, 'expected': tc['expected']})\n"
+            "        if tc.get('is_hidden', False):\n"
+            "            results.append({'name': tc['name'], 'passed': passed, 'is_hidden': True})\n"
+            "        else:\n"
+            "            results.append({'name': tc['name'], 'passed': passed, 'actual': actual, 'expected': tc['expected']})\n"
             "    except MemoryError:\n"
             "        raise\n"
             "    except Exception as e:\n"
-            "        results.append({'name': tc['name'], 'passed': False, 'error': str(e)})\n"
+            "        if tc.get('is_hidden', False):\n"
+            "            results.append({'name': tc['name'], 'passed': False, 'error': 'Hidden test execution failed', 'is_hidden': True})\n"
+            "        else:\n"
+            "            results.append({'name': tc['name'], 'passed': False, 'error': str(e)})\n"
             "print(_j.dumps(results))\n"
         )
 
@@ -316,29 +321,67 @@ class IsolatedSandboxWorkerAdapter(CodeSandboxPort):
         source_code: str,
         test_cases: list[dict[str, Any]],
         timeout_ms: int,
+        memory_limit_mb: int = MAX_SANDBOX_MEMORY_MB,
     ) -> SandboxExecutionResult:
         lowered = source_code.lower()
         for forbidden in ("attach", "pragma", "load_extension", "drop ", "delete "):
             if forbidden in lowered:
                 raise SandboxSecurityError(f"Forbidden SQL keyword blocked: '{forbidden.strip()}'")
 
+        max_sql_rows = 1000
+        harness = (
+            "import json as _j, sqlite3 as _s, time as _t\n"
+            f"source_code = {source_code!r}\n"
+            f"cases_list = _j.loads({json.dumps(test_cases)!r})\n"
+            f"deadline_s = {timeout_ms / 1000.0!r}\n"
+            f"max_rows = {max_sql_rows}\n"
+            "t0 = _t.monotonic()\n"
+            "conn = _s.connect(':memory:')\n"
+            "conn.set_progress_handler(lambda: 1 if (_t.monotonic() - t0) > deadline_s else 0, 5000)\n"
+            "try:\n"
+            "    conn.execute('CREATE TABLE competencies (concept_slug TEXT, depth_level_norm REAL, stability_s REAL);')\n"
+            "    conn.executemany(\n"
+            "        'INSERT INTO competencies VALUES (?, ?, ?);',\n"
+            "        [('net-internet', 0.75, 3.0), ('web-http', 0.50, 1.8), ('os-basics', 0.25, 3.0)],\n"
+            "    )\n"
+            "    cur = conn.execute(source_code)\n"
+            "    fetched = cur.fetchmany(max_rows + 1)\n"
+            "    if len(fetched) > max_rows:\n"
+            "        raise RuntimeError(f'SQL result exceeded {max_rows} rows limit')\n"
+            "    rows = [list(r) for r in fetched]\n"
+            "finally:\n"
+            "    conn.close()\n"
+            "results = []\n"
+            "for tc in cases_list:\n"
+            "    passed = (rows == tc['expected'])\n"
+            "    if tc.get('is_hidden', False):\n"
+            "        results.append({'name': tc['name'], 'passed': passed, 'is_hidden': True})\n"
+            "    else:\n"
+            "        results.append({'name': tc['name'], 'passed': passed, 'actual': rows, 'expected': tc['expected']})\n"
+            "print(_j.dumps(results))\n"
+        )
+
         t0 = time.monotonic()
-        conn = sqlite3.connect(":memory:", timeout=timeout_ms / 1000.0)
         try:
-            conn.execute(
-                "CREATE TABLE competencies (concept_slug TEXT, depth_level_norm REAL, stability_s REAL);"
+            proc = subprocess.run(
+                [sys.executable, "-I", "-c", harness],
+                capture_output=True,
+                text=True,
+                timeout=timeout_ms / 1000.0,
+                env={},
+                preexec_fn=lambda: _apply_posix_rlimits(memory_limit_mb, apply_as_limit=True),
+                check=False,
             )
-            conn.executemany(
-                "INSERT INTO competencies VALUES (?, ?, ?);",
-                [
-                    ("net-internet", 0.75, 3.0),
-                    ("web-http", 0.50, 1.8),
-                    ("os-basics", 0.25, 3.0),
-                ],
-            )
-            rows = [list(r) for r in conn.execute(source_code).fetchall()]
-        except sqlite3.Error as exc:
-            elapsed_ms = max(1, int((time.monotonic() - t0) * 1000))
+        except subprocess.TimeoutExpired as exc:
+            raise SandboxTimeoutError(timeout_ms) from exc
+
+        elapsed_ms = max(1, int((time.monotonic() - t0) * 1000))
+        if proc.returncode != 0:
+            stderr_msg = proc.stderr.strip() or "SQL sandbox execution failed"
+            if "interrupted" in stderr_msg.lower():
+                raise SandboxTimeoutError(timeout_ms)
+            if "MemoryError" in stderr_msg or proc.returncode == -9:
+                raise SandboxSecurityError("Memory limit exceeded (128MB).")
             return SandboxExecutionResult(
                 passed_tests=0,
                 total_tests=len(test_cases),
@@ -346,26 +389,27 @@ class IsolatedSandboxWorkerAdapter(CodeSandboxPort):
                 runtime_ms=elapsed_ms,
                 memory_kb=8192,
                 test_results=[
-                    {"name": tc["name"], "passed": False, "error": str(exc)}
+                    (
+                        {
+                            "name": tc["name"],
+                            "passed": False,
+                            "error": "Hidden test execution failed",
+                            "is_hidden": True,
+                        }
+                        if tc.get("is_hidden", False)
+                        else {"name": tc["name"], "passed": False, "error": stderr_msg}
+                    )
                     for tc in test_cases
                 ],
             )
-        finally:
-            conn.close()
 
-        elapsed_ms = max(1, int((time.monotonic() - t0) * 1000))
-        results = []
-        for tc in test_cases:
-            passed = rows == tc["expected"]
-            results.append(
-                {"name": tc["name"], "passed": passed, "actual": rows, "expected": tc["expected"]}
-            )
-        passed_count = sum(1 for r in results if r["passed"])
+        results = json.loads(proc.stdout.strip() or "[]")
+        passed_count = sum(1 for r in results if r.get("passed"))
         return SandboxExecutionResult(
             passed_tests=passed_count,
             total_tests=len(test_cases),
             code_score=round(passed_count / max(1, len(test_cases)), 4),
-            runtime_ms=elapsed_ms,
+            runtime_ms=min(elapsed_ms, timeout_ms),
             memory_kb=8192,
             test_results=results,
         )
@@ -397,8 +441,14 @@ class IsolatedSandboxWorkerAdapter(CodeSandboxPort):
             "  try {\n"
             "    const actual = vm.runInContext(tc.call, ctx, { timeout: timeoutMs });\n"
             "    const passed = JSON.stringify(actual) === JSON.stringify(tc.expected);\n"
+            "    if (tc.is_hidden) {\n"
+            "      return { name: tc.name, passed, is_hidden: true };\n"
+            "    }\n"
             "    return { name: tc.name, passed, actual, expected: tc.expected };\n"
             "  } catch (e) {\n"
+            "    if (tc.is_hidden) {\n"
+            "      return { name: tc.name, passed: false, error: 'Hidden test execution failed', is_hidden: true };\n"
+            "    }\n"
             "    return { name: tc.name, passed: false, error: String(e) };\n"
             "  }\n"
             "});\n"

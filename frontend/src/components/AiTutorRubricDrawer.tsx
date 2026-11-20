@@ -482,15 +482,19 @@ export function AiTutorRubricDrawer({
                         </div>
                         <div>
                           <h3 className="text-sm font-headline font-bold text-on-surface">
-                            Nhận xét Sư phạm từ AI Tutor (Mô hình Socratic)
+                            {graderSource === 'llm_rubric'
+                              ? 'Nhận xét Sư phạm từ AI Tutor (LLM Rubric)'
+                              : 'Phản hồi Chấm Rubric Tất định (Offline Fallback)'}
                           </h3>
                           <span className="text-[10px] font-label text-on-surface-variant">
-                            Phân tích lập luận dựa trên Knowledge Graph
+                            {graderSource === 'llm_rubric'
+                              ? 'Phân tích lập luận dựa trên Knowledge Graph'
+                              : 'Đối sánh từ khóa theo tiêu chí Rubric'}
                           </span>
                         </div>
                       </div>
                       <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-primary/10 text-primary font-bold">
-                        VERIFIED
+                        {graderSource === 'llm_rubric' ? 'LLM_GRADED' : 'DETERMINISTIC'}
                       </span>
                     </div>
 

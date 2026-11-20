@@ -146,6 +146,238 @@ def _migration_0006(conn: Connection) -> None:
             conn.execute(text(stmt))
 
 
+def _migration_0007(conn: Connection) -> None:
+    """Move application tables into their 4 owning schemas and configure per-service LOGIN roles."""
+    if conn.dialect.name != "postgresql":
+        return
+
+    table_ownership: list[tuple[str, str]] = [
+        ("auth_svc", "users"),
+        ("content_svc", "domains"),
+        ("content_svc", "concepts"),
+        ("content_svc", "concept_prerequisites"),
+        ("content_svc", "domain_concept_map"),
+        ("content_svc", "quiz_questions"),
+        ("content_svc", "depth_questions"),
+        ("content_svc", "grading_rubrics"),
+        ("content_svc", "code_challenges"),
+        ("assess_svc", "user_concept_mastery"),
+        ("assess_svc", "quiz_attempts"),
+        ("assess_svc", "user_node_competency"),
+        ("assess_svc", "assessment_sessions"),
+        ("assess_svc", "attempt_records"),
+        ("assess_svc", "outbox_events"),
+        ("rec_ai_svc", "recommendation_logs"),
+        ("rec_ai_svc", "rl_experience_buffer"),
+        ("rec_ai_svc", "model_registry"),
+        ("rec_ai_svc", "online_eval_runs"),
+        ("rec_ai_svc", "consumed_events"),
+    ]
+    for schema_name, tbl_name in table_ownership:
+        conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema_name};"))
+        conn.execute(
+            text(
+                f"""
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1 FROM information_schema.tables
+                        WHERE table_schema = 'public' AND table_name = '{tbl_name}'
+                    ) AND NOT EXISTS (
+                        SELECT 1 FROM information_schema.tables
+                        WHERE table_schema = '{schema_name}' AND table_name = '{tbl_name}'
+                    ) THEN
+                        EXECUTE 'ALTER TABLE public.{tbl_name} SET SCHEMA {schema_name}';
+                    END IF;
+                END
+                $$;
+                """
+            )
+        )
+
+    svc_users = [
+        ("auth_svc", "auth_svc_user"),
+        ("content_svc", "content_svc_user"),
+        ("assess_svc", "assess_svc_user"),
+        ("rec_ai_svc", "rec_ai_svc_user"),
+    ]
+    for owner_schema, login_user in svc_users:
+        conn.execute(
+            text(
+                f"""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{login_user}') THEN
+                        CREATE ROLE {login_user} LOGIN PASSWORD 'plumora_dev_pass_local_only';
+                    END IF;
+                END
+                $$;
+                """
+            )
+        )
+        for target_schema, _ in svc_users:
+            conn.execute(text(f"REVOKE ALL ON SCHEMA {target_schema} FROM {login_user};"))
+            conn.execute(text(f"REVOKE ALL ON ALL TABLES IN SCHEMA {target_schema} FROM {login_user};"))
+        conn.execute(text(f"GRANT USAGE ON SCHEMA {owner_schema} TO {login_user};"))
+        conn.execute(
+            text(
+                f"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA {owner_schema} TO {login_user};"
+            )
+        )
+        conn.execute(text(f"ALTER ROLE {login_user} SET search_path TO {owner_schema};"))
+
+    # Allow monolith owner role to resolve tables across all 4 schemas seamlessly (public last)
+    conn.execute(
+        text("ALTER ROLE CURRENT_USER SET search_path TO auth_svc, content_svc, assess_svc, rec_ai_svc, public;")
+    )
+
+
+def migrate_public_table_safely(conn: Connection, target_schema: str, table_name: str) -> None:
+    """Preflight PK conflicts and dependent FKs before moving a public table into target_schema."""
+    if conn.dialect.name != "postgresql":
+        return
+    public_exists = conn.execute(
+        text(
+            "SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = 'public' AND table_name = :tbl"
+        ),
+        {"tbl": table_name},
+    ).scalar()
+    target_exists = conn.execute(
+        text(
+            "SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = :schema AND table_name = :tbl"
+        ),
+        {"schema": target_schema, "tbl": table_name},
+    ).scalar()
+    if not public_exists or not target_exists:
+        return
+
+    pk_cols = list(
+        conn.execute(
+            text(
+                """
+                SELECT kcu.column_name
+                FROM information_schema.table_constraints tc
+                JOIN information_schema.key_column_usage kcu
+                  ON tc.constraint_name = kcu.constraint_name
+                 AND tc.table_schema = kcu.table_schema
+                WHERE tc.constraint_type = 'PRIMARY KEY'
+                  AND tc.table_schema = :schema
+                  AND tc.table_name = :tbl
+                ORDER BY kcu.ordinal_position
+                """
+            ),
+            {"schema": target_schema, "tbl": table_name},
+        ).scalars()
+    )
+    if pk_cols:
+        join_cond = " AND ".join(f"p.{col} = t.{col}" for col in pk_cols)
+        overlap_count = int(
+            conn.execute(
+                text(
+                    f"SELECT COUNT(*) FROM public.{table_name} p "
+                    f"JOIN {target_schema}.{table_name} t ON {join_cond}"
+                )
+            ).scalar()
+            or 0
+        )
+        if overlap_count > 0:
+            raise RuntimeError(
+                f"Migration conflict: public.{table_name} has {overlap_count} "
+                f"conflicting primary key row(s) with {target_schema}.{table_name}"
+            )
+
+    dep_fks = list(
+        conn.execute(
+            text(
+                """
+                SELECT tc.table_name
+                FROM information_schema.table_constraints tc
+                JOIN information_schema.referential_constraints rc
+                  ON tc.constraint_name = rc.constraint_name
+                 AND tc.constraint_schema = rc.constraint_schema
+                JOIN information_schema.table_constraints pk
+                  ON rc.unique_constraint_name = pk.constraint_name
+                 AND rc.unique_constraint_schema = pk.constraint_schema
+                WHERE tc.constraint_type = 'FOREIGN KEY'
+                  AND tc.table_schema = 'public'
+                  AND pk.table_schema = 'public'
+                  AND pk.table_name = :tbl
+                  AND tc.table_name <> :tbl
+                """
+            ),
+            {"tbl": table_name},
+        ).scalars()
+    )
+    if dep_fks:
+        raise RuntimeError(
+            f"Migration conflict: public.{table_name} has dependent FKs in public schema: {dep_fks}"
+        )
+
+    conn.execute(text(f"INSERT INTO {target_schema}.{table_name} SELECT * FROM public.{table_name};"))
+    conn.execute(text(f"DROP TABLE public.{table_name};"))
+
+
+def _migration_0008(conn: Connection) -> None:
+    """Clean up duplicate tables in public schema if already present in owning service schemas."""
+    if conn.dialect.name != "postgresql":
+        return
+
+    table_ownership: list[tuple[str, str]] = [
+        ("auth_svc", "users"),
+        ("content_svc", "domains"),
+        ("content_svc", "concepts"),
+        ("content_svc", "concept_prerequisites"),
+        ("content_svc", "domain_concept_map"),
+        ("content_svc", "quiz_questions"),
+        ("content_svc", "depth_questions"),
+        ("content_svc", "grading_rubrics"),
+        ("content_svc", "code_challenges"),
+        ("assess_svc", "user_concept_mastery"),
+        ("assess_svc", "quiz_attempts"),
+        ("assess_svc", "user_node_competency"),
+        ("assess_svc", "assessment_sessions"),
+        ("assess_svc", "attempt_records"),
+        ("assess_svc", "outbox_events"),
+        ("rec_ai_svc", "recommendation_logs"),
+        ("rec_ai_svc", "rl_experience_buffer"),
+        ("rec_ai_svc", "model_registry"),
+        ("rec_ai_svc", "online_eval_runs"),
+        ("rec_ai_svc", "consumed_events"),
+    ]
+    for schema_name, tbl_name in table_ownership:
+        migrate_public_table_safely(conn, schema_name, tbl_name)
+    conn.execute(
+        text("ALTER ROLE CURRENT_USER SET search_path TO auth_svc, content_svc, assess_svc, rec_ai_svc, public;")
+    )
+
+
+def _migration_0009(conn: Connection) -> None:
+    """Enforce single active model invariant via unique partial index (F10)."""
+    if conn.dialect.name == "postgresql":
+        conn.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_model_registry_single_active "
+                "ON rec_ai_svc.model_registry (is_active) WHERE is_active IS TRUE;"
+            )
+        )
+    else:
+        existing_tables = {
+            row[0]
+            for row in conn.execute(
+                text("SELECT name FROM sqlite_master WHERE type='table';")
+            ).fetchall()
+        }
+        if "model_registry" in existing_tables:
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_model_registry_single_active "
+                    "ON model_registry (is_active) WHERE is_active = 1;"
+                )
+            )
+
+
 MIGRATIONS: list[tuple[str, Callable[[Connection], None]]] = [
     ("0001_initial_schema", _migration_0001),
     ("0002_add_quiz_attempt_state_version_and_unlocked", _migration_0002),
@@ -153,6 +385,9 @@ MIGRATIONS: list[tuple[str, Callable[[Connection], None]]] = [
     ("0004_add_user_role_column", _migration_0004),
     ("0005_phase3_four_schemas_and_online_rl", _migration_0005),
     ("0006_add_performance_indexes", _migration_0006),
+    ("0007_strict_schema_isolation", _migration_0007),
+    ("0008_cleanup_public_duplicates", _migration_0008),
+    ("0009_single_active_model_index", _migration_0009),
 ]
 
 
@@ -199,5 +434,11 @@ def run_database_migrations(engine: Engine) -> list[str]:
     except SQLAlchemyError as exc:
         logger.error("Database migration execution failed: %s", exc)
         raise RuntimeError(f"Database migration failed: {exc}") from exc
+
+    if engine.dialect.name == "postgresql" and (
+        "0007_strict_schema_isolation" in applied_versions
+        or "0008_cleanup_public_duplicates" in applied_versions
+    ):
+        engine.dispose()
 
     return applied_versions

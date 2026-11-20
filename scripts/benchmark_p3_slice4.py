@@ -110,7 +110,8 @@ async def _virtual_user_loop(
     stats: dict[str, Any],
 ) -> None:
     uname = f"vu_{vu_id}_{uuid.uuid4().hex[:6]}"
-    async with httpx.AsyncClient(base_url=gateway_url, timeout=10.0) as client:
+    await asyncio.sleep(vu_id * 0.05)
+    async with httpx.AsyncClient(base_url=gateway_url, timeout=20.0) as client:
         reg = await client.post(
             "/api/v1/auth/register",
             json={"username": uname, "display_name": f"VU {vu_id}", "password": "StrongPass!2026"},
@@ -119,6 +120,12 @@ async def _virtual_user_loop(
             stats["errors_5xx"] += 1
             return
 
+        def _record_status(code: int) -> None:
+            bucket = f"{code // 100}xx"
+            stats["status_histogram"][bucket] = stats["status_histogram"].get(bucket, 0) + 1
+            if code >= 500:
+                stats["errors_5xx"] += 1
+
         while time.monotonic() < end_time:
             # 1. GET /api/v2/domains
             t0 = time.monotonic()
@@ -126,8 +133,8 @@ async def _virtual_user_loop(
             dt1 = (time.monotonic() - t0) * 1000.0
             stats["all_latencies"].append(dt1)
             stats["total_requests"] += 1
-            if r1.status_code >= 500:
-                stats["errors_5xx"] += 1
+            _record_status(r1.status_code)
+            assert r1.status_code == 200 and "domains" in r1.json()
 
             # 2. GET /api/v2/domains/frontend/roadmap
             t0 = time.monotonic()
@@ -135,8 +142,8 @@ async def _virtual_user_loop(
             dt2 = (time.monotonic() - t0) * 1000.0
             stats["all_latencies"].append(dt2)
             stats["total_requests"] += 1
-            if r2.status_code >= 500:
-                stats["errors_5xx"] += 1
+            _record_status(r2.status_code)
+            assert r2.status_code == 200 and "nodes" in r2.json()
 
             # 3. POST /api/v2/recommendations (GNN-PPO)
             t0 = time.monotonic()
@@ -145,8 +152,38 @@ async def _virtual_user_loop(
             stats["all_latencies"].append(dt3)
             stats["rec_latencies"].append(dt3)
             stats["total_requests"] += 1
-            if r3.status_code >= 500:
-                stats["errors_5xx"] += 1
+            _record_status(r3.status_code)
+            assert r3.status_code == 200 and "recommended_action" in r3.json()
+
+            # 4. Assessment write path: start + submit depth step
+            t0 = time.monotonic()
+            r4 = await client.post(
+                "/api/v2/assessments/start",
+                json={"domain_slug": "frontend", "concept_slug": "fe-dom-events", "session_mode": "depth_probe"},
+            )
+            dt4 = (time.monotonic() - t0) * 1000.0
+            stats["all_latencies"].append(dt4)
+            stats["write_latencies"].append(dt4)
+            stats["total_requests"] += 1
+            _record_status(r4.status_code)
+            assert r4.status_code == 201, f"Expected 201 from assessments/start, got {r4.status_code}"
+            sess = r4.json()
+            t0 = time.monotonic()
+            r5 = await client.post(
+                f"/api/v2/assessments/{sess['session_id']}/submit",
+                json={
+                    "submission_id": str(uuid.uuid4()),
+                    "question_id": sess["step_item"]["question_id"],
+                    "selected_option": "A",
+                    "written_explanation": None,
+                },
+            )
+            dt5 = (time.monotonic() - t0) * 1000.0
+            stats["all_latencies"].append(dt5)
+            stats["write_latencies"].append(dt5)
+            stats["total_requests"] += 1
+            _record_status(r5.status_code)
+            assert r5.status_code == 200 and "updated_competency" in r5.json()
 
             await asyncio.sleep(0.05)
 
@@ -155,21 +192,21 @@ async def run_20vu_load_benchmark(duration_s: float = 60.0) -> dict[str, Any]:
     """Start 4 Microservices + API Gateway and run 20 concurrent VUs for `duration_s` seconds."""
     env = os.environ.copy()
     env["JWT_SECRET_KEY"] = "plumora_benchmark_shared_jwt_secret_key_min_32_chars"
-    env["AUTH_SERVICE_URL"] = "http://127.0.0.1:8001"
-    env["CONTENT_SERVICE_URL"] = "http://127.0.0.1:8002"
-    env["ASSESSMENT_SERVICE_URL"] = "http://127.0.0.1:8003"
-    env["RECOMMENDATION_SERVICE_URL"] = "http://127.0.0.1:8004"
+    env["AUTH_SERVICE_URL"] = "http://127.0.0.1:18101"
+    env["CONTENT_SERVICE_URL"] = "http://127.0.0.1:18102"
+    env["ASSESSMENT_SERVICE_URL"] = "http://127.0.0.1:18103"
+    env["RECOMMENDATION_SERVICE_URL"] = "http://127.0.0.1:18104"
 
     procs: list[subprocess.Popen[bytes]] = []
     services_cmd = [
-        ("services.user_auth_service:app", "8001"),
-        ("services.content_kg_service:app", "8002"),
-        ("services.assessment_grader_service:app", "8003"),
-        ("services.recommendation_ai_service:app", "8004"),
-        ("services.api_gateway:app", "8000"),
+        ("services.user_auth_service:app", "18101", "1"),
+        ("services.content_kg_service:app", "18102", "1"),
+        ("services.assessment_grader_service:app", "18103", "3"),
+        ("services.recommendation_ai_service:app", "18104", "4"),
+        ("services.api_gateway:app", "18100", "4"),
     ]
     try:
-        for app_target, port in services_cmd:
+        for app_target, port, workers in services_cmd:
             p = subprocess.Popen(  # noqa: S603
                 [
                     sys.executable,
@@ -180,6 +217,8 @@ async def run_20vu_load_benchmark(duration_s: float = 60.0) -> dict[str, Any]:
                     "127.0.0.1",
                     "--port",
                     port,
+                    "--workers",
+                    workers,
                     "--log-level",
                     "warning",
                 ],
@@ -190,25 +229,28 @@ async def run_20vu_load_benchmark(duration_s: float = 60.0) -> dict[str, Any]:
             )
             procs.append(p)
 
-        for _, port in services_cmd[:-1]:
+        for _, port, _ in services_cmd[:-1]:
             await _wait_for_port(f"http://127.0.0.1:{port}/health")
-        await _wait_for_port("http://127.0.0.1:8000/api/v1/auth/me")
+        await _wait_for_port("http://127.0.0.1:18100/api/v1/auth/me")
 
         stats: dict[str, Any] = {
             "total_requests": 0,
             "errors_5xx": 0,
+            "status_histogram": {},
             "all_latencies": [],
             "rec_latencies": [],
+            "write_latencies": [],
         }
         t_start = time.monotonic()
         end_time = t_start + duration_s
         await asyncio.gather(
-            *[_virtual_user_loop(i, "http://127.0.0.1:8000", end_time, stats) for i in range(20)]
+            *[_virtual_user_loop(i, "http://127.0.0.1:18100", end_time, stats) for i in range(20)]
         )
         elapsed = time.monotonic() - t_start
 
         all_lat = sorted(stats["all_latencies"])
         rec_lat = sorted(stats["rec_latencies"])
+        write_lat = sorted(stats["write_latencies"])
         total_req = stats["total_requests"]
         err_5xx = stats["errors_5xx"]
 
@@ -217,6 +259,7 @@ async def run_20vu_load_benchmark(duration_s: float = 60.0) -> dict[str, Any]:
             "duration_seconds": round(elapsed, 2),
             "total_requests": total_req,
             "requests_per_second": round(total_req / max(0.1, elapsed), 2),
+            "status_histogram": stats["status_histogram"],
             "http_5xx_count": err_5xx,
             "http_5xx_rate_pct": round((err_5xx / max(1, total_req)) * 100.0, 4),
             "overall_latency_ms": {
@@ -230,6 +273,12 @@ async def run_20vu_load_benchmark(duration_s: float = 60.0) -> dict[str, Any]:
                 "p50": _percentile(rec_lat, 50),
                 "p95": _percentile(rec_lat, 95),
                 "p99": _percentile(rec_lat, 99),
+            },
+            "assessment_write_latency_ms": {
+                "mean": round(statistics.mean(write_lat), 2) if write_lat else 0.0,
+                "p50": _percentile(write_lat, 50),
+                "p95": _percentile(write_lat, 95),
+                "p99": _percentile(write_lat, 99),
             },
         }
     finally:

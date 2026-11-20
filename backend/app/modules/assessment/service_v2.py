@@ -7,8 +7,8 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select, text
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.db.models import (
@@ -34,6 +34,7 @@ from app.modules.assessment.ebbinghaus import (
     INITIAL_STABILITY_DAYS,
     compute_elapsed_days,
     compute_retention,
+    is_review_needed,
     update_stability,
 )
 from app.modules.assessment.placement_engine import (
@@ -70,6 +71,11 @@ from app.modules.assessment.schemas_v2 import (
     V2RecommendationResponse,
     V2RecommendedAction,
 )
+from app.modules.events.internal_client import (
+    content_service_url,
+    fetch_concept_bundle_internal,
+    fetch_domain_bundle_internal,
+)
 from app.modules.events.outbox import record_outbox_event_in_tx
 
 _RUBRIC_SERVICE = CircuitBreakerRubricService(
@@ -80,6 +86,20 @@ _RUBRIC_SERVICE = CircuitBreakerRubricService(
 _SANDBOX_WORKER = IsolatedSandboxWorkerAdapter()
 
 
+def _lock_user_for_assessment(db: Session, user_id: uuid.UUID) -> UserModel | None:
+    """Acquire pessimistic per-user transaction lock; fallback to pg_advisory_xact_lock under schema isolation."""
+    if db.get_bind() is not None and db.get_bind().dialect.name == "postgresql" and content_service_url():
+        db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:uid))"), {"uid": str(user_id)})
+        return None
+    try:
+        return db.scalars(select(UserModel).where(UserModel.id == user_id).with_for_update()).first()
+    except SQLAlchemyError:
+        db.rollback()
+        if db.get_bind() is not None and db.get_bind().dialect.name == "postgresql":
+            db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:uid))"), {"uid": str(user_id)})
+        return None
+
+
 def _sync_v2_to_mvp_if_backend(
     db: Session,
     user_id: uuid.UUID,
@@ -87,7 +107,13 @@ def _sync_v2_to_mvp_if_backend(
     depth_norm: float,
 ) -> None:
     """Keep MVP user_concept_mastery synchronized when a Backend concept is updated in v2."""
-    concept = db.scalars(select(ConceptModel).where(ConceptModel.slug == concept_slug)).first()
+    if content_service_url():
+        return
+    try:
+        concept = db.scalars(select(ConceptModel).where(ConceptModel.slug == concept_slug)).first()
+    except SQLAlchemyError:
+        db.rollback()
+        return
     if concept is None:
         return
     mastery = db.get(UserConceptMasteryModel, (user_id, concept.action_id))
@@ -112,20 +138,38 @@ def _check_concept_eligible(
     domain_slug: str | None,
     concept_slug: str,
 ) -> DomainConceptMapModel:
-    from app.modules.content.kg_service import sync_mvp_mastery_to_v2_competency
-
-    sync_mvp_mastery_to_v2_competency(db, user_id)
-    node = db.get(DomainConceptMapModel, (domain_slug, concept_slug)) if domain_slug else None
-    if node is None:
-        # Resolve dynamically from any domain containing concept_slug
-        node = db.scalars(
-            select(DomainConceptMapModel).where(DomainConceptMapModel.concept_slug == concept_slug)
-        ).first()
-    if node is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error_code": "CONCEPT_NOT_FOUND", "message": f"Concept '{concept_slug}' not found."},
+    if content_service_url():
+        bundle = fetch_concept_bundle_internal(concept_slug)
+        if bundle is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error_code": "CONCEPT_NOT_FOUND", "message": f"Concept '{concept_slug}' not found."},
+            )
+        n = bundle["node"]
+        node = DomainConceptMapModel(
+            domain_slug=str(n["domain_slug"]),
+            concept_slug=str(n["concept_slug"]),
+            node_idx=int(n["node_idx"]),
+            title=str(n["title"]),
+            tier=int(n["tier"]),
+            is_shared=bool(n["is_shared"]),
+            prerequisites_json=list(n.get("prerequisites_json", [])),
         )
+    else:
+        from app.modules.content.kg_service import sync_mvp_mastery_to_v2_competency
+
+        sync_mvp_mastery_to_v2_competency(db, user_id)
+        node_opt = db.get(DomainConceptMapModel, (domain_slug, concept_slug)) if domain_slug else None
+        if node_opt is None:
+            node_opt = db.scalars(
+                select(DomainConceptMapModel).where(DomainConceptMapModel.concept_slug == concept_slug)
+            ).first()
+        if node_opt is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error_code": "CONCEPT_NOT_FOUND", "message": f"Concept '{concept_slug}' not found."},
+            )
+        node = node_opt
 
     for prereq_slug in node.prerequisites_json:
         comp = db.get(UserNodeCompetencyModel, (user_id, prereq_slug))
@@ -140,11 +184,221 @@ def _check_concept_eligible(
     return node
 
 
-def _build_step_item(db: Session, q: DepthQuestionModel) -> DepthStepItem:
-    rubric_summary: list[dict[str, Any]] | None = None
-    rubric = db.scalars(
-        select(GradingRubricModel).where(GradingRubricModel.question_id == q.id)
+def _question_from_dict(qd: dict[str, Any]) -> DepthQuestionModel:
+    return DepthQuestionModel(
+        id=uuid.UUID(str(qd["id"])),
+        concept_slug=str(qd["concept_slug"]),
+        depth_tier=int(qd["depth_tier"]),
+        task_type=str(qd["task_type"]),
+        prompt=str(qd["prompt"]),
+        options_json=qd.get("options_json"),
+        correct_option_key=qd.get("correct_option_key"),
+        is_placement_eligible=bool(qd.get("is_placement_eligible")),
+    )
+
+
+def _rubric_from_dict(q_id: uuid.UUID, r_dict: dict[str, Any]) -> GradingRubricModel:
+    return GradingRubricModel(
+        id=uuid.uuid4(),
+        question_id=q_id,
+        criteria_json=list(r_dict.get("criteria_json", [])),
+        reference_explanation=str(r_dict.get("reference_explanation", "")),
+    )
+
+
+def _get_domain_bundle_or_db(
+    db: Session,
+    domain_slug: str,
+) -> tuple[list[DomainConceptMapModel], dict[uuid.UUID, DepthQuestionModel], dict[uuid.UUID, GradingRubricModel]]:
+    if content_service_url():
+        bundle = fetch_domain_bundle_internal(domain_slug)
+        if bundle is None:
+            return [], {}, {}
+        nodes = [
+            DomainConceptMapModel(
+                domain_slug=str(n["domain_slug"]),
+                concept_slug=str(n["concept_slug"]),
+                node_idx=int(n["node_idx"]),
+                title=str(n["title"]),
+                tier=int(n["tier"]),
+                is_shared=bool(n["is_shared"]),
+                prerequisites_json=list(n.get("prerequisites_json", [])),
+            )
+            for n in bundle.get("nodes", [])
+        ]
+        q_map: dict[uuid.UUID, DepthQuestionModel] = {}
+        r_map: dict[uuid.UUID, GradingRubricModel] = {}
+        for qd in bundle.get("questions", []):
+            q_obj = _question_from_dict(qd)
+            q_map[q_obj.id] = q_obj
+            if qd.get("rubric"):
+                r_map[q_obj.id] = _rubric_from_dict(q_obj.id, qd["rubric"])
+        return nodes, q_map, r_map
+
+    nodes = list(
+        db.scalars(
+            select(DomainConceptMapModel)
+            .where(DomainConceptMapModel.domain_slug == domain_slug)
+            .order_by(DomainConceptMapModel.node_idx)
+        ).all()
+    )
+    slugs = [n.concept_slug for n in nodes]
+    qs = (
+        db.scalars(
+            select(DepthQuestionModel)
+            .where(DepthQuestionModel.concept_slug.in_(slugs))
+            .order_by(DepthQuestionModel.depth_tier)
+        ).all()
+        if slugs
+        else []
+    )
+    q_map = {q.id: q for q in qs}
+    r_rows = (
+        db.scalars(select(GradingRubricModel).where(GradingRubricModel.question_id.in_(list(q_map.keys())))).all()
+        if q_map
+        else []
+    )
+    r_map = {r.question_id: r for r in r_rows}
+    return nodes, q_map, r_map
+
+
+def _get_concept_bundle_or_db(
+    db: Session,
+    concept_slug: str,
+) -> tuple[list[DepthQuestionModel], dict[uuid.UUID, GradingRubricModel], CodeChallengeModel | None]:
+    if content_service_url():
+        bundle = fetch_concept_bundle_internal(concept_slug)
+        if bundle is None:
+            return [], {}, None
+        qs: list[DepthQuestionModel] = []
+        r_map: dict[uuid.UUID, GradingRubricModel] = {}
+        for qd in bundle.get("questions", []):
+            q_obj = _question_from_dict(qd)
+            qs.append(q_obj)
+            if qd.get("rubric"):
+                r_map[q_obj.id] = _rubric_from_dict(q_obj.id, qd["rubric"])
+        ch_d = bundle.get("code_challenge")
+        ch_obj = (
+            CodeChallengeModel(
+                id=uuid.UUID(str(ch_d["id"])),
+                concept_slug=str(ch_d["concept_slug"]),
+                title=str(ch_d["title"]),
+                language=str(ch_d["language"]),
+                prompt=str(ch_d["prompt"]),
+                buggy_starter_code=str(ch_d["buggy_starter_code"]),
+                test_cases_json=list(ch_d["test_cases_json"]),
+                timeout_ms=int(ch_d["timeout_ms"]),
+                memory_limit_mb=int(ch_d["memory_limit_mb"]),
+            )
+            if ch_d
+            else None
+        )
+        return qs, r_map, ch_obj
+
+    qs = list(
+        db.scalars(
+            select(DepthQuestionModel)
+            .where(DepthQuestionModel.concept_slug == concept_slug)
+            .order_by(DepthQuestionModel.depth_tier)
+        ).all()
+    )
+    q_ids = [q.id for q in qs]
+    r_rows = (
+        db.scalars(select(GradingRubricModel).where(GradingRubricModel.question_id.in_(q_ids))).all()
+        if q_ids
+        else []
+    )
+    r_map = {r.question_id: r for r in r_rows}
+    ch_obj = db.scalars(
+        select(CodeChallengeModel).where(CodeChallengeModel.concept_slug == concept_slug)
     ).first()
+    return qs, r_map, ch_obj
+
+
+def _build_domain_obs_snapshot(
+    db: Session,
+    user_id: uuid.UUID,
+    domain_slug: str | None,
+    nodes: list[DomainConceptMapModel] | None = None,
+    *,
+    target_concept_slug: str | None = None,
+) -> dict[str, Any]:
+    """Build structured domain observation snapshot (before/after) with real node_order & retention."""
+    if not domain_slug:
+        return {"domain_slug": "", "node_order": [], "action_node_idx": None, "nodes": []}
+    domain_nodes = nodes if nodes is not None else _get_domain_bundle_or_db(db, domain_slug)[0]
+    if not domain_nodes:
+        return {"domain_slug": domain_slug, "node_order": [], "action_node_idx": None, "nodes": []}
+    slugs = [n.concept_slug for n in domain_nodes]
+    comp_rows = db.scalars(
+        select(UserNodeCompetencyModel).where(
+            UserNodeCompetencyModel.user_id == user_id,
+            UserNodeCompetencyModel.concept_slug.in_(slugs),
+        )
+    ).all()
+    comp_map = {r.concept_slug: r for r in comp_rows}
+    node_entries: list[dict[str, Any]] = []
+    action_node_idx: int | None = None
+    for idx, n in enumerate(domain_nodes):
+        if target_concept_slug and n.concept_slug == target_concept_slug:
+            action_node_idx = idx
+        c = comp_map.get(n.concept_slug)
+        depth = float(c.depth_level_norm) if c else 0.0
+        conf = float(c.confidence) if c else 0.0
+        if c is not None and c.last_practiced_at is not None:
+            dt = compute_elapsed_days(c.last_practiced_at, 0.0)
+            ret = float(compute_retention(dt, float(c.stability_s)))
+        else:
+            ret = 1.0
+        needs_rev = 1.0 if (c is not None and is_review_needed(depth, ret)) else 0.0
+        elig = 1.0 if all(
+            (comp_map.get(p) is not None and comp_map[p].depth_level_norm >= 0.75)
+            for p in n.prerequisites_json
+        ) else 0.0
+        code_sc = float(c.code_practice_score) if c else 0.0
+        feats = [
+            round(depth, 4),
+            round(conf, 4),
+            round(ret, 4),
+            elig,
+            needs_rev,
+            round(float(n.tier) / 4.0, 4),
+            round(code_sc, 4),
+            1.0,
+        ]
+        node_entries.append(
+            {
+                "concept_slug": n.concept_slug,
+                "node_idx": idx,
+                "mastery": round(depth, 4),
+                "confidence": round(conf, 4),
+                "retention": round(ret, 4),
+                "eligible": elig,
+                "needs_review": needs_rev > 0.5,
+                "tier_norm": round(float(n.tier) / 4.0, 4),
+                "code_score": round(code_sc, 4),
+                "features": feats,
+            }
+        )
+    return {
+        "domain_slug": domain_slug,
+        "node_order": slugs,
+        "action_node_idx": action_node_idx,
+        "nodes": node_entries,
+    }
+
+
+def _build_step_item(
+    db: Session,
+    q: DepthQuestionModel,
+    rubric_map: dict[uuid.UUID, GradingRubricModel] | None = None,
+) -> DepthStepItem:
+    rubric_summary: list[dict[str, Any]] | None = None
+    rubric = rubric_map.get(q.id) if rubric_map is not None else None
+    if rubric is None and not content_service_url():
+        rubric = db.scalars(
+            select(GradingRubricModel).where(GradingRubricModel.question_id == q.id)
+        ).first()
     if rubric is not None:
         rubric_summary = [
             {"name": c["name"], "weight": c["weight"]} for c in rubric.criteria_json
@@ -165,35 +419,81 @@ def start_placement_session(
     domain_slug: str,
 ) -> PlacementStartResponse:
     """Start an Adaptive Placement session (<= 6 DAG-stepping questions, cap 0.75)."""
-    domain = db.get(DomainModel, domain_slug)
-    if domain is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error_code": "DOMAIN_NOT_FOUND", "message": f"Domain '{domain_slug}' not found."},
+    if content_service_url():
+        bundle = fetch_domain_bundle_internal(domain_slug)
+        if bundle is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error_code": "DOMAIN_NOT_FOUND", "message": f"Domain '{domain_slug}' not found."},
+            )
+        nodes = [
+            DomainConceptMapModel(
+                domain_slug=str(n["domain_slug"]),
+                concept_slug=str(n["concept_slug"]),
+                node_idx=int(n["node_idx"]),
+                title=str(n["title"]),
+                tier=int(n["tier"]),
+                is_shared=bool(n["is_shared"]),
+                prerequisites_json=list(n.get("prerequisites_json", [])),
+            )
+            for n in bundle.get("nodes", [])
+        ]
+        root_slugs = [n.concept_slug for n in nodes if not n.prerequisites_json]
+        first_slug = root_slugs[0] if root_slugs else nodes[0].concept_slug
+        first_node = next(n for n in nodes if n.concept_slug == first_slug)
+        q_dicts = [
+            qd for qd in bundle.get("questions", [])
+            if qd["concept_slug"] == first_slug and qd.get("is_placement_eligible")
+        ]
+        if not q_dicts:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error_code": "NO_PLACEMENT_QUESTIONS", "message": "No placement questions seeded."},
+            )
+        qd0 = min(q_dicts, key=lambda x: int(x["depth_tier"]))
+        q = DepthQuestionModel(
+            id=uuid.UUID(str(qd0["id"])),
+            concept_slug=str(qd0["concept_slug"]),
+            depth_tier=int(qd0["depth_tier"]),
+            task_type=str(qd0["task_type"]),
+            prompt=str(qd0["prompt"]),
+            options_json=qd0.get("options_json"),
+            correct_option_key=qd0.get("correct_option_key"),
+            is_placement_eligible=bool(qd0.get("is_placement_eligible")),
         )
+    else:
+        domain = db.get(DomainModel, domain_slug)
+        if domain is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error_code": "DOMAIN_NOT_FOUND", "message": f"Domain '{domain_slug}' not found."},
+            )
 
-    nodes = db.scalars(
-        select(DomainConceptMapModel)
-        .where(DomainConceptMapModel.domain_slug == domain_slug)
-        .order_by(DomainConceptMapModel.node_idx)
-    ).all()
-    root_slugs = [n.concept_slug for n in nodes if not n.prerequisites_json]
-    first_slug = root_slugs[0] if root_slugs else nodes[0].concept_slug
-    first_node = next(n for n in nodes if n.concept_slug == first_slug)
+        nodes = list(
+            db.scalars(
+                select(DomainConceptMapModel)
+                .where(DomainConceptMapModel.domain_slug == domain_slug)
+                .order_by(DomainConceptMapModel.node_idx)
+            ).all()
+        )
+        root_slugs = [n.concept_slug for n in nodes if not n.prerequisites_json]
+        first_slug = root_slugs[0] if root_slugs else nodes[0].concept_slug
+        first_node = next(n for n in nodes if n.concept_slug == first_slug)
 
-    q = db.scalars(
-        select(DepthQuestionModel)
-        .where(
-            DepthQuestionModel.concept_slug == first_slug,
-            DepthQuestionModel.is_placement_eligible.is_(True),
-        )
-        .order_by(DepthQuestionModel.depth_tier)
-    ).first()
-    if q is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error_code": "NO_PLACEMENT_QUESTIONS", "message": "No placement questions seeded."},
-        )
+        q_opt = db.scalars(
+            select(DepthQuestionModel)
+            .where(
+                DepthQuestionModel.concept_slug == first_slug,
+                DepthQuestionModel.is_placement_eligible.is_(True),
+            )
+            .order_by(DepthQuestionModel.depth_tier)
+        ).first()
+        if q_opt is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error_code": "NO_PLACEMENT_QUESTIONS", "message": "No placement questions seeded."},
+            )
+        q = q_opt
 
     session = AssessmentSessionModel(
         user_id=user.id,
@@ -237,7 +537,7 @@ def submit_placement_answer(
 ) -> PlacementAnswerResponse:
     """Evaluate one Adaptive Placement answer, step up DAG or stop branch, cap at 0.75."""
     # Lock user row BEFORE idempotency check to eliminate race conditions (F-G3-03)
-    locked_user = db.scalars(select(UserModel).where(UserModel.id == user.id).with_for_update()).first()
+    locked_user = _lock_user_for_assessment(db, user.id)
 
     existing = db.scalars(
         select(AttemptRecordModel).where(
@@ -261,6 +561,11 @@ def submit_placement_answer(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error_code": "SESSION_NOT_FOUND", "message": "Placement session not found."},
         )
+    if session.session_mode != "placement":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error_code": "SESSION_MODE_MISMATCH", "message": "Session is not a placement session."},
+        )
     if session.status != "active":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -270,18 +575,15 @@ def submit_placement_answer(
             },
         )
 
-    q = db.get(DepthQuestionModel, payload.question_id)
+    nodes, q_map, _ = _get_domain_bundle_or_db(db, domain_slug)
+    q = q_map.get(payload.question_id)
+    if q is None and not content_service_url():
+        q = db.get(DepthQuestionModel, payload.question_id)
     if q is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error_code": "QUESTION_NOT_FOUND", "message": "Question not found."},
         )
-
-    nodes = db.scalars(
-        select(DomainConceptMapModel)
-        .where(DomainConceptMapModel.domain_slug == domain_slug)
-        .order_by(DomainConceptMapModel.node_idx)
-    ).all()
     node_map = {n.concept_slug: n for n in nodes}
     curr_node = node_map.get(q.concept_slug)
     if curr_node is None:
@@ -292,9 +594,22 @@ def submit_placement_answer(
                 "message": f"Question does not belong to domain '{domain_slug}'.",
             },
         )
+    state_check = dict(session.state_json or {})
+    expected_q_id = state_check.get("current_question_id")
+    if not expected_q_id or str(payload.question_id) != str(expected_q_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_code": "QUESTION_STEP_MISMATCH",
+                "message": "Submitted question_id does not match the current placement question.",
+            },
+        )
 
     passed = payload.selected_option.upper() == (q.correct_option_key or "").upper()
     node_init = build_placement_node_init(q.concept_slug, curr_node.tier, passed)
+    obs_before_snap = _build_domain_obs_snapshot(
+        db, user.id, domain_slug, nodes=nodes, target_concept_slug=q.concept_slug
+    )
 
     # Persist competency (without overwriting higher existing peak)
     comp = db.get(UserNodeCompetencyModel, (user.id, q.concept_slug))
@@ -353,14 +668,14 @@ def submit_placement_answer(
             if nxt_slug in visited:
                 continue
             visited.append(nxt_slug)
-            nxt_q = db.scalars(
-                select(DepthQuestionModel)
-                .where(
-                    DepthQuestionModel.concept_slug == nxt_slug,
-                    DepthQuestionModel.is_placement_eligible.is_(True),
-                )
-                .order_by(DepthQuestionModel.depth_tier)
-            ).first()
+            nxt_q = next(
+                (
+                    cand_q
+                    for cand_q in sorted(q_map.values(), key=lambda x: x.depth_tier)
+                    if cand_q.concept_slug == nxt_slug and cand_q.is_placement_eligible
+                ),
+                None,
+            )
             if nxt_q is not None:
                 next_q_item = PlacementQuestionItem(
                     question_id=nxt_q.id,
@@ -391,6 +706,10 @@ def submit_placement_answer(
     if locked_user is not None:
         locked_user.state_version += 1
 
+    db.flush()
+    obs_after_snap = _build_domain_obs_snapshot(
+        db, user.id, domain_slug, nodes=nodes, target_concept_slug=q.concept_slug
+    )
     record_outbox_event_in_tx(
         db,
         event_type="CompetencyUpdatedEvent",
@@ -400,9 +719,12 @@ def submit_placement_answer(
             "domain_slug": domain_slug,
             "concept_slug": q.concept_slug,
             "action_mode": "Learn_New",
+            "action_node_idx": obs_before_snap.get("action_node_idx"),
             "reward": 1.0 if passed else -0.25,
             "depth_level_norm": round(comp.depth_level_norm, 4),
             "stability_s": round(comp.stability_s, 4),
+            "obs_before": obs_before_snap,
+            "obs_after": obs_after_snap,
         },
     )
     db.add(
@@ -458,18 +780,10 @@ def start_depth_or_review_session(
     if payload.session_mode == "depth_probe" and comp is not None and comp.depth_level_norm >= 0.50 or payload.session_mode == "spaced_review":
         start_tier = 3
 
-    q = db.scalars(
-        select(DepthQuestionModel).where(
-            DepthQuestionModel.concept_slug == payload.concept_slug,
-            DepthQuestionModel.depth_tier == start_tier,
-        )
-    ).first()
-    if q is None:
-        q = db.scalars(
-            select(DepthQuestionModel)
-            .where(DepthQuestionModel.concept_slug == payload.concept_slug)
-            .order_by(DepthQuestionModel.depth_tier)
-        ).first()
+    concept_qs, rubric_map, _ = _get_concept_bundle_or_db(db, payload.concept_slug)
+    q = next((cand for cand in concept_qs if cand.depth_tier == start_tier), None)
+    if q is None and concept_qs:
+        q = concept_qs[0]
     if q is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -486,7 +800,7 @@ def start_depth_or_review_session(
         consecutive_fails_at_tier=0,
         highest_passed_tier=0,
         steps_completed=0,
-        state_json={},
+        state_json={"current_question_id": str(q.id)},
     )
     db.add(session)
     db.commit()
@@ -497,7 +811,7 @@ def start_depth_or_review_session(
         concept_slug=payload.concept_slug,
         session_mode=payload.session_mode,
         current_depth_tier=q.depth_tier,
-        step_item=_build_step_item(db, q),
+        step_item=_build_step_item(db, q, rubric_map),
     )
 
 
@@ -509,7 +823,7 @@ def submit_depth_or_review_step(
 ) -> AssessmentSubmitResponse:
     """Submit a step in 5-Depth Probing or Spaced Review with Rubric + AI Tutor + Ebbinghaus."""
     # Lock user row BEFORE idempotency check to eliminate race conditions (F-G3-03)
-    locked_user = db.scalars(select(UserModel).where(UserModel.id == user.id).with_for_update()).first()
+    locked_user = _lock_user_for_assessment(db, user.id)
 
     existing = db.scalars(
         select(AttemptRecordModel).where(
@@ -533,6 +847,11 @@ def submit_depth_or_review_step(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error_code": "SESSION_NOT_FOUND", "message": "Assessment session not found."},
         )
+    if session.session_mode not in ("depth_probe", "spaced_review"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error_code": "SESSION_MODE_MISMATCH", "message": "Invalid session mode for depth/review submit."},
+        )
     if session.status != "active":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -542,7 +861,11 @@ def submit_depth_or_review_step(
             },
         )
 
-    q = db.get(DepthQuestionModel, payload.question_id)
+    concept_slug_lookup = session.concept_slug or ""
+    concept_qs, rubric_map, _ = _get_concept_bundle_or_db(db, concept_slug_lookup)
+    q = next((cand for cand in concept_qs if cand.id == payload.question_id), None)
+    if q is None and not content_service_url():
+        q = db.get(DepthQuestionModel, payload.question_id)
     if q is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -554,6 +877,24 @@ def submit_depth_or_review_step(
             detail={
                 "error_code": "QUESTION_SESSION_MISMATCH",
                 "message": f"Question does not belong to concept '{session.concept_slug}'.",
+            },
+        )
+    sess_state = dict(session.state_json or {})
+    expected_q_id = sess_state.get("current_question_id")
+    if expected_q_id and str(payload.question_id) != str(expected_q_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_code": "QUESTION_STEP_MISMATCH",
+                "message": "Submitted question_id does not match the current assessment step.",
+            },
+        )
+    if session.session_mode == "depth_probe" and q.depth_tier != session.current_depth_tier:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_code": "QUESTION_TIER_MISMATCH",
+                "message": f"Expected depth tier {session.current_depth_tier}, got tier {q.depth_tier}.",
             },
         )
 
@@ -579,9 +920,11 @@ def submit_depth_or_review_step(
                     "message": "Written explanation must be at least 10 characters.",
                 },
             )
-        rubric = db.scalars(
-            select(GradingRubricModel).where(GradingRubricModel.question_id == q.id)
-        ).first()
+        rubric = rubric_map.get(q.id)
+        if rubric is None and not content_service_url():
+            rubric = db.scalars(
+                select(GradingRubricModel).where(GradingRubricModel.question_id == q.id)
+            ).first()
         criteria = [
             RubricCriterion(
                 name=str(c["name"]),
@@ -607,6 +950,9 @@ def submit_depth_or_review_step(
         )
 
     concept_slug = session.concept_slug or q.concept_slug
+    obs_before_snap = _build_domain_obs_snapshot(
+        db, user.id, session.domain_slug, target_concept_slug=concept_slug
+    )
     comp = db.get(UserNodeCompetencyModel, (user.id, concept_slug))
     if comp is None:
         comp = UserNodeCompetencyModel(
@@ -651,14 +997,13 @@ def submit_depth_or_review_step(
         next_tier_val = trans.next_depth_tier
         if trans.next_depth_tier is not None:
             session.current_depth_tier = trans.next_depth_tier
-            nxt_q = db.scalars(
-                select(DepthQuestionModel).where(
-                    DepthQuestionModel.concept_slug == concept_slug,
-                    DepthQuestionModel.depth_tier == trans.next_depth_tier,
-                )
-            ).first()
+            nxt_q = next((cand for cand in concept_qs if cand.depth_tier == trans.next_depth_tier), None)
             if nxt_q is not None:
-                next_step_item = _build_step_item(db, nxt_q)
+                next_step_item = _build_step_item(db, nxt_q, rubric_map)
+        session.state_json = {
+            **sess_state,
+            "current_question_id": str(next_step_item.question_id) if next_step_item else None,
+        }
 
         # Update competency when session finishes or when highest tier increases
         passed_code = comp.code_practice_score >= 1.0
@@ -708,6 +1053,10 @@ def submit_depth_or_review_step(
         locked_user.state_version += 1
 
     action_mode = "Spaced_Review" if session.session_mode == "spaced_review" else "Deep_Probe"
+    db.flush()
+    obs_after_snap = _build_domain_obs_snapshot(
+        db, user.id, session.domain_slug, target_concept_slug=concept_slug
+    )
     record_outbox_event_in_tx(
         db,
         event_type="CompetencyUpdatedEvent",
@@ -717,9 +1066,12 @@ def submit_depth_or_review_step(
             "domain_slug": session.domain_slug,
             "concept_slug": concept_slug,
             "action_mode": action_mode,
+            "action_node_idx": obs_before_snap.get("action_node_idx"),
             "reward": round(float(step_score) * 2.0 - 0.5, 4),
             "depth_level_norm": round(comp.depth_level_norm, 4),
             "stability_s": round(comp.stability_s, 4),
+            "obs_before": obs_before_snap,
+            "obs_after": obs_after_snap,
         },
     )
     db.add(
@@ -770,9 +1122,7 @@ def get_code_challenge_for_concept(
 ) -> CodeChallengeOut:
     """Fetch public Code Sandbox challenge for a concept after verifying DAG eligibility."""
     _check_concept_eligible(db, user.id, None, concept_slug)
-    ch = db.scalars(
-        select(CodeChallengeModel).where(CodeChallengeModel.concept_slug == concept_slug)
-    ).first()
+    _, _, ch = _get_concept_bundle_or_db(db, concept_slug)
     if ch is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -807,7 +1157,7 @@ def submit_code_sandbox(
 ) -> CodeSandboxSubmitResponse:
     """Execute user code in isolated sandbox worker, enforce limits, and update competency."""
     # Lock user row BEFORE idempotency check to eliminate race conditions (F-G3-03)
-    locked_user = db.scalars(select(UserModel).where(UserModel.id == user.id).with_for_update()).first()
+    locked_user = _lock_user_for_assessment(db, user.id)
 
     existing = db.scalars(
         select(AttemptRecordModel).where(
@@ -827,8 +1177,8 @@ def submit_code_sandbox(
 
     node = _check_concept_eligible(db, user.id, None, concept_slug)
 
-    ch = db.get(CodeChallengeModel, payload.challenge_id)
-    if ch is None or ch.concept_slug != concept_slug:
+    _, _, ch = _get_concept_bundle_or_db(db, concept_slug)
+    if ch is None or ch.id != payload.challenge_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error_code": "CODE_CHALLENGE_NOT_FOUND", "message": "Challenge not found."},
@@ -853,6 +1203,9 @@ def submit_code_sandbox(
             detail={"error_code": exc.error_code, "message": str(exc)},
         ) from exc
 
+    obs_before_snap = _build_domain_obs_snapshot(
+        db, user.id, node.domain_slug, target_concept_slug=concept_slug
+    )
     comp = db.get(UserNodeCompetencyModel, (user.id, concept_slug))
     if comp is None:
         comp = UserNodeCompetencyModel(
@@ -882,6 +1235,23 @@ def submit_code_sandbox(
         _sync_v2_to_mvp_if_backend(db, user.id, concept_slug, new_depth)
     comp.updated_at = datetime.now(UTC)
 
+    hidden_names = {
+        str(tc["name"]) for tc in ch.test_cases_json if tc.get("is_hidden", False)
+    }
+    sanitized_results = [
+        (
+            {
+                "name": r.get("name"),
+                "passed": bool(r.get("passed")),
+                "is_hidden": True,
+                **({"error": "Hidden test execution failed"} if "error" in r else {}),
+            }
+            if r.get("is_hidden") or r.get("name") in hidden_names
+            else r
+        )
+        for r in exec_res.test_results
+    ]
+
     attempt_id = uuid.uuid4()
     resp_obj = CodeSandboxSubmitResponse(
         attempt_id=attempt_id,
@@ -891,7 +1261,7 @@ def submit_code_sandbox(
         code_score=exec_res.code_score,
         runtime_ms=exec_res.runtime_ms,
         memory_kb=exec_res.memory_kb,
-        test_results=exec_res.test_results,
+        test_results=sanitized_results,
         updated_competency=UpdatedCompetencyOut(
             depth_level_norm=round(comp.depth_level_norm, 4),
             depth_label=comp.depth_label,
@@ -903,6 +1273,10 @@ def submit_code_sandbox(
     if locked_user is not None:
         locked_user.state_version += 1
 
+    db.flush()
+    obs_after_snap = _build_domain_obs_snapshot(
+        db, user.id, node.domain_slug, target_concept_slug=concept_slug
+    )
     record_outbox_event_in_tx(
         db,
         event_type="CompetencyUpdatedEvent",
@@ -912,9 +1286,12 @@ def submit_code_sandbox(
             "domain_slug": node.domain_slug,
             "concept_slug": concept_slug,
             "action_mode": "Code_Practice",
+            "action_node_idx": obs_before_snap.get("action_node_idx"),
             "reward": round(float(exec_res.code_score) * 2.0 - 0.5, 4),
             "depth_level_norm": round(comp.depth_level_norm, 4),
             "stability_s": round(comp.stability_s, 4),
+            "obs_before": obs_before_snap,
+            "obs_after": obs_after_snap,
         },
     )
     db.add(

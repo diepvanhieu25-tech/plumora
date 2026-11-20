@@ -6,6 +6,7 @@ import os
 
 import httpx
 from fastapi import FastAPI, Request, Response
+from fastapi.responses import JSONResponse
 
 app = FastAPI(title="Plumora API Gateway", version="2.0.0")
 _GATEWAY_CLIENT = httpx.AsyncClient(
@@ -33,8 +34,18 @@ def _resolve_upstream(path: str) -> str:
 
 @app.api_route("/api/{rest:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def proxy_api(request: Request, rest: str) -> Response:
-    """Reverse-proxy /api/* requests to the responsible microservice."""
+    """Reverse-proxy /api/* requests to the responsible microservice, blocking internal routes."""
     full_path = f"/api/{rest}"
+    if full_path.startswith("/api/v2/internal") or "/internal/" in full_path:
+        return JSONResponse(
+            status_code=403,
+            content={
+                "detail": {
+                    "error_code": "INTERNAL_ENDPOINT_FORBIDDEN",
+                    "message": "Internal endpoints are not publicly accessible.",
+                }
+            },
+        )
     upstream = _resolve_upstream(full_path)
     target_url = f"{upstream}{full_path}"
     if request.url.query:

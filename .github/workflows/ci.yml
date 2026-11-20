@@ -55,11 +55,12 @@ jobs:
           cd ../rl && uv sync --frozen
           cd ../frontend && npm ci
 
-      - name: 1. Lint & Format Check (Ruff & ESLint)
+      - name: 1. Lint & Format Check (Ruff, ESLint, Git Diff)
         run: |
           cd backend && uv run ruff check .
           cd ../rl && uv run ruff check .
           cd ../frontend && npm run lint
+          cd .. && git diff --check
 
       - name: 2. Type Check (Mypy & TypeScript)
         run: |
@@ -69,8 +70,9 @@ jobs:
 
       - name: 3. Unit & Mock Behavioral Tests
         env:
-          DATABASE_URL: postgresql+psycopg://plumora_app:plumora_dev_pass_local_only@127.0.0.1:5432/plumora_dev
-          REDIS_URL: redis://127.0.0.1:6379/0
+          DATABASE_URL: postgresql+psycopg://plumora_app:plumora_dev_pass_local_only@127.0.0.1:5432/plumora_test
+          PLUMORA_TEST_DB_NAME: plumora_test
+          REDIS_URL: redis://127.0.0.1:6379/1
         run: |
           cd backend && uv run pytest
           cd ../rl && uv run pytest
@@ -113,6 +115,7 @@ jobs:
           BACKEND_BASE_URL: http://127.0.0.1:8000
         run: |
           cd frontend
+          npx playwright install --with-deps chromium
           npx vite preview --host 127.0.0.1 --port 3000 &
           echo "Waiting up to 20s for frontend readiness at http://127.0.0.1:3000..."
           FE_HEALTHY=0

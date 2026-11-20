@@ -319,10 +319,25 @@ def test_fg3_04_active_model_registry_serving_redis_cache_and_real_online_rl() -
             assert r2.status_code == 200
             assert r2.json()["state_source"] in ("redis_cache", "postgres_fallback")
 
-            # Seed 16 experience buffer samples for micro-batch
+            # Seed 16 valid 12-node backend experience buffer samples for micro-batch
             with SessionLocal() as db:
+                from app.modules.recommendation.admin_service import _load_domain_topology_for_rl
+
                 u = db.scalar(select(UserModel).where(UserModel.username == uname))
                 assert u is not None
+                be_order = _load_domain_topology_for_rl(db, "backend")[0]
+                obs_b_12 = {
+                    "domain_slug": "backend",
+                    "node_order": be_order,
+                    "action_node_idx": 0,
+                    "nodes": [{"features": [0.0, 0.0, 1.0, 1.0, 0.0, 0.25, 0.0, 1.0]} for _ in be_order],
+                }
+                obs_a_12 = {
+                    "domain_slug": "backend",
+                    "node_order": be_order,
+                    "action_node_idx": 0,
+                    "nodes": [{"features": [0.5, 0.7, 1.0, 1.0, 0.0, 0.25, 0.0, 1.0]} for _ in be_order],
+                }
                 for _ in range(16):
                     bid = uuid.uuid4()
                     buf_ids.append(bid)
@@ -335,8 +350,8 @@ def test_fg3_04_active_model_registry_serving_redis_cache_and_real_online_rl() -
                             concept_slug="net-internet",
                             action_mode="Learn_New",
                             reward=1.0,
-                            obs_before_json=[0.0],
-                            obs_after_json=[0.5],
+                            obs_before_json=obs_b_12,
+                            obs_after_json=obs_a_12,
                         )
                     )
                 db.commit()

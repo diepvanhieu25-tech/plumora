@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import uuid
 
 from fastapi import APIRouter, Request
@@ -25,6 +26,13 @@ from app.modules.auth.security import (
 from app.modules.auth.service import apply_preset_to_user_in_tx
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+
+
+def _is_microservice_mode() -> bool:
+    return (
+        os.environ.get("MICROSERVICE_MODE", "").lower() == "true"
+        or bool(os.environ.get("ASSESSMENT_SERVICE_URL") or os.environ.get("CONTENT_SERVICE_URL"))
+    )
 
 
 @router.post("/register")
@@ -51,10 +59,12 @@ def register_user(
         password_hash=hash_password(payload.password),
         state_version=1,
     )
+    is_microservice_mode = _is_microservice_mode()
     try:
         db.add(user)
         db.flush()
-        apply_preset_to_user_in_tx(db, user, "new_learner")
+        if not is_microservice_mode:
+            apply_preset_to_user_in_tx(db, user, "new_learner")
         db.commit()
     except IntegrityError:
         db.rollback()
@@ -68,9 +78,10 @@ def register_user(
         )
 
     db.refresh(user)
-    write_through_state_cache(db, user.id)
+    if not is_microservice_mode:
+        write_through_state_cache(db, user.id)
 
-    token = create_access_token(user.id, user.username)
+    token = create_access_token(user.id, user.username, role=user.role)
     res = JSONResponse(
         status_code=201,
         content={"user": serialize_user(user), "access_token": token},
@@ -125,8 +136,9 @@ def login_user(
             },
         )
 
-    write_through_state_cache(db, user.id)
-    token = create_access_token(user.id, user.username)
+    if not _is_microservice_mode():
+        write_through_state_cache(db, user.id)
+    token = create_access_token(user.id, user.username, role=user.role)
     res = JSONResponse(
         status_code=200,
         content={"user": serialize_user(user), "access_token": token},

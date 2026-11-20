@@ -63,7 +63,7 @@ const SERVICE_META: Array<{
 function isServiceHealthy(status: string | undefined): boolean {
   if (!status) return false
   const s = status.toLowerCase()
-  return s === 'healthy' || s === 'ok' || s === 'up' || s === 'monolith_embedded'
+  return s === 'healthy' || s === 'ok' || s === 'up' || s === 'in_process' || s === 'monolith_embedded'
 }
 
 export function AdminSystemHealthPage() {
@@ -200,7 +200,7 @@ export function AdminSystemHealthPage() {
             <div className="p-5 rounded-xl bg-surface-container-lowest shadow-sm border border-outline-variant/15 flex flex-col justify-between space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-label uppercase tracking-wider text-on-surface-variant">
-                  Tổng số Microservices
+                  {health.mode === 'monolith' ? 'Modules (Monolith)' : 'Tổng số Microservices'}
                 </span>
                 <div className="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary">
                   <Layers className="w-4 h-4" aria-hidden="true" />
@@ -211,7 +211,9 @@ export function AdminSystemHealthPage() {
                   <span className="text-3xl font-headline font-bold text-on-surface tracking-tight">
                     {healthyCount} / {totalServices}
                   </span>
-                  <span className="text-xs font-semibold text-primary">Active</span>
+                  <span className="text-xs font-semibold text-primary">
+                    {health.mode === 'monolith' ? 'In-Process' : 'Active'}
+                  </span>
                 </div>
                 <p className="text-xs text-on-surface-variant mt-1">
                   Trạng thái kết nối các module dịch vụ
@@ -234,20 +236,26 @@ export function AdminSystemHealthPage() {
             {/* Card 2 */}
             <div className="p-5 rounded-xl bg-surface-container-lowest shadow-sm border border-outline-variant/15 flex flex-col justify-between space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-label uppercase tracking-wider text-on-surface-variant">
-                  Độ trễ Redis Streams
-                </span>
-                <div className="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-secondary">
-                  <Zap className="w-4 h-4" aria-hidden="true" />
-                </div>
-              </div>
-              <div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-headline font-bold text-secondary tracking-tight">
-                    {health.redis_stream_lag_ms}ms
+                  <span className="text-xs font-label uppercase tracking-wider text-on-surface-variant">
+                    Redis Ping &amp; Stream Pending
                   </span>
-                  <span className="text-xs font-semibold text-secondary">Consumer Lag</span>
+                  <div className="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-secondary">
+                    <Zap className="w-4 h-4" aria-hidden="true" />
+                  </div>
                 </div>
+                <div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-headline font-bold text-secondary tracking-tight">
+                      {health.redis_stream_lag_ms != null && health.redis_stream_lag_ms >= 0
+                        ? `${health.redis_stream_lag_ms}ms`
+                        : 'Unknown'}
+                    </span>
+                    <span className="text-xs font-semibold text-secondary">
+                      {health.consumer_group_active
+                        ? `Pending: ${health.redis_stream_pending != null && health.redis_stream_pending >= 0 ? health.redis_stream_pending : 'Unknown'}`
+                        : 'Consumer: Unverified'}
+                    </span>
+                  </div>
                 <p className="text-xs text-on-surface-variant mt-1">
                   {health.redis_connected
                     ? 'Redis 7 đã kết nối ổn định'
@@ -281,7 +289,7 @@ export function AdminSystemHealthPage() {
               <div>
                 <div className="flex items-baseline gap-2">
                   <span className="text-3xl font-headline font-bold text-on-surface tracking-tight">
-                    {health.outbox_pending_count}
+                    {health.outbox_pending_count >= 0 ? health.outbox_pending_count : 'Unknown'}
                   </span>
                   <span className="text-xs font-semibold text-primary">bản ghi</span>
                 </div>
@@ -442,11 +450,13 @@ export function AdminSystemHealthPage() {
                       </td>
                       <td className="py-3.5 px-2 text-center">
                         <span className="px-2 py-0.5 rounded bg-surface-container text-on-surface font-semibold">
-                          {health.outbox_pending_count}
+                          {health.outbox_pending_count >= 0 ? health.outbox_pending_count : 'Unknown'}
                         </span>
                       </td>
                       <td className="py-3.5 px-2 text-center text-primary font-semibold">
-                        {health.redis_stream_lag_ms}ms
+                        {health.redis_stream_lag_ms != null && health.redis_stream_lag_ms >= 0
+                          ? `${health.redis_stream_lag_ms}ms`
+                          : 'Unknown'}
                       </td>
                       <td className="py-3.5 px-3 text-right">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-primary-container text-on-primary-container font-semibold text-[11px]">
@@ -470,7 +480,9 @@ export function AdminSystemHealthPage() {
                         </span>
                       </td>
                       <td className="py-3.5 px-2 text-center text-primary font-semibold">
-                        {health.redis_stream_lag_ms}ms
+                        {health.redis_stream_lag_ms != null && health.redis_stream_lag_ms >= 0
+                          ? `${health.redis_stream_lag_ms}ms`
+                          : 'Unknown'}
                       </td>
                       <td className="py-3.5 px-3 text-right">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-secondary-container text-on-secondary-container font-semibold text-[11px]">

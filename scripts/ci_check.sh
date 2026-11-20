@@ -10,7 +10,7 @@ echo "=== [1/6] Lint Check (Backend, RL, Frontend) ==="
 (cd frontend && npm run lint)
 
 echo "=== [2/6] Type Check (Backend, RL, Frontend) ==="
-(cd backend && uv run mypy app tests)
+(cd backend && uv run mypy app services tests)
 (cd rl && uv run mypy src tests)
 (cd frontend && npm run typecheck)
 
@@ -97,5 +97,18 @@ if node scripts/audit_p3_slice1.cjs --negative-control > /dev/null 2>&1; then
 else
   echo "Audit negative-control probe correctly failed with non-zero exit code as expected."
 fi
+
+echo "=== [7/7] Docker Compose Config, Microservices Edge & Diff Whitespace Check ==="
+docker compose config --quiet
+docker compose --profile microservices config --quiet
+if curl -s -o /dev/null http://127.0.0.1:8080/api/v1/auth/me 2>/dev/null; then
+  GW_INT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/api/v2/internal/domains/frontend/bundle)
+  if [ "$GW_INT_STATUS" != "403" ]; then
+    echo "FATAL: API Gateway :8080 internal route returned $GW_INT_STATUS (expected 403)"
+    exit 1
+  fi
+  echo "API Gateway :8080 internal edge block verified (403)."
+fi
+git diff --check
 
 echo "=== ALL DAY-0 CI, INTEGRATION & BROWSER E2E HARDENING CHECKS PASSED ==="

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import time
 import urllib.error
@@ -118,6 +119,39 @@ class LlmRubricGraderAdapter(RubricGraderPort):
         if not api_url or not api_key:
             raise ConnectionError("External LLM API is not configured in local/offline mode.")
 
+        request_payload = {
+            "model": os.environ.get("PLUMORA_LLM_MODEL", "gpt-4o-mini"),
+            "response_format": {"type": "json_object"},
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an educational rubric grader. Evaluate the student's explanation "
+                        "against the weighted criteria and return JSON with keys: "
+                        "rubric_score (float 0..1), tutor_summary (string), criteria_results (list)."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": json.dumps(
+                        {
+                            "prompt": prompt,
+                            "written_explanation": written_explanation,
+                            "criteria": [
+                                {
+                                    "name": c.name,
+                                    "weight": c.weight,
+                                    "required_keywords": c.required_keywords,
+                                }
+                                for c in criteria
+                            ],
+                            "reference_explanation": reference_explanation,
+                        },
+                        ensure_ascii=False,
+                    ),
+                },
+            ],
+        }
         req = urllib.request.Request(
             api_url,
             method="POST",
@@ -125,13 +159,33 @@ class LlmRubricGraderAdapter(RubricGraderPort):
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
             },
-            data=b"{}",
+            data=json.dumps(request_payload).encode("utf-8"),
         )
         with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
             if resp.status >= 400:
                 raise RuntimeError(f"LLM API returned HTTP {resp.status}")
-        # If configured external endpoint succeeds in future, parse response; otherwise fallback
-        raise RuntimeError("LLM response parsing requires provider schema")
+            raw_bytes = resp.read()
+
+        parsed = json.loads(raw_bytes.decode("utf-8"))
+        if "choices" in parsed and isinstance(parsed["choices"], list) and parsed["choices"]:
+            content_str = parsed["choices"][0]["message"]["content"]
+            graded = json.loads(content_str) if isinstance(content_str, str) else content_str
+        else:
+            graded = parsed
+
+        raw_score = float(graded["rubric_score"])
+        if not (0.0 <= raw_score <= 1.0):
+            raise ValueError(f"LLM rubric_score out of bounds: {raw_score}")
+        tutor_summary = str(graded.get("tutor_summary", "")).strip()
+        if not tutor_summary:
+            raise ValueError("LLM response missing tutor_summary")
+        crit_results = graded.get("criteria_results")
+        if not isinstance(crit_results, list):
+            crit_results = [
+                {"name": c.name, "weight": c.weight, "score": raw_score}
+                for c in criteria
+            ]
+        return round(raw_score, 4), tutor_summary, crit_results, "llm_rubric"
 
 
 class CircuitBreakerRubricService:

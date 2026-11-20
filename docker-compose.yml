@@ -75,9 +75,12 @@ services:
       dockerfile: backend/Dockerfile
     command: ["uvicorn", "services.user_auth_service:app", "--host", "0.0.0.0", "--port", "8001"]
     environment:
-      DATABASE_URL: postgresql+psycopg://${DB_USER:-plumora_app}:${DB_PASSWORD:-plumora_dev_pass_local_only}@postgres:5432/${DB_NAME:-plumora_dev}
+      MICROSERVICE_MODE: "true"
+      DATABASE_URL: postgresql+psycopg://auth_svc_user:${AUTH_DB_PASSWORD:-plumora_dev_pass_local_only}@postgres:5432/${DB_NAME:-plumora_dev}
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-plumora_local_dev_secret_key_min_32_chars_01}
+      CONTENT_SERVICE_URL: http://content-kg-service:8002
+      ASSESSMENT_SERVICE_URL: http://assessment-grader-service:8003
     depends_on:
       postgres:
         condition: service_healthy
@@ -91,9 +94,10 @@ services:
       dockerfile: backend/Dockerfile
     command: ["uvicorn", "services.content_kg_service:app", "--host", "0.0.0.0", "--port", "8002"]
     environment:
-      DATABASE_URL: postgresql+psycopg://${DB_USER:-plumora_app}:${DB_PASSWORD:-plumora_dev_pass_local_only}@postgres:5432/${DB_NAME:-plumora_dev}
+      DATABASE_URL: postgresql+psycopg://content_svc_user:${CONTENT_DB_PASSWORD:-plumora_dev_pass_local_only}@postgres:5432/${DB_NAME:-plumora_dev}
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-plumora_local_dev_secret_key_min_32_chars_01}
+      ASSESSMENT_SERVICE_URL: http://assessment-grader-service:8003
     depends_on:
       postgres:
         condition: service_healthy
@@ -105,11 +109,12 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    command: ["uvicorn", "services.assessment_grader_service:app", "--host", "0.0.0.0", "--port", "8003"]
+    command: ["uvicorn", "services.assessment_grader_service:app", "--host", "0.0.0.0", "--port", "8003", "--workers", "2"]
     environment:
-      DATABASE_URL: postgresql+psycopg://${DB_USER:-plumora_app}:${DB_PASSWORD:-plumora_dev_pass_local_only}@postgres:5432/${DB_NAME:-plumora_dev}
+      DATABASE_URL: postgresql+psycopg://assess_svc_user:${ASSESS_DB_PASSWORD:-plumora_dev_pass_local_only}@postgres:5432/${DB_NAME:-plumora_dev}
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-plumora_local_dev_secret_key_min_32_chars_01}
+      CONTENT_SERVICE_URL: http://content-kg-service:8002
     depends_on:
       postgres:
         condition: service_healthy
@@ -121,11 +126,15 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    command: ["uvicorn", "services.recommendation_ai_service:app", "--host", "0.0.0.0", "--port", "8004"]
+    command: ["uvicorn", "services.recommendation_ai_service:app", "--host", "0.0.0.0", "--port", "8004", "--workers", "4"]
     environment:
-      DATABASE_URL: postgresql+psycopg://${DB_USER:-plumora_app}:${DB_PASSWORD:-plumora_dev_pass_local_only}@postgres:5432/${DB_NAME:-plumora_dev}
+      DATABASE_URL: postgresql+psycopg://rec_ai_svc_user:${REC_AI_DB_PASSWORD:-plumora_dev_pass_local_only}@postgres:5432/${DB_NAME:-plumora_dev}
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-plumora_local_dev_secret_key_min_32_chars_01}
+      AUTH_SERVICE_URL: http://user-auth-service:8001
+      CONTENT_SERVICE_URL: http://content-kg-service:8002
+      ASSESSMENT_SERVICE_URL: http://assessment-grader-service:8003
+      RECOMMENDATION_SERVICE_URL: http://recommendation-ai-service:8004
     depends_on:
       postgres:
         condition: service_healthy
@@ -137,7 +146,12 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    command: ["uvicorn", "services.api_gateway:app", "--host", "0.0.0.0", "--port", "8000"]
+    command: ["uvicorn", "services.api_gateway:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+    environment:
+      AUTH_SERVICE_URL: http://user-auth-service:8001
+      CONTENT_SERVICE_URL: http://content-kg-service:8002
+      ASSESSMENT_SERVICE_URL: http://assessment-grader-service:8003
+      RECOMMENDATION_SERVICE_URL: http://recommendation-ai-service:8004
     ports:
       - "${GATEWAY_PORT:-8080}:8000"
     depends_on:

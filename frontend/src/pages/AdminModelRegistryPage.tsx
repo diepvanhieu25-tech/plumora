@@ -298,11 +298,11 @@ export function AdminModelRegistryPage() {
                     <th className="py-3 px-3 rounded-l-lg font-semibold min-w-[180px]">
                       Chỉ số Đo lường
                     </th>
-                    <th className="py-3 px-2 text-center text-outline">Random / Topo</th>
+                    <th className="py-3 px-2 text-center text-outline">Random / B2</th>
                     <th className="py-3 px-2 text-center text-outline">Heuristics B3</th>
-                    <th className="py-3 px-2 text-center text-outline">MLP-PPO</th>
+                    <th className="py-3 px-2 text-center text-outline">PPO-MLP (Masked)</th>
                     <th className="py-3 px-3 text-center bg-[#F0FDF4] text-[#14532D] font-bold rounded-r-lg">
-                      GNN-PPO v2 Base
+                      GNN-PPO (Masked)
                     </th>
                   </tr>
                 </thead>
@@ -313,14 +313,28 @@ export function AdminModelRegistryPage() {
                         1. In-Domain Reward
                       </div>
                       <div className="text-[11px] text-on-surface-variant">
-                        Backend + Frontend + DevOps
+                        Backend + Frontend + DevOps (seed {status?.benchmark_report?.eval_seed ?? 'N/A'})
                       </div>
                     </td>
-                    <td className="py-3 px-2 text-center text-on-surface-variant">12.40</td>
-                    <td className="py-3 px-2 text-center text-on-surface-variant">54.10</td>
-                    <td className="py-3 px-2 text-center text-on-surface-variant">61.20</td>
+                    <td className="py-3 px-2 text-center text-on-surface-variant">
+                      {status?.benchmark_report?.scenario_a_known_domains?.heuristic_b2
+                        ? status.benchmark_report.scenario_a_known_domains.heuristic_b2.mean_reward.toFixed(2)
+                        : 'N/A'}
+                    </td>
+                    <td className="py-3 px-2 text-center text-on-surface-variant">
+                      {status?.benchmark_report?.scenario_a_known_domains?.heuristic_b3
+                        ? status.benchmark_report.scenario_a_known_domains.heuristic_b3.mean_reward.toFixed(2)
+                        : 'N/A'}
+                    </td>
+                    <td className="py-3 px-2 text-center text-on-surface-variant">
+                      {status?.benchmark_report?.scenario_a_known_domains?.ppo_mlp_masked
+                        ? status.benchmark_report.scenario_a_known_domains.ppo_mlp_masked.mean_reward.toFixed(2)
+                        : 'N/A'}
+                    </td>
                     <td className="py-3 px-3 text-center bg-[#F0FDF4] text-[#15803D] font-bold">
-                      66.65
+                      {status?.benchmark_report?.scenario_a_known_domains?.gnn_ppo_masked
+                        ? status.benchmark_report.scenario_a_known_domains.gnn_ppo_masked.mean_reward.toFixed(2)
+                        : 'N/A'}
                     </td>
                   </tr>
                   <tr className="hover:bg-surface-container-low/40 transition-colors">
@@ -332,11 +346,25 @@ export function AdminModelRegistryPage() {
                         heldout_data_eng_graph (10 nodes)
                       </div>
                     </td>
-                    <td className="py-3 px-2 text-center text-on-surface-variant">9.80</td>
-                    <td className="py-3 px-2 text-center text-on-surface-variant">52.30</td>
-                    <td className="py-3 px-2 text-center text-on-surface-variant">58.90</td>
+                    <td className="py-3 px-2 text-center text-on-surface-variant">
+                      {status?.benchmark_report?.scenario_b_zero_shot_transfer?.heuristic_b2
+                        ? status.benchmark_report.scenario_b_zero_shot_transfer.heuristic_b2.mean_reward.toFixed(2)
+                        : 'N/A'}
+                    </td>
+                    <td className="py-3 px-2 text-center text-on-surface-variant">
+                      {status?.benchmark_report?.scenario_b_zero_shot_transfer?.heuristic_b3
+                        ? status.benchmark_report.scenario_b_zero_shot_transfer.heuristic_b3.mean_reward.toFixed(2)
+                        : 'N/A'}
+                    </td>
+                    <td className="py-3 px-2 text-center text-on-surface-variant">
+                      {status?.benchmark_report?.scenario_b_zero_shot_transfer?.ppo_mlp_masked
+                        ? status.benchmark_report.scenario_b_zero_shot_transfer.ppo_mlp_masked.mean_reward.toFixed(2)
+                        : 'N/A'}
+                    </td>
                     <td className="py-3 px-3 text-center bg-[#F0FDF4] text-[#15803D] font-bold">
-                      67.36
+                      {status?.benchmark_report?.scenario_b_zero_shot_transfer?.gnn_ppo_masked
+                        ? status.benchmark_report.scenario_b_zero_shot_transfer.gnn_ppo_masked.mean_reward.toFixed(2)
+                        : 'N/A'}
                     </td>
                   </tr>
                   <tr className="hover:bg-surface-container-low/40 transition-colors">
@@ -348,11 +376,25 @@ export function AdminModelRegistryPage() {
                         Kahn Post-masking Invariant
                       </div>
                     </td>
-                    <td className="py-3 px-2 text-center text-error">34.2%</td>
-                    <td className="py-3 px-2 text-center text-on-surface-variant">0.0%</td>
-                    <td className="py-3 px-2 text-center text-on-surface-variant">0.0%</td>
+                    <td className="py-3 px-2 text-center text-on-surface-variant">
+                      {status?.benchmark_report?.scenario_a_known_domains?.heuristic_b2
+                        ? `${(status.benchmark_report.scenario_a_known_domains.heuristic_b2.invalid_action_rate * 100).toFixed(1)}%`
+                        : 'N/A'}
+                    </td>
+                    <td className="py-3 px-2 text-center text-on-surface-variant">
+                      {status?.benchmark_report?.scenario_a_known_domains?.heuristic_b3
+                        ? `${(status.benchmark_report.scenario_a_known_domains.heuristic_b3.invalid_action_rate * 100).toFixed(1)}%`
+                        : 'N/A'}
+                    </td>
+                    <td className="py-3 px-2 text-center text-on-surface-variant">
+                      {status?.benchmark_report?.scenario_a_known_domains?.ppo_mlp_masked
+                        ? `${(status.benchmark_report.scenario_a_known_domains.ppo_mlp_masked.masked_violation_rate * 100).toFixed(1)}%`
+                        : 'N/A'}
+                    </td>
                     <td className="py-3 px-3 text-center bg-[#F0FDF4] text-[#14532D] font-bold">
-                      0.0% (PASS)
+                      {status?.benchmark_report?.scenario_a_known_domains?.gnn_ppo_masked
+                        ? `${(status.benchmark_report.scenario_a_known_domains.gnn_ppo_masked.masked_violation_rate * 100).toFixed(1)}%`
+                        : 'N/A'}
                     </td>
                   </tr>
                   <tr className="hover:bg-surface-container-low/40 transition-colors">
@@ -389,12 +431,46 @@ export function AdminModelRegistryPage() {
                 </div>
               </div>
               <div className="w-full h-32 flex items-end gap-4 sm:gap-8 pt-4 px-2">
-                {[
-                  { label: 'Random', inDom: 18, transfer: 15, active: false },
-                  { label: 'Heuristics', inDom: 80, transfer: 77, active: false },
-                  { label: 'MLP-PPO', inDom: 91, transfer: 87, active: false },
-                  { label: 'GNN-PPO', inDom: 99, transfer: 100, active: true },
-                ].map((bar) => (
+                {(() => {
+                  const scA = status?.benchmark_report?.scenario_a_known_domains
+                  const scB = status?.benchmark_report?.scenario_b_zero_shot_transfer
+                  const rawBars = [
+                    {
+                      label: 'Random B2',
+                      inVal: scA?.heuristic_b2?.mean_reward ?? 0,
+                      trVal: scB?.heuristic_b2?.mean_reward ?? 0,
+                      active: false,
+                    },
+                    {
+                      label: 'Heuristics B3',
+                      inVal: scA?.heuristic_b3?.mean_reward ?? 0,
+                      trVal: scB?.heuristic_b3?.mean_reward ?? 0,
+                      active: false,
+                    },
+                    {
+                      label: 'PPO-MLP (Masked)',
+                      inVal: scA?.ppo_mlp_masked?.mean_reward ?? 0,
+                      trVal: scB?.ppo_mlp_masked?.mean_reward ?? 0,
+                      active: false,
+                    },
+                    {
+                      label: 'GNN-PPO (Masked)',
+                      inVal: scA?.gnn_ppo_masked?.mean_reward ?? 0,
+                      trVal: scB?.gnn_ppo_masked?.mean_reward ?? 0,
+                      active: true,
+                    },
+                  ]
+                  const maxVal = Math.max(
+                    1,
+                    ...rawBars.flatMap((b) => [b.inVal, b.trVal])
+                  )
+                  return rawBars.map((bar) => ({
+                    label: bar.label,
+                    inDom: Math.max(4, Math.min(100, Math.round((bar.inVal / maxVal) * 100))),
+                    transfer: Math.max(4, Math.min(100, Math.round((bar.trVal / maxVal) * 100))),
+                    active: bar.active,
+                  }))
+                })().map((bar) => (
                   <div
                     key={bar.label}
                     className={`flex-1 flex flex-col items-center gap-1.5 h-full justify-end ${
@@ -438,7 +514,19 @@ export function AdminModelRegistryPage() {
                 Cơ sở Khoa học: Zero-Shot Transfer qua Isomorphic Node Embeddings
               </h3>
               <p className="text-xs font-body text-on-surface-variant leading-relaxed">
-                Mô hình Masked GNN-PPO 3 lớp mã hóa cấu trúc quan hệ tiên quyết topo thay vì ghi nhớ cứng ID khái niệm, giúp đạt <strong>67.36</strong> điểm trên đồ thị Kỹ nghệ Dữ liệu chưa từng thấy với <strong>0.0%</strong> vi phạm tiên quyết.
+                Mô hình Masked GNN-PPO 3 lớp mã hóa cấu trúc quan hệ tiên quyết topo thay vì ghi nhớ cứng ID khái niệm, giúp đạt{' '}
+                <strong>
+                  {status?.benchmark_report?.scenario_b_zero_shot_transfer?.gnn_ppo_masked
+                    ? status.benchmark_report.scenario_b_zero_shot_transfer.gnn_ppo_masked.mean_reward.toFixed(2)
+                    : 'N/A'}
+                </strong>{' '}
+                điểm trên đồ thị Kỹ nghệ Dữ liệu chưa từng thấy với{' '}
+                <strong>
+                  {status?.benchmark_report?.scenario_b_zero_shot_transfer?.gnn_ppo_masked
+                    ? `${(status.benchmark_report.scenario_b_zero_shot_transfer.gnn_ppo_masked.masked_violation_rate * 100).toFixed(1)}%`
+                    : '0.0%'}
+                </strong>{' '}
+                vi phạm tiên quyết.
               </p>
             </div>
           </div>

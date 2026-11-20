@@ -12,6 +12,7 @@ import redis
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from fastapi import Request, Response
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.config import resolve_jwt_secret, settings
@@ -60,12 +61,13 @@ def verify_password(plain_password: str, password_hash: str) -> bool:
         return False
 
 
-def create_access_token(user_id: uuid.UUID, username: str) -> str:
-    """Issue an HS256 JWT token with unique jti for revocation support."""
+def create_access_token(user_id: uuid.UUID, username: str, role: str = "learner") -> str:
+    """Issue an HS256 JWT token with unique jti and role claim for microservice verification."""
     now = datetime.now(UTC)
     payload = {
         "sub": str(user_id),
         "username": username,
+        "role": role,
         "jti": str(uuid.uuid4()),
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(hours=TOKEN_EXPIRE_HOURS)).timestamp()),
@@ -163,8 +165,59 @@ def set_auth_cookie(response: Response, token: str) -> None:
     )
 
 
+def create_internal_service_token(service_name: str = "plumora-internal") -> str:
+    """Issue a short-lived HS256 JWT exclusively for service-to-service internal calls (R3-01)."""
+    now = datetime.now(UTC)
+    payload = {
+        "sub": service_name,
+        "svc": service_name,
+        "typ": "internal_service",
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(minutes=5)).timestamp()),
+    }
+    return str(jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM))
+
+
+def require_internal_service(request: Request) -> str:
+    """FastAPI dependency rejecting anonymous and user tokens on /api/v2/internal/* routes."""
+    from fastapi import HTTPException, status
+
+    svc_token = request.headers.get("X-Service-Token", "").strip()
+    if not svc_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "error_code": "INTERNAL_AUTH_REQUIRED",
+                "message": "Internal service authentication is required.",
+            },
+        )
+    try:
+        decoded = jwt.decode(svc_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except jwt.PyJWTError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "error_code": "INTERNAL_SERVICE_FORBIDDEN",
+                "message": "Invalid internal service token.",
+            },
+        ) from exc
+    if decoded.get("typ") != "internal_service" or not decoded.get("svc"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "error_code": "INTERNAL_SERVICE_FORBIDDEN",
+                "message": "Caller is not an authorized internal service.",
+            },
+        )
+    return str(decoded["svc"])
+
+
+_USERS_TABLE_INACCESSIBLE = False
+
+
 def extract_current_user(request: Request, db: Session) -> UserModel | None:
     """Extract and verify authenticated UserModel from Cookie or Authorization Bearer header."""
+    global _USERS_TABLE_INACCESSIBLE
     token = extract_raw_token(request)
     if not token:
         return None
@@ -176,4 +229,17 @@ def extract_current_user(request: Request, db: Session) -> UserModel | None:
         user_id = uuid.UUID(str(decoded["sub"]))
     except (jwt.PyJWTError, ValueError, KeyError):
         return None
-    return db.get(UserModel, user_id)
+    if not _USERS_TABLE_INACCESSIBLE:
+        try:
+            return db.get(UserModel, user_id)
+        except SQLAlchemyError:
+            db.rollback()
+            _USERS_TABLE_INACCESSIBLE = True
+    return UserModel(
+        id=user_id,
+        username=str(decoded.get("username", "")),
+        display_name=str(decoded.get("username", "")),
+        password_hash="",
+        role=str(decoded.get("role", "learner")),
+        state_version=1,
+    )

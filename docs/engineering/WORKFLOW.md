@@ -15,12 +15,9 @@ Read only the current skill and triggered references. Do not confuse the brief's
 
 ## Current verification applicability
 
-Established in `ENV-01` (`docs/environment.md` & `docs/verification/HANDOFF_ENV_01.md`):
-- **Day-0 CI & Full Local Verification Suite:** `./scripts/ci_check.sh` (runs `ruff check .` & `mypy` in `backend/` and `rl/`, `npm run lint` & `npm run typecheck` & `npm run build` in `frontend/`, and environment smoke tests against live `PostgreSQL 16` + `Redis 7`).
+- **Day-0 CI & Full Local Verification Suite:** `./scripts/ci_check.sh` (runs `ruff check .` & `mypy` in `backend/` and `rl/`, `npm run lint` & `npm run typecheck` & `npm run build` in `frontend/`, unit/behavioral tests, live fullstack integration, and Chromium E2E audit against live `PostgreSQL 16` + `Redis 7`).
 - **Backing Services Health:** `docker compose --env-file .env.local ps` (`plumora-postgres` and `plumora-redis` must report `Up (healthy)` on `127.0.0.1:5432` and `127.0.0.1:6379`).
-- **Smoke vs RED Behavioral Suites:**
-  - Smoke (`GREEN`): `cd backend && uv run pytest tests/smoke`, `cd rl && uv run pytest tests/smoke`, `cd frontend && npm run test:smoke`.
-  - Behavioral Product Suites (`RED` prior to `RL-01` / `SLICE-01` logic; `GREEN` after implementation): `cd rl && uv run pytest tests/red`, `cd backend && uv run pytest tests/red`, `cd frontend && npm run test:red`.
+- **Smoke & Behavioral Suites:** `cd backend && uv run pytest`, `cd rl && uv run pytest`, `cd frontend && npm run test:unit`, `cd frontend && npm run test:integration`.
 
 ## Handoff record
 

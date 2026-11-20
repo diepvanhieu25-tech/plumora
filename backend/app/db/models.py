@@ -475,11 +475,11 @@ class RlExperienceBufferModel(Base):
     concept_slug: Mapped[str] = mapped_column(String(64), nullable=False)
     action_mode: Mapped[str] = mapped_column(String(32), nullable=False)
     reward: Mapped[float] = mapped_column(Float, nullable=False)
-    obs_before_json: Mapped[list[list[float]]] = mapped_column(
+    obs_before_json: Mapped[dict[str, Any] | list[list[float]]] = mapped_column(
         JSON().with_variant(JSONB(), "postgresql"),
         nullable=False,
     )
-    obs_after_json: Mapped[list[list[float]]] = mapped_column(
+    obs_after_json: Mapped[dict[str, Any] | list[list[float]]] = mapped_column(
         JSON().with_variant(JSONB(), "postgresql"),
         nullable=False,
     )
