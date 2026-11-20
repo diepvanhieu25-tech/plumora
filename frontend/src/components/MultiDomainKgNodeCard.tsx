@@ -1,5 +1,6 @@
 import {
   Award,
+  BookOpen,
   CheckCircle2,
   Code2,
   GitMerge,
@@ -15,6 +16,7 @@ import type { DomainRoadmapNode } from '../types'
 interface MultiDomainKgNodeCardProps {
   node: DomainRoadmapNode
   isRecommended?: boolean
+  onOpenPlaybook?: (node: DomainRoadmapNode) => void
   onStartDepthProbe: (slug: string) => void
   onStartCodeSandbox: (slug: string) => void
   onStartReview: (slug: string) => void
@@ -64,6 +66,7 @@ function getDepthBadge(depthNorm: number) {
 export function MultiDomainKgNodeCard({
   node,
   isRecommended = false,
+  onOpenPlaybook,
   onStartDepthProbe,
   onStartCodeSandbox,
   onStartReview,
@@ -222,36 +225,50 @@ export function MultiDomainKgNodeCard({
       </div>
 
       {/* Actions Bar */}
-      <div className="pt-2 border-t border-surface-container flex flex-wrap gap-2 relative z-10">
-        {node.needs_review && (
+      <div className="pt-2 border-t border-surface-container flex flex-col gap-2 relative z-10">
+        {onOpenPlaybook && (
           <button
             type="button"
-            onClick={() => onStartReview(node.slug)}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-label font-bold bg-tertiary text-on-tertiary hover:bg-tertiary-dim shadow-sm cursor-pointer transition-colors"
+            disabled={!node.is_eligible}
+            onClick={() => onOpenPlaybook(node)}
+            className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-label font-bold bg-surface-container-low text-primary border border-primary/25 hover:bg-primary-container/30 disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer transition-colors"
+            data-testid={`open-playbook-${node.slug}`}
           >
-            <History className="w-3.5 h-3.5" aria-hidden="true" />
-            Ôn tập ngay
+            <BookOpen className="w-3.5 h-3.5" aria-hidden="true" />
+            Đọc Lý thuyết (Playbook)
           </button>
         )}
-        <button
-          type="button"
-          disabled={!node.is_eligible}
-          onClick={() => onStartDepthProbe(node.slug)}
-          className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-headline font-bold bg-primary text-on-primary hover:bg-primary-dim disabled:opacity-45 disabled:cursor-not-allowed shadow-sm cursor-pointer transition-colors"
-        >
-          <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
-          Đào sâu 5 tầng
-        </button>
-        <button
-          type="button"
-          disabled={!node.is_eligible}
-          onClick={() => onStartCodeSandbox(node.slug)}
-          className="inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-label font-semibold bg-surface-container text-on-surface hover:bg-surface-container-high disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer transition-colors"
-          title="Thực hành Code Sandbox"
-        >
-          <Code2 className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
-          Code
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {node.needs_review && (
+            <button
+              type="button"
+              onClick={() => onStartReview(node.slug)}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-label font-bold bg-tertiary text-on-tertiary hover:bg-tertiary-dim shadow-sm cursor-pointer transition-colors"
+            >
+              <History className="w-3.5 h-3.5" aria-hidden="true" />
+              Ôn tập ngay
+            </button>
+          )}
+          <button
+            type="button"
+            disabled={!node.is_eligible}
+            onClick={() => onStartDepthProbe(node.slug)}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-headline font-bold bg-primary text-on-primary hover:bg-primary-dim disabled:opacity-45 disabled:cursor-not-allowed shadow-sm cursor-pointer transition-colors"
+          >
+            <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
+            Đào sâu 5 tầng
+          </button>
+          <button
+            type="button"
+            disabled={!node.is_eligible}
+            onClick={() => onStartCodeSandbox(node.slug)}
+            className="inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-label font-semibold bg-surface-container text-on-surface hover:bg-surface-container-high disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer transition-colors"
+            title="Thực hành Code Sandbox"
+          >
+            <Code2 className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
+            Code
+          </button>
+        </div>
       </div>
     </article>
   )

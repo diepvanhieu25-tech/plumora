@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
+  BookOpen,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -20,8 +21,9 @@ import {
   Zap,
 } from 'lucide-react'
 import { apiGetDomainRoadmap, apiGetV2Recommendation } from '../api'
+import { LessonPlaybookModal } from '../components/LessonPlaybookModal'
 import { MultiDomainKgNodeCard } from '../components/MultiDomainKgNodeCard'
-import type { DomainRoadmapResponse, V2RecommendationResponse } from '../types'
+import type { DomainRoadmapNode, DomainRoadmapResponse, V2RecommendationResponse } from '../types'
 
 interface MultiDomainRoadmapPageProps {
   domainSlug: string
@@ -69,6 +71,7 @@ export function MultiDomainRoadmapPage({
   const [filterMode, setFilterMode] = useState<'all' | 'recommended' | 'review' | 'shared'>('all')
   const [simDays, setSimDays] = useState<number>(0)
   const [showRlDetails, setShowRlDetails] = useState(false)
+  const [playbookNode, setPlaybookNode] = useState<DomainRoadmapNode | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -94,6 +97,10 @@ export function MultiDomainRoadmapPage({
   }, [loadData])
 
   const recommendedSlug = rec?.recommended_action?.concept_slug
+  const recommendedNode = useMemo(
+    () => roadmap?.nodes.find((n) => n.slug === recommendedSlug) ?? null,
+    [roadmap, recommendedSlug],
+  )
 
   const summaryCounts = useMemo(() => {
     const nodes = roadmap?.nodes ?? []
@@ -421,6 +428,16 @@ export function MultiDomainRoadmapPage({
                     </div>
 
                     <div className="flex flex-col gap-2">
+                      {recommendedNode && (
+                        <button
+                          type="button"
+                          onClick={() => setPlaybookNode(recommendedNode)}
+                          className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white border border-primary/30 text-primary hover:bg-primary-container/20 font-label font-bold text-xs shadow-2xs transition-all cursor-pointer"
+                        >
+                          <BookOpen className="w-4 h-4" aria-hidden="true" />
+                          <span>Đọc Lý thuyết (Playbook)</span>
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={handleCtaRecommended}
@@ -436,7 +453,7 @@ export function MultiDomainRoadmapPage({
                         data-testid="toggle-gnn-inference-btn"
                       >
                         <Activity className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
-                        <span>Chi tiết gợi ý AI</span>
+                        <span>Giải thích đề xuất AI</span>
                         {showRlDetails ? (
                           <ChevronUp className="w-3.5 h-3.5" aria-hidden="true" />
                         ) : (
@@ -447,62 +464,90 @@ export function MultiDomainRoadmapPage({
                   </div>
                 </div>
 
-                {/* Expandable 8-dim GNN-PPO Node Features Table */}
-                {showRlDetails && rec.node_features_snapshot && (
+                {/* Expandable AI Explanation & Feature Matrix */}
+                {showRlDetails && (
                   <div
-                    className="pt-4 border-t border-surface-container-high space-y-2"
+                    className="pt-4 border-t border-surface-container-high space-y-4"
                     data-testid="gnn-ppo-inference-panel"
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-on-surface-variant">
-                      <span>
-                        Vector Đặc trưng 8 Chiều / Node (N={rec.node_features_snapshot.length},
-                        policy_source={rec.policy_source})
-                      </span>
-                      <span>
-                        [depth, conf, R(t), eligible, needs_review, tier/4, code_score, bias]
-                      </span>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                      <div className="p-3.5 rounded-xl bg-surface-container-low space-y-1">
+                        <span className="font-bold text-primary block">1. Lý do chọn chủ đề</span>
+                        <p className="text-on-surface-variant leading-relaxed">
+                          {rec.recommended_action.reason_vi}
+                        </p>
+                      </div>
+                      <div className="p-3.5 rounded-xl bg-surface-container-low space-y-1">
+                        <span className="font-bold text-secondary block">
+                          2. Điều kiện tiên quyết &amp; Độ nhớ
+                        </span>
+                        <p className="text-on-surface-variant leading-relaxed">
+                          {recommendedNode && recommendedNode.prerequisites.length > 0
+                            ? `Đã hoàn thành các bài nền: ${recommendedNode.prerequisites.join(', ')}.`
+                            : 'Đây là chủ đề nền tảng gốc, sẵn sàng học ngay.'}{' '}
+                          {recommendedNode
+                            ? `Độ vững hiện tại: ${Math.round(recommendedNode.depth_level_norm * 100)}%.`
+                            : ''}
+                        </p>
+                      </div>
+                      <div className="p-3.5 rounded-xl bg-surface-container-low space-y-1">
+                        <span className="font-bold text-tertiary block">
+                          3. Phương pháp đề xuất
+                        </span>
+                        <p className="text-on-surface-variant leading-relaxed">
+                          {MODE_LABELS[rec.recommended_action.learning_mode]?.desc ??
+                            'Học lý thuyết Playbook trước, sau đó hoàn thành bài kiểm tra để mở khóa các chủ đề tiếp theo.'}
+                        </p>
+                      </div>
                     </div>
-                    <div className="overflow-x-auto bg-surface-container-lowest rounded-xl border border-outline-variant/30">
-                      <table className="w-full text-[11px] font-mono text-left">
-                        <thead className="bg-surface-container-low text-on-surface-variant border-b border-outline-variant/30">
-                          <tr>
-                            <th className="py-2 px-3">Node</th>
-                            <th className="py-2 px-2">Depth</th>
-                            <th className="py-2 px-2">Conf</th>
-                            <th className="py-2 px-2">R(t)</th>
-                            <th className="py-2 px-2">Eligible</th>
-                            <th className="py-2 px-2">Review</th>
-                            <th className="py-2 px-2">Code</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-surface-container">
-                          {roadmap.nodes.map((node, idx) => {
-                            const row = rec.node_features_snapshot?.[idx] ?? []
-                            const isTarget = node.slug === recommendedSlug
-                            return (
-                              <tr
-                                key={node.slug}
-                                className={
-                                  isTarget
-                                    ? 'bg-tertiary-fixed/15 font-bold text-on-tertiary-container'
-                                    : 'text-on-surface'
-                                }
-                              >
-                                <td className="py-1.5 px-3">
-                                  {node.slug} {isTarget ? '(Selected)' : ''}
-                                </td>
-                                <td className="py-1.5 px-2">{row[0]?.toFixed(2) ?? '0.00'}</td>
-                                <td className="py-1.5 px-2">{row[1]?.toFixed(2) ?? '0.00'}</td>
-                                <td className="py-1.5 px-2">{row[2]?.toFixed(2) ?? '0.00'}</td>
-                                <td className="py-1.5 px-2">{row[3] === 1 ? '1' : '0'}</td>
-                                <td className="py-1.5 px-2">{row[4] === 1 ? '1' : '0'}</td>
-                                <td className="py-1.5 px-2">{row[6]?.toFixed(2) ?? '0.00'}</td>
-                              </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+
+                    {rec.node_features_snapshot && (
+                      <div className="overflow-x-auto bg-surface-container-lowest rounded-xl border border-outline-variant/30">
+                        <table className="w-full text-[11px] font-mono text-left">
+                          <thead className="bg-surface-container-low text-on-surface-variant border-b border-outline-variant/30">
+                            <tr>
+                              <th className="py-2 px-3">Chủ đề</th>
+                              <th className="py-2 px-2">Độ sâu</th>
+                              <th className="py-2 px-2">Độ tin cậy</th>
+                              <th className="py-2 px-2">Độ nhớ R(t)</th>
+                              <th className="py-2 px-2">Mở khóa</th>
+                              <th className="py-2 px-2">Cần ôn</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-surface-container">
+                            {roadmap.nodes.map((node, idx) => {
+                              const row = rec.node_features_snapshot?.[idx] ?? []
+                              const isTarget = node.slug === recommendedSlug
+                              return (
+                                <tr
+                                  key={node.slug}
+                                  className={
+                                    isTarget
+                                      ? 'bg-tertiary-fixed/15 font-bold text-on-tertiary-container'
+                                      : 'text-on-surface'
+                                  }
+                                >
+                                  <td className="py-1.5 px-3">
+                                    {node.title} {isTarget ? '(AI chọn)' : ''}
+                                  </td>
+                                  <td className="py-1.5 px-2">
+                                    {Math.round((row[0] ?? 0) * 100)}%
+                                  </td>
+                                  <td className="py-1.5 px-2">
+                                    {Math.round((row[1] ?? 0) * 100)}%
+                                  </td>
+                                  <td className="py-1.5 px-2">
+                                    {Math.round((row[2] ?? 0) * 100)}%
+                                  </td>
+                                  <td className="py-1.5 px-2">{row[3] === 1 ? 'Có' : 'Khóa'}</td>
+                                  <td className="py-1.5 px-2">{row[4] === 1 ? 'Cần ôn' : 'Ổn'}</td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -672,6 +717,7 @@ export function MultiDomainRoadmapPage({
                         key={node.slug}
                         node={node}
                         isRecommended={node.slug === recommendedSlug}
+                        onOpenPlaybook={(n) => setPlaybookNode(n)}
                         onStartDepthProbe={(slug) => onStartDepthProbe(domainSlug, slug)}
                         onStartCodeSandbox={(slug) => onStartCodeSandbox(domainSlug, slug)}
                         onStartReview={(slug) => onStartReview(domainSlug, slug)}
@@ -684,6 +730,13 @@ export function MultiDomainRoadmapPage({
           </div>
         </>
       )}
+
+      <LessonPlaybookModal
+        node={playbookNode}
+        onClose={() => setPlaybookNode(null)}
+        onStartDepthProbe={(slug) => onStartDepthProbe(domainSlug, slug)}
+        onStartCodeSandbox={(slug) => onStartCodeSandbox(domainSlug, slug)}
+      />
     </section>
   )
 }
