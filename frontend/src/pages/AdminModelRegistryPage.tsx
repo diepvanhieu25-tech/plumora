@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  Activity,
   AlertTriangle,
   Check,
   CheckCircle2,
@@ -12,7 +11,6 @@ import {
   RefreshCw,
   RotateCcw,
   Search,
-  Server,
   ShieldCheck,
 } from 'lucide-react'
 import {
@@ -20,15 +18,11 @@ import {
   apiAdminGetOnlineRlStatus,
   apiAdminRollbackModel,
 } from '../api'
-import type { ActiveView, ModelRegistryItem, OnlineRlStatusResponse } from '../types'
-
-interface AdminModelRegistryPageProps {
-  onNavigate: (view: ActiveView) => void
-}
+import type { ModelRegistryItem, OnlineRlStatusResponse } from '../types'
 
 const PAGE_SIZE = 8
 
-export function AdminModelRegistryPage({ onNavigate }: AdminModelRegistryPageProps) {
+export function AdminModelRegistryPage() {
   const [status, setStatus] = useState<OnlineRlStatusResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [busyAction, setBusyAction] = useState<string | null>(null)
@@ -167,22 +161,6 @@ export function AdminModelRegistryPage({ onNavigate }: AdminModelRegistryPagePro
                 </span>
               </div>
             )}
-            <button
-              type="button"
-              onClick={() => onNavigate('admin_online_rl')}
-              className="inline-flex items-center gap-1.5 px-3 min-h-[44px] sm:min-h-[34px] rounded-lg bg-surface-container-lowest border border-outline-variant/40 text-xs font-label font-semibold text-on-surface hover:border-primary cursor-pointer"
-            >
-              <Activity className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
-              Online RL
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigate('admin_health')}
-              className="inline-flex items-center gap-1.5 px-3 min-h-[44px] sm:min-h-[34px] rounded-lg bg-surface-container-lowest border border-outline-variant/40 text-xs font-label font-semibold text-on-surface hover:border-primary cursor-pointer"
-            >
-              <Server className="w-3.5 h-3.5 text-secondary" aria-hidden="true" />
-              Microservices
-            </button>
             <button
               type="button"
               onClick={() => void load()}

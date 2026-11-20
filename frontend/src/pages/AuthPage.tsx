@@ -30,27 +30,6 @@ interface AuthPageProps {
   onSubmit: (e: React.FormEvent) => Promise<void>
 }
 
-const PHASE3_DOMAINS_OVERVIEW = [
-  {
-    title: 'Backend Engineering',
-    count: '12 khái niệm',
-    summary: 'Mạng, OS, HTTP, SQL/ACID, NoSQL, REST API, Redis & Bảo mật JWT/API',
-    color: 'border-l-[#15803D]',
-  },
-  {
-    title: 'Frontend Engineering',
-    count: '10 khái niệm',
-    summary: 'HTML/DOM, CSS Layout, JS Async, React State, Auth & Performance',
-    color: 'border-l-[#0D9488]',
-  },
-  {
-    title: 'DevOps & Cloud',
-    count: '9 khái niệm',
-    summary: 'Linux/Networking, Docker, CI/CD, Kubernetes, Observability & Security',
-    color: 'border-l-[#D97706]',
-  },
-]
-
 export function AuthPage({
   portal = 'learner',
   onSwitchPortal,
@@ -312,120 +291,193 @@ export function AuthPage({
               </span>
             </div>
             {onSwitchPortal && (
-              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#F1F5F9] text-[11px]">
-                <span className="text-[#57534E] font-medium">Chuyển cổng:</span>
-                <button
-                  type="button"
-                  onClick={() => onSwitchPortal('learner')}
-                  className={`min-h-[44px] px-3 py-2 rounded-lg border cursor-pointer ${
-                    portal === 'learner'
-                      ? 'bg-[#F0FDF4] text-[#15803D] border-[#86EFAC] font-bold'
-                      : 'bg-white text-[#57534E] border-[#D8E2D8] hover:text-[#14241B]'
-                  }`}
-                >
-                  Học viên (/)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onSwitchPortal('expert')}
-                  className={`min-h-[44px] px-3 py-2 rounded-lg border cursor-pointer ${
-                    portal === 'expert'
-                      ? 'bg-[#EFF6FF] text-[#1D4ED8] border-[#93C5FD] font-bold'
-                      : 'bg-white text-[#57534E] border-[#D8E2D8] hover:text-[#14241B]'
-                  }`}
-                >
-                  Chuyên gia (/expert/login)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onSwitchPortal('admin')}
-                  className={`min-h-[44px] px-3 py-2 rounded-lg border cursor-pointer ${
-                    portal === 'admin'
-                      ? 'bg-[#FFFBEB] text-[#B45309] border-[#F59E0B] font-bold'
-                      : 'bg-white text-[#57534E] border-[#D8E2D8] hover:text-[#14241B]'
-                  }`}
-                >
-                  Quản trị (/admin/login)
-                </button>
+              <div className="pt-2.5 border-t border-[#F1F5F9] space-y-2 text-[11px]">
+                <span className="text-[#57534E] font-medium block">Chuyển cổng đăng nhập:</span>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onSwitchPortal('learner')}
+                    className={`min-h-[40px] px-2 py-1.5 rounded-lg border text-center cursor-pointer transition-colors ${
+                      portal === 'learner'
+                        ? 'bg-[#F0FDF4] text-[#15803D] border-[#86EFAC] font-bold'
+                        : 'bg-white text-[#57534E] border-[#D8E2D8] hover:text-[#14241B]'
+                    }`}
+                  >
+                    Học viên
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onSwitchPortal('expert')}
+                    className={`min-h-[40px] px-2 py-1.5 rounded-lg border text-center cursor-pointer transition-colors ${
+                      portal === 'expert'
+                        ? 'bg-[#EFF6FF] text-[#1D4ED8] border-[#93C5FD] font-bold'
+                        : 'bg-white text-[#57534E] border-[#D8E2D8] hover:text-[#14241B]'
+                    }`}
+                  >
+                    Chuyên gia
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onSwitchPortal('admin')}
+                    className={`min-h-[40px] px-2 py-1.5 rounded-lg border text-center cursor-pointer transition-colors ${
+                      portal === 'admin'
+                        ? 'bg-[#FFFBEB] text-[#B45309] border-[#F59E0B] font-bold'
+                        : 'bg-white text-[#57534E] border-[#D8E2D8] hover:text-[#14241B]'
+                    }`}
+                  >
+                    Quản trị
+                  </button>
+                </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* Right Column: Pedagogical Overview of 12 Backend Concepts & DQN Engine */}
+        {/* Right Column: Interactive Seeded Demo Accounts & Runtime Status (Stitch SCR-01) */}
         <div className="lg:col-span-6 bg-[#F6F8F5] p-8 md:p-10 flex flex-col justify-between">
           <div>
-            {/* Header */}
             <div className="flex items-center gap-2 mb-2">
               <span className="p-1.5 rounded-lg bg-white text-[#15803D] border border-[#D8E2D8]">
                 <Layers className="w-4 h-4 text-[#15803D]" aria-hidden="true" />
               </span>
               <h2 className="text-base font-extrabold text-[#14241B]">
-                Đồ thị Tri thức Đa ngành &amp; Trí tuệ GNN-PPO
+                {portal === 'admin'
+                  ? 'Tài khoản Quản trị Mẫu (Seeded)'
+                  : portal === 'expert'
+                    ? 'Tài khoản Chuyên gia Mẫu (Seeded)'
+                    : 'Tài khoản Học viên Mẫu (Seeded trong PostgreSQL)'}
               </h2>
             </div>
             <p className="text-xs text-[#3F5247] font-normal leading-relaxed mb-4">
-              Hệ thống đánh giá năng lực 5 tầng, chấm Code Sandbox cô lập và đồng bộ trí nhớ Ebbinghaus qua 3 lĩnh vực liên thông (7 khái niệm giao thoa):
+              {portal === 'learner'
+                ? 'Chọn nhanh 1 trong 3 tài khoản học viên thật (đi qua luồng xác thực & lưu trữ thật 100%, không dùng bypass) để kiểm thử GNN-PPO & đánh giá 5 tầng:'
+                : 'Chọn nhanh tài khoản nội bộ mẫu để điền vào form đăng nhập (xác thực Argon2id + HttpOnly Cookie thật 100%):'}
             </p>
 
-            {/* 3 Domain Overview Cards */}
-            <div className="space-y-2.5">
-              {PHASE3_DOMAINS_OVERVIEW.map((domain) => (
-                <div
-                  key={domain.title}
-                  className={`bg-white rounded-xl p-3 border border-[#D8E2D8] border-l-4 ${domain.color} shadow-2xs space-y-1`}
+            {portal === 'learner' ? (
+              <div className="space-y-3">
+                {[
+                  {
+                    username: 'learner_new',
+                    badge: 'Học viên Mới bắt đầu',
+                    progress: '0/12 khái niệm Backend • Phù hợp test Adaptive Placement',
+                    hint: 'Tầng 1 mở khóa sẵn (net-internet, os-basics)',
+                    tone: 'bg-[#F6F8F5] text-[#3F5247] border-[#D8E2D8]',
+                  },
+                  {
+                    username: 'learner_foundation',
+                    badge: 'Đã hoàn thành Nền tảng',
+                    progress: '4/12 khái niệm Backend • Liên thông Frontend & DevOps',
+                    hint: 'GNN-PPO đề xuất: db-transactions (Đào sâu 5 tầng)',
+                    tone: 'bg-[#FFFBEB] text-[#92400E] border-[#FCD34D]',
+                  },
+                  {
+                    username: 'learner_api_stage',
+                    badge: 'Đang học Tầng 3 API',
+                    progress: '7/12 khái niệm Backend • Mở khóa nhiều node nâng cao',
+                    hint: 'Sẵn sàng thử thách Code Sandbox & Ebbinghaus Review',
+                    tone: 'bg-[#F0FDFA] text-[#115E59] border-[#99F6E4]',
+                  },
+                ].map((acc) => {
+                  const selected = usernameInput === acc.username
+                  return (
+                    <button
+                      key={acc.username}
+                      type="button"
+                      onClick={() => {
+                        setAuthMode('login')
+                        setUsernameInput(acc.username)
+                        setPasswordInput('PlumoraDemo#2026')
+                      }}
+                      className={`w-full text-left rounded-xl p-3.5 border transition-all cursor-pointer space-y-1.5 ${
+                        selected
+                          ? 'bg-white border-2 border-[#15803D] shadow-sm'
+                          : 'bg-white border-[#D8E2D8] hover:border-[#15803D]/60'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-mono font-bold text-xs text-[#14241B]">
+                            {acc.username}
+                          </span>
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#F1F5F1] text-[#3F5247]">
+                            {acc.badge}
+                          </span>
+                        </div>
+                        <span
+                          className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                            selected ? 'border-[#15803D]' : 'border-[#ACB4AF]'
+                          }`}
+                        >
+                          {selected && <span className="w-2 h-2 rounded-full bg-[#15803D]" />}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#3F5247]">{acc.progress}</p>
+                      <div className={`text-[11px] px-2.5 py-1 rounded-lg border ${acc.tone}`}>
+                        {acc.hint}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUsernameInput(portal === 'admin' ? 'admin_demo' : 'expert_demo')
+                    setPasswordInput('PlumoraDemo#2026')
+                  }}
+                  className={`w-full text-left rounded-xl p-4 border transition-all cursor-pointer space-y-1.5 ${
+                    usernameInput === (portal === 'admin' ? 'admin_demo' : 'expert_demo')
+                      ? 'bg-white border-2 border-[#15803D] shadow-sm'
+                      : 'bg-white border-[#D8E2D8] hover:border-[#15803D]/60'
+                  }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs text-[#14241B]">{domain.title}</span>
-                    <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-[#F6F8F5] text-[#57534E] border border-[#D8E2D8]">
-                      {domain.count}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono font-bold text-xs text-[#14241B]">
+                      {portal === 'admin' ? 'admin_demo' : 'expert_demo'}
+                    </span>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#DCFCE7] text-[#14532D]">
+                      Bấm để điền vào form
                     </span>
                   </div>
-                  <p className="text-[11px] text-[#57534E] leading-snug">{domain.summary}</p>
-                </div>
-              ))}
-            </div>
+                  <p className="text-xs text-[#3F5247]">
+                    {portal === 'admin'
+                      ? 'Quản trị Safe Micro-batch Online RL, Safety Evaluation Gate, 1-Click Rollback & Cụm 4 Microservices.'
+                      : 'Quản trị Knowledge Graph đa ngành (Kahn DAG), Ngân hàng Đề 5 Tầng & Rubric, Code Challenge Sandbox.'}
+                  </p>
+                </button>
 
-            {/* Pedagogical Feature Callouts */}
-            <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-              <div className="bg-white p-2.5 rounded-lg border border-[#D8E2D8] space-y-1">
-                <div className="flex items-center gap-1 text-[#15803D] font-bold">
-                  <Cpu className="w-3.5 h-3.5" aria-hidden="true" />
-                  <span>GNN-PPO + Guardrail</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                  <div className="bg-white p-3 rounded-xl border border-[#D8E2D8] space-y-1">
+                    <div className="flex items-center gap-1.5 text-[#15803D] font-bold">
+                      <Cpu className="w-3.5 h-3.5" aria-hidden="true" />
+                      <span>GNN-PPO + Guardrail</span>
+                    </div>
+                    <p className="text-[11px] text-[#57534E] leading-snug">
+                      Suy luận đồ thị 3 lớp và bảo toàn Zero-shot giữa 3 ngành.
+                    </p>
+                  </div>
+                  <div className="bg-white p-3 rounded-xl border border-[#D8E2D8] space-y-1">
+                    <div className="flex items-center gap-1.5 text-[#0D9488] font-bold">
+                      <Compass className="w-3.5 h-3.5" aria-hidden="true" />
+                      <span>4 Schema Cô lập</span>
+                    </div>
+                    <p className="text-[11px] text-[#57534E] leading-snug">
+                      auth_svc • content_svc • assess_svc • rec_ai_svc.
+                    </p>
+                  </div>
                 </div>
-                <p className="text-[11px] text-[#57534E] leading-snug">
-                  Mạng GNN-PPO 3 lớp gợi ý khái niệm tối ưu và bảo toàn Zero-shot giữa các ngành.
-                </p>
               </div>
-
-              <div className="bg-white p-2.5 rounded-lg border border-[#D8E2D8] space-y-1">
-                <div className="flex items-center gap-1 text-[#0D9488] font-bold">
-                  <Compass className="w-3.5 h-3.5" aria-hidden="true" />
-                  <span>Đánh giá 5 tầng &amp; Sandbox</span>
-                </div>
-                <p className="text-[11px] text-[#57534E] leading-snug">
-                  Kiểm tra từ Nhận biết đến Kiến trúc, chấm Rubric AI &amp; Code Sandbox cô lập.
-                </p>
-              </div>
-            </div>
-
-            {/* Role Access Summary */}
-            <div className="mt-4 bg-white rounded-xl border border-[#D8E2D8] p-3 text-xs space-y-1.5">
-              <div className="flex items-center gap-1.5 font-bold text-[#14241B]">
-                <ShieldCheck className="w-3.5 h-3.5 text-[#15803D]" aria-hidden="true" />
-                <span>Điều hướng Phân quyền Tự động (RBAC)</span>
-              </div>
-              <p className="text-[11px] text-[#57534E] leading-relaxed">
-                Hệ thống tự động định tuyến theo vai trò tài khoản sau khi xác thực: Học viên (Lộ trình &amp; Đánh giá), Chuyên gia (Quản trị KG &amp; Rubric), hoặc Quản trị (Safe Online RL &amp; Cụm dịch vụ).
-              </p>
-            </div>
+            )}
           </div>
 
           {/* Bottom Backend Runtime Verification */}
-          <div className="mt-6 border border-[#BBF7D0] bg-white rounded-xl p-3 flex items-start gap-2.5 shadow-2xs">
+          <div className="mt-6 border border-[#BBF7D0] bg-[#F0FDF4] rounded-xl p-3.5 flex items-start gap-2.5 shadow-2xs">
             <Database className="w-4 h-4 text-[#15803D] shrink-0 mt-0.5" aria-hidden="true" />
-            <div className="text-xs text-[#14532D] font-mono leading-relaxed">
-              <span className="font-bold">Hệ thống Lưu trữ &amp; Trạng thái:</span> PostgreSQL 16 ACID SSoT • Redis 7 Cache • Độc lập trên từng tài khoản học viên.
+            <div className="text-xs text-[#14532D] leading-relaxed">
+              <span className="font-bold">Runtime Đang Chạy:</span> PostgreSQL 16 (SSoT) • Redis 7 State Cache • GNN-PPO Checkpoint Verified.
             </div>
           </div>
         </div>

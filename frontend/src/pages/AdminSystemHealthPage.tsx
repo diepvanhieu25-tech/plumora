@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
-  Activity,
   AlertTriangle,
   BarChart3,
   CheckCircle2,
@@ -9,15 +8,10 @@ import {
   Layers,
   Lock,
   RefreshCw,
-  ShieldCheck,
   Zap,
 } from 'lucide-react'
 import { apiAdminGetSystemHealth } from '../api'
-import type { ActiveView, SystemHealthResponse } from '../types'
-
-interface AdminSystemHealthPageProps {
-  onNavigate: (view: ActiveView) => void
-}
+import type { SystemHealthResponse } from '../types'
 
 const SERVICE_META: Array<{
   key: string
@@ -72,7 +66,7 @@ function isServiceHealthy(status: string | undefined): boolean {
   return s === 'healthy' || s === 'ok' || s === 'up' || s === 'monolith_embedded'
 }
 
-export function AdminSystemHealthPage({ onNavigate }: AdminSystemHealthPageProps) {
+export function AdminSystemHealthPage() {
   const [health, setHealth] = useState<SystemHealthResponse | null>(null)
   const [latencyMs, setLatencyMs] = useState<number | null>(null)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
@@ -146,30 +140,15 @@ export function AdminSystemHealthPage({ onNavigate }: AdminSystemHealthPageProps
             Kiểm soát tính độc lập Database Schema, Độ trễ Redis Streams Event Bus, Idempotency và Trạng thái hạ tầng theo chuẩn Kiến trúc Phân tán Plumora.
           </p>
           {lastUpdated && (
-            <p className="text-xs text-on-surface-variant font-mono">
-              Cập nhật lúc {lastUpdated} • Độ trễ API thực tế: {latencyMs ?? 0} ms
+            <p className="text-xs text-on-surface-variant font-label">
+              Cập nhật lúc <span className="font-mono">{lastUpdated}</span> • Độ trễ API thực tế:{' '}
+              <span className="font-mono">{latencyMs ?? 0} ms</span>
             </p>
           )}
         </div>
 
         {/* Right Header Action Group */}
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-          <button
-            type="button"
-            onClick={() => onNavigate('admin_online_rl')}
-            className="inline-flex items-center gap-1.5 px-3 min-h-[44px] sm:min-h-[38px] rounded-lg bg-surface-container-lowest border border-outline-variant/40 text-xs font-label font-semibold text-on-surface hover:border-primary cursor-pointer"
-          >
-            <Activity className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
-            Online RL Monitor
-          </button>
-          <button
-            type="button"
-            onClick={() => onNavigate('admin_registry')}
-            className="inline-flex items-center gap-1.5 px-3 min-h-[44px] sm:min-h-[38px] rounded-lg bg-surface-container-lowest border border-outline-variant/40 text-xs font-label font-semibold text-on-surface hover:border-primary cursor-pointer"
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
-            Safety Gate
-          </button>
           <button
             type="button"
             onClick={() => void load()}

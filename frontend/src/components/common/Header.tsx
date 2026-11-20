@@ -54,6 +54,11 @@ export function Header({ user, portal = 'learner', activeView, onNavigate, onLog
               </p>
             </div>
           </div>
+
+          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#F6F8F5] border border-[#D8E2D8] text-xs text-[#3F5247]">
+            <span className="w-2 h-2 rounded-full bg-[#16A34A]" />
+            <span className="font-mono text-[11px]">PostgreSQL 16 • Redis 7 • GNN-PPO v2</span>
+          </div>
         </div>
       </header>
     )
