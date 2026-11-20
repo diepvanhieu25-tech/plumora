@@ -114,7 +114,7 @@ export function AdminSystemHealthPage() {
             <span>Kiến trúc Phân tán</span>
             <span className="text-outline-variant font-mono">/</span>
             <span className="text-primary font-medium">
-              Cụm 4 Microservices &amp; Outbox Health (SCR-20)
+              Cụm 4 Microservices &amp; Outbox Health
             </span>
           </nav>
 
@@ -290,9 +290,9 @@ export function AdminSystemHealthPage() {
                 </p>
               </div>
               <div className="pt-3 border-t border-surface-container flex items-center justify-between text-[11px] font-mono">
-                <span className="text-on-surface-variant">Invariant Rule</span>
+                <span className="text-on-surface-variant">Trạng thái Outbox</span>
                 <span className="px-2 py-0.5 rounded bg-primary-container text-on-primary-container font-semibold">
-                  INV-OUTBOX-01
+                  Transactional Outbox
                 </span>
               </div>
             </div>

@@ -169,7 +169,6 @@ export function DepthProbePage({
 
   const isMcq = stepItem?.task_type === 'mcq'
   const canSubmit = isMcq ? Boolean(selectedOption) : writtenExplanation.trim().length >= 10
-  const shortSubmissionHash = pendingSubmissionId.slice(0, 8)
   const shortSessionId = sessionId ? sessionId.slice(0, 6).toUpperCase() : 'INIT'
 
   return (
@@ -211,11 +210,11 @@ export function DepthProbePage({
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container text-secondary font-medium">
             <ShieldCheck className="w-3.5 h-3.5 text-secondary" aria-hidden="true" />
-            <span>5-Depth Probing State Machine v2</span>
+            <span>Đánh giá Chiều sâu 5 Tầng</span>
           </div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container-low text-on-surface-variant font-mono">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container-low text-on-surface-variant">
             <Shield className="w-3.5 h-3.5 text-tertiary" aria-hidden="true" />
-            <span>Idempotency: #{shortSubmissionHash}</span>
+            <span>Phiên làm bài được bảo vệ</span>
           </div>
           {tutorFeedback && (
             <button
@@ -224,7 +223,7 @@ export function DepthProbePage({
               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-container/60 text-on-primary-container font-bold cursor-pointer hover:bg-primary-container transition-colors"
             >
               <Sparkles className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
-              <span>Xem Giải thích AI Tutor (SCR-14)</span>
+              <span>Xem Giải thích Gia sư AI</span>
             </button>
           )}
         </div>
@@ -753,7 +752,7 @@ export function DepthProbePage({
                 >
                   <span className="flex items-center gap-2">
                     <MessageSquare className="w-4 h-4 text-tertiary" aria-hidden="true" />
-                    <span>Trợ lý Gia sư AI Socratic (SCR-14)</span>
+                    <span>Trợ lý Gia sư AI</span>
                   </span>
                   <ChevronRight className="w-3.5 h-3.5 text-outline" aria-hidden="true" />
                 </button>
@@ -767,15 +766,13 @@ export function DepthProbePage({
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-xs text-on-surface-variant">
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-primary" />
-          <span className="font-semibold text-on-surface">Đánh giá Thích ứng Hoạt động:</span>
-          <span>
-            Hệ thống phân tích ma trận Bloom 5 tầng ({graderSource})
-          </span>
+          <span className="font-semibold text-on-surface">Đánh giá Chiều sâu:</span>
+          <span>Phân tích năng lực 5 tầng từ nhận biết đến thiết kế hệ thống</span>
         </div>
-        <div className="flex items-center gap-4 font-mono text-[11px]">
-          <span>Status: {sessionStatus}</span>
+        <div className="flex items-center gap-3 text-[11px]">
+          <span>Trạng thái: {sessionStatus === 'active' ? 'Đang làm bài' : 'Đã hoàn thành'}</span>
           <span className="text-outline-variant">&bull;</span>
-          <span className="text-primary font-semibold">SHA-256 Validated</span>
+          <span className="text-primary font-semibold">Đã đồng bộ an toàn</span>
         </div>
       </div>
 

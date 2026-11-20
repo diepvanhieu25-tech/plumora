@@ -204,15 +204,15 @@ export function MultiDomainHubPage({
             <span className="font-semibold text-on-surface">Hồ sơ Năng lực Liên thông</span>
           </nav>
 
-          <div className="flex flex-wrap items-center gap-2.5 font-mono">
+          <div className="flex flex-wrap items-center gap-2.5">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary-container/40 text-on-secondary-container text-[11px] font-medium">
               <Sparkles className="w-3.5 h-3.5 text-secondary shrink-0" aria-hidden="true" />
-              <span>GNN Cross-Domain Sync: Đang hoạt động</span>
+              <span>Đồng bộ kiến thức liên ngành: Đang bật</span>
             </div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface-container-high text-on-surface text-[11px]">
               <span className="w-1.5 h-1.5 rounded-full bg-primary" />
               <span className="text-primary font-semibold">
-                {stats.totalLearned}/{stats.totalNodes} Khái niệm
+                {stats.totalLearned}/{stats.totalNodes} Chủ đề
               </span>
             </div>
           </div>
@@ -224,10 +224,10 @@ export function MultiDomainHubPage({
         <div className="space-y-1.5">
           <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider font-label">
             <Compass className="w-3.5 h-3.5" aria-hidden="true" />
-            Multi-Domain Competency Engine
+            Lộ trình Học tập Đa lĩnh vực
           </div>
           <h1 className="text-2xl sm:text-3xl font-headline font-bold text-on-surface tracking-tight">
-            Hồ sơ Năng lực Liên thông • Giao thoa Đa miền
+            Hồ sơ Năng lực &amp; Lộ trình Chuyên môn
           </h1>
           <p className="text-sm text-on-surface-variant max-w-3xl leading-relaxed">
             Động cơ tri thức Graph Neural Network liên tục đồng bộ mức hiểu và độ bền trí nhớ giữa

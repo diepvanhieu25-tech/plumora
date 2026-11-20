@@ -94,7 +94,7 @@ export function AdminOnlineRlPage({ onNavigate }: AdminOnlineRlPageProps) {
               <span>Reinforcement Learning</span>
               <span>/</span>
               <span className="font-semibold text-primary">
-                Giám sát Online RL &amp; Buffer (SCR-18)
+                Giám sát Online RL &amp; Buffer
               </span>
             </nav>
             <div className="flex flex-wrap items-center gap-3">
@@ -124,7 +124,7 @@ export function AdminOnlineRlPage({ onNavigate }: AdminOnlineRlPageProps) {
             </div>
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary font-semibold">
               <ShieldCheck className="w-4 h-4 shrink-0" aria-hidden="true" />
-              <span className="tracking-wide">INV-ONLINE-RL-01</span>
+              <span className="tracking-wide">Safe Online RL Active</span>
             </div>
             {activeModel && (
               <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-container text-on-surface-variant">

@@ -9,7 +9,6 @@ import {
   Code2,
   Cpu,
   FileCode2,
-  Lock,
   Play,
   RefreshCw,
   RotateCcw,
@@ -93,7 +92,6 @@ export function CodeSandboxPage({
         ? 'js'
         : 'py'
   const lineCount = Math.max(14, code.split('\n').length)
-  const shortChallengeId = challenge ? challenge.challenge_id.slice(0, 6).toUpperCase() : 'SBX'
 
   return (
     <section
@@ -122,34 +120,24 @@ export function CodeSandboxPage({
             <span className="font-mono text-on-surface font-semibold">{conceptSlug}</span>
             <ChevronRight className="w-3.5 h-3.5 text-outline-variant" aria-hidden="true" />
             <span className="text-primary font-semibold truncate">
-              Phòng Thực hành Code Sandbox (SCR-13)
+              Phòng Thực hành Lập trình
             </span>
           </nav>
         </div>
 
         {/* Security Guardrail Badges */}
         {challenge && (
-          <div className="flex items-center flex-wrap gap-2 text-[11px] font-mono">
+          <div className="flex items-center flex-wrap gap-2 text-[11px]">
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container-low text-primary shadow-2xs">
               <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
-              <span className="font-sans font-medium">Worker Cô lập:</span>
-              <span className="font-bold">network_mode=none</span>
-            </div>
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container-low text-secondary shadow-2xs">
-              <Lock className="w-3.5 h-3.5" aria-hidden="true" />
-              <span className="font-sans font-medium">Read-Only RootFS:</span>
-              <span className="font-bold">tmpfs /tmp</span>
+              <span className="font-medium">Môi trường chạy cô lập an toàn</span>
             </div>
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-tertiary-fixed/20 text-on-tertiary-container shadow-2xs">
               <Clock className="w-3.5 h-3.5" aria-hidden="true" />
-              <span className="font-sans font-medium">Giới hạn:</span>
-              <span className="font-bold">
+              <span className="font-medium">Giới hạn:</span>
+              <span className="font-bold font-mono">
                 &le; {challenge.timeout_ms}ms | {challenge.memory_limit_mb}MB RAM
               </span>
-            </div>
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-surface-container text-on-surface-variant font-mono text-[10px]">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-              <span>Session: #SBX-{shortChallengeId}</span>
             </div>
           </div>
         )}
@@ -513,19 +501,19 @@ export function CodeSandboxPage({
       )}
 
       {/* 3. Bottom System Status Bar */}
-      <div className="w-full bg-surface-container-lowest rounded-xl py-2.5 px-5 shadow-2xs border border-outline-variant/25 text-xs font-mono text-on-surface-variant flex flex-wrap items-center justify-between gap-4">
+      <div className="w-full bg-surface-container-lowest rounded-xl py-2.5 px-5 shadow-2xs border border-outline-variant/25 text-xs text-on-surface-variant flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3 flex-wrap">
-          <span className="flex items-center gap-1.5 text-on-surface font-semibold font-sans">
+          <span className="flex items-center gap-1.5 text-on-surface font-semibold">
             <Terminal className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
-            Plumora Isolated Worker Engine v2.0
+            Môi trường Thực hành Plumora
           </span>
           <span className="text-surface-container-highest">&bull;</span>
-          <span className="hidden sm:inline">AST Guardrail &amp; Subprocess RLIMIT Enforced</span>
+          <span className="hidden sm:inline">Kiểm thử tự động an toàn</span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 text-primary font-semibold">
           <span className="inline-flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-primary" />
-            <span>Idempotency State: READY</span>
+            <span>Sẵn sàng chạy kiểm thử</span>
           </span>
         </div>
       </div>

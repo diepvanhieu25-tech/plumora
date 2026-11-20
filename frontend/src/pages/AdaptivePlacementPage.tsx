@@ -141,7 +141,7 @@ export function AdaptivePlacementPage({
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="hidden md:inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface-container text-on-surface-variant text-xs font-medium">
             <ShieldCheck className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
-            <span>Phiên chẩn đoán bảo vệ an toàn (State Machine v2)</span>
+            <span>Đánh giá năng lực đầu vào thích ứng</span>
           </div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface-container-high text-xs font-mono font-medium text-on-surface">
             <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />

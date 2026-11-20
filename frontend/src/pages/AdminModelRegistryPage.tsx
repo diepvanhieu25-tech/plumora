@@ -130,7 +130,7 @@ export function AdminModelRegistryPage() {
           <span>Reinforcement Learning</span>
           <span className="text-outline-variant">/</span>
           <span className="text-primary font-medium">
-            Safety Gate &amp; Model Registry (SCR-19)
+            Safety Gate &amp; Model Registry
           </span>
         </div>
 

@@ -14,17 +14,17 @@ export function Header({ user, portal = 'learner', activeView, onNavigate, onLog
   if (!user) {
     const subtitle =
       portal === 'admin'
-        ? 'Cổng Quản trị Hệ thống — Safe Online RL & Safety Gate'
+        ? 'Cổng Quản trị Hệ thống & Điều phối Mô hình'
         : portal === 'expert'
-          ? 'Cổng Chuyên gia Nội dung — Biên soạn DAG & Rubric 5 tầng'
-          : 'Nền tảng đánh giá năng lực 5 tầng & gợi ý lộ trình đa lĩnh vực bằng Học tăng cường'
+          ? 'Cổng Chuyên gia Nội dung & Thiết kế Lộ trình'
+          : 'Nền tảng học tập thích ứng & đánh giá năng lực cá nhân hóa'
 
     const badge =
       portal === 'admin'
-        ? 'Admin Portal'
+        ? 'Quản trị viên'
         : portal === 'expert'
-          ? 'Expert Portal'
-          : 'GNN-PPO Adaptive RL'
+          ? 'Chuyên gia'
+          : 'Học tập Thích ứng'
 
     return (
       <header className="w-full bg-white border-b border-[#D8E2D8] shadow-xs">
@@ -57,7 +57,7 @@ export function Header({ user, portal = 'learner', activeView, onNavigate, onLog
 
           <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#F6F8F5] border border-[#D8E2D8] text-xs text-[#3F5247]">
             <span className="w-2 h-2 rounded-full bg-[#16A34A]" />
-            <span className="font-mono text-[11px]">PostgreSQL 16 • Redis 7 • GNN-PPO v2</span>
+            <span className="font-medium text-[11px]">Lộ trình Cá nhân hóa • Đánh giá 5 tầng</span>
           </div>
         </div>
       </header>

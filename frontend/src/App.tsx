@@ -244,14 +244,14 @@ export function App({ initialUser = null, initialView }: AppProps = {}) {
         )}
       </main>
 
-      <footer className="w-full bg-white border-t border-[#D8E2D8] py-3.5 px-6 text-xs text-[#57534E] font-mono">
+      <footer className="w-full bg-white border-t border-[#D8E2D8] py-3.5 px-6 text-xs text-[#57534E]">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-[#15803D]"></span>
-            <span>Plumora Adaptive Learning v2.0.0 • GNN-PPO Verified Checkpoints</span>
+            <span className="font-medium">Plumora — Nền tảng Học tập Thích ứng Cá nhân hóa</span>
           </div>
           <div className="flex items-center gap-4 text-[#78716C] text-[11px]">
-            <span>5-Depth Assessment &amp; Ebbinghaus Memory Active</span>
+            <span>Lộ trình Đa ngành • Thực hành Trực tiếp • Ôn tập Thông minh</span>
           </div>
         </div>
       </footer>

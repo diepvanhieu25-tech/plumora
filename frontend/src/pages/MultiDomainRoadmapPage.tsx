@@ -322,27 +322,23 @@ export function MultiDomainRoadmapPage({
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-tertiary-fixed/20 text-tertiary text-[11px] font-label font-extrabold uppercase tracking-wider">
                     <Compass className="w-4 h-4 text-tertiary" aria-hidden="true" />
-                    <span>
-                      Khuyến nghị Bước học Tiếp theo ({rec.recommended_action.learning_mode})
-                    </span>
+                    <span>Gợi ý Bước học Tiếp theo</span>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
                     <span
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-container/50 text-on-primary-container font-mono text-[11px] font-bold"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-container/50 text-on-primary-container text-[11px] font-bold"
                       data-testid="gnn-ppo-policy-badge"
                     >
                       <Cpu className="w-3.5 h-3.5" aria-hidden="true" />
-                      {rec.policy_source === 'gnn_ppo'
-                        ? 'Mô hình GNN-PPO'
-                        : rec.policy_source === 'gnn_ppo_masked'
-                          ? 'GNN-PPO + Policy Guardrail'
-                          : 'Quy tắc Đồ thị (Fallback)'}
+                      {rec.policy_source === 'gnn_ppo' || rec.policy_source === 'gnn_ppo_masked'
+                        ? 'Gợi ý từ AI (GNN-PPO)'
+                        : 'Đề xuất Theo Lộ trình (Fallback)'}
                     </span>
                     {rec.guardrail_applied && (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold px-2.5 py-1 rounded-full bg-surface-container text-primary">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-surface-container text-primary">
                         <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
-                        Guardrail Active
+                        Đủ điều kiện tiên quyết
                       </span>
                     )}
                   </div>
@@ -371,9 +367,9 @@ export function MultiDomainRoadmapPage({
                         {rec.recommended_action.reason_vi}
                       </p>
                     </div>
-                    <div className="mt-4 pt-3 border-t border-surface-container flex items-center gap-2 text-[11px] font-mono text-on-surface-variant">
+                    <div className="mt-4 pt-3 border-t border-surface-container flex items-center gap-2 text-[11px] text-on-surface-variant">
                       <Check className="w-3.5 h-3.5 text-secondary" aria-hidden="true" />
-                      <span>DAG Prerequisites Validated</span>
+                      <span>Đã hoàn thành các bài tiên quyết</span>
                     </div>
                   </div>
 
@@ -397,44 +393,31 @@ export function MultiDomainRoadmapPage({
                     </div>
                     <div className="mt-4 pt-3 border-t border-surface-container flex items-center gap-2 text-[11px] font-label text-secondary font-semibold">
                       <Zap className="w-3.5 h-3.5" aria-hidden="true" />
-                      <span>Chế độ: {rec.recommended_action.learning_mode}</span>
+                      <span>
+                        Hình thức:{' '}
+                        {MODE_LABELS[rec.recommended_action.learning_mode]?.title ??
+                          rec.recommended_action.learning_mode}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Column 3: Provenance Metadata & Launch Action */}
+                  {/* Column 3: Action & Optional AI Details */}
                   <div className="md:col-span-4 p-4 rounded-2xl bg-surface-container flex flex-col justify-between gap-4">
                     <div className="space-y-2">
                       <span className="text-[11px] font-label font-bold uppercase tracking-wider text-on-surface-variant block">
-                        Provenance Kỹ thuật
+                        Sẵn sàng Bắt đầu
                       </span>
-                      <div className="flex flex-col gap-1.5 font-mono text-[11px] text-on-surface-variant">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-outline">policy_source:</span>
-                          <span className="font-semibold text-primary">{rec.policy_source}</span>
-                        </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-outline">state_source:</span>
-                          <span className="text-on-surface font-medium">{rec.state_source}</span>
-                        </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-outline">guardrail:</span>
-                          <span className="text-on-surface font-medium">
-                            {rec.guardrail_applied ? 'DAG_Masked' : 'Passed'}
-                          </span>
-                        </div>
-                        {rec.checkpoint_sha256 && (
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-outline">chk_hash:</span>
-                            <span
-                              className="truncate max-w-[130px] text-primary font-semibold"
-                              title={rec.checkpoint_sha256}
-                              data-testid="gnn-ppo-checkpoint-sha"
-                            >
-                              {rec.checkpoint_sha256.slice(0, 12)}…
-                            </span>
-                          </div>
-                        )}
-                      </div>
+                      <p className="text-xs text-on-surface-variant leading-relaxed">
+                        Hệ thống đã kiểm tra điều kiện tiên quyết và mức độ ghi nhớ của bạn để chọn bài học tối ưu nhất lúc này.
+                      </p>
+                      {rec.checkpoint_sha256 && (
+                        <span
+                          className="sr-only"
+                          data-testid="gnn-ppo-checkpoint-sha"
+                        >
+                          {rec.checkpoint_sha256}
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex flex-col gap-2">
@@ -443,7 +426,7 @@ export function MultiDomainRoadmapPage({
                         onClick={handleCtaRecommended}
                         className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-on-primary hover:bg-primary-dim font-headline font-bold text-xs sm:text-sm shadow-sm transition-all cursor-pointer"
                       >
-                        <span>Bắt đầu Bước học AI Đề xuất</span>
+                        <span>Bắt đầu Bước học Đề xuất</span>
                         <ArrowRight className="w-4 h-4" aria-hidden="true" />
                       </button>
                       <button
@@ -453,7 +436,7 @@ export function MultiDomainRoadmapPage({
                         data-testid="toggle-gnn-inference-btn"
                       >
                         <Activity className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
-                        <span>Suy diễn GNN-PPO</span>
+                        <span>Chi tiết gợi ý AI</span>
                         {showRlDetails ? (
                           <ChevronUp className="w-3.5 h-3.5" aria-hidden="true" />
                         ) : (

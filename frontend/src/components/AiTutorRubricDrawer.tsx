@@ -119,17 +119,15 @@ export function AiTutorRubricDrawer({
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-base font-headline font-extrabold text-on-surface">
-                  Phân tích Rubric, Gia sư AI Socratic &amp; Trạm Ebbinghaus (SCR-14)
+                  Phân tích Tiêu chí &amp; Gia sư AI
                 </h2>
-                <span className="px-2 py-0.5 rounded bg-primary/10 text-primary font-mono text-[10px] font-bold">
-                  INV-DEPTH-01 Checked
+                <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-bold">
+                  Chấm điểm Minh bạch
                 </span>
               </div>
               <div className="flex items-center gap-2 text-xs text-on-surface-variant mt-0.5">
-                <span>Khái niệm:</span>
+                <span>Chủ đề:</span>
                 <span className="font-mono text-primary font-bold">{conceptSlug}</span>
-                <span>&bull;</span>
-                <span className="font-mono text-[11px]">grader_source: {graderSource}</span>
               </div>
             </div>
           </div>
@@ -307,20 +305,12 @@ export function AiTutorRubricDrawer({
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 text-primary" aria-hidden="true" />
                   <span className="text-xs font-bold font-headline uppercase tracking-wider text-on-surface">
-                    Lưu ý minh bạch (INV-DEPTH-01)
+                    Lưu ý minh bạch
                   </span>
                 </div>
                 <p className="text-xs text-on-surface leading-relaxed font-medium bg-surface-container-low p-3 rounded-xl">
-                  Minh bạch đánh giá (INV-DEPTH-01): Điểm LLM chỉ dùng để phản hồi học tập; tín hiệu
-                  Reward RL chỉ tính trên dịch chuyển bậc năng lực đã kiểm chứng Rubric.
+                  Điểm số được chấm theo tiêu chí chuẩn hóa; phản hồi của Gia sư AI giúp bạn cải thiện câu trả lời hiệu quả hơn.
                 </p>
-                <div className="bg-surface-container p-2.5 rounded-xl font-mono text-[11px] text-on-surface flex flex-wrap items-center justify-between gap-2">
-                  <span>
-                    DAG_Prereq_Guard: <strong className="text-primary">LOCKED_SECURE</strong>
-                  </span>
-                  <span>&bull;</span>
-                  <span>policy: deterministic_ppo</span>
-                </div>
               </div>
             </div>
 
