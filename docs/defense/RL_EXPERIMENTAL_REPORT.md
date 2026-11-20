@@ -189,3 +189,35 @@ Toàn bộ báo cáo kết quả sẽ được ghi đè và so sánh trực ti�
 sha256sum rl/artifacts/checkpoint.zip
 # Kết quả mong đợi: e464fa638cee04fda6a386ffb6cdf24d9190d0f1167feb56d4da0063499a6b6b
 ```
+
+---
+
+## 10. Mở Rộng Thực Nghiệm Giai Đoạn 3 (`v2.0.0`): `GNN-PPO` Đa Lĩnh Vực & *Zero-shot Domain Transfer* (`CLAIM-P3-03`, `CLAIM-P3-04`)
+
+### 10.1. Thiết Lập Môi Trường & Kiến Trúc `GNN-PPO`
+- **Simulator Đa lĩnh vực (`MultiDomainStudentSimulatorEnv`):** 4 đồ thị DAG (`backend` 12 node, `frontend` 10 node, `devops` 9 node dùng để huấn luyện; `heldout_data_eng_graph` 10 node giữ kín để kiểm chứng *Zero-shot Domain Transfer*).
+- **Biểu diễn Đồ thị (`Node Features` $\mathbb{R}^{N \times 8}$):** `depth_level_norm`, `confidence`, `retention_ebbinghaus`, `is_eligible`, `needs_review`, `tier_difficulty`, `code_practice_score`, `is_goal_path`. Ba tham số ẩn $(\alpha, \lambda_{\text{forget}}, \beta_{\text{code}})$ bị cách ly hoàn toàn khỏi observation (`No Data Leakage`).
+- **Mạng `GnnActorCritic` (3 Lớp PyTorch Tensor Thuần):** Dùng ma trận kề có hướng chuẩn hóa bậc ($\tilde{\mathbf{A}}_{\text{in}}, \tilde{\mathbf{A}}_{\text{out}}$) + `MeanPool` + `Node-wise Actor Head` chọn cặp $(v, m) \in \mathcal{V} \times \{0..3\}$ (`Learn_New`, `Deep_Probe`, `Code_Practice`, `Spaced_Review`).
+- **Quy tắc Đối sánh Công bằng (`Padded Flat Observation` $N_{\max}=16$):** `DQN-MLP` và `PPO-MLP` dùng vector đệm $128$ chiều (`Discrete(64)`).
+- **Hạt giống & Checkpoint (`rl/artifacts/gnn_ppo_v2_base.zip`):** Huấn luyện trên `train_seeds = [101, 202, 303]`, chọn mô hình tốt nhất trên `val_seed = 999` (`selected_seed = 101`), `SHA-256 = 9977d5f606427d0eb25970b1ce8cf23fa0232e2d7ff0fe392e80d2413d534201`.
+
+### 10.2. Bảng Kết Quả Đối Sánh 4 Cấp (`eval_seed = 2026`, `500` episodes)
+
+| Phương Pháp (`Policy`) | Kịch Bản A: 3 Ngành Đã Biết<br>`Mean ± Std` / `Median (IQR)` / `Completion` | Kịch Bản B: *Zero-shot Transfer* (`heldout_data_eng_graph`)<br>`Mean ± Std` / `Median (IQR)` / `Completion` | Tỷ Lệ Vi Phạm DAG<br>(`Unmasked` / `Masked`) |
+| :--- | :---: | :---: | :---: |
+| **`Heuristic B1`** *(Tier-order)* | $44.7152 \pm 6.2025$<br>$44.5289\ (7.6571)$ / `2.4%` | $45.7332 \pm 5.9808$<br>$46.4571\ (7.8617)$ / `0.4%` | `0.0%` / `0.0%` |
+| **`Heuristic B2`** *(Random-eligible)* | $0.5780 \pm 22.8860$<br>$0.8271\ (30.3139)$ / `0.0%` | $2.4377 \pm 21.6138$<br>$3.2615\ (26.3134)$ / `0.0%` | `0.0%` / `0.0%` |
+| **`Heuristic B3`** *(Greedy-mastery)* | $58.1104 \pm 7.8744$<br>$58.3076\ (10.5189)$ / `1.2%` | $58.1649 \pm 7.6597$<br>$58.2040\ (10.5258)$ / `0.2%` | `0.0%` / `0.0%` |
+| **`DQN-MLP`** *(Padded 128-dim)* | $-151.5628 \pm 5.5413$<br>$-152.0689\ (7.2148)$ / `0.0%` | $-148.2334 \pm 4.9309$<br>$-149.2008\ (6.9818)$ / `0.0%` | — |
+| **`PPO-MLP`** *(Padded 128-dim)* | $-157.6880 \pm 6.8729$<br>$-157.2500\ (10.7500)$ / `0.0%` | $-148.9750 \pm 4.2991$<br>$-148.9500\ (4.5000)$ / `0.0%` | — |
+| **`GNN-PPO (Unmasked)`** | **$\mathbf{66.6476 \pm 8.7348}$**<br>$67.5242\ (12.3104)$ / **`37.2%`** | **$\mathbf{67.3580 \pm 9.7991}$**<br>$65.8537\ (16.1586)$ / **`39.2%`** | **`0.0%`** / `0.0%` |
+| **`GNN-PPO (Guardrail Masked)`** | **$\mathbf{61.7239 \pm 9.0600}$**<br>$60.8482\ (12.9301)$ / **`34.6%`** | **$\mathbf{62.0429 \pm 9.9426}$**<br>$60.6248\ (15.5398)$ / **`35.2%`** | `0.0%` / **`0.0%`** |
+
+### 10.3. Tái Lập Thực Nghiệm Giai Đoạn 3
+```bash
+cd /home/diepvanhieu/workspace/plumora/rl
+PYTHONPATH=src uv run python -m plumora_rl.evaluate_phase3 --eval-seed 2026 --episodes 500
+sha256sum artifacts/gnn_ppo_v2_base.zip
+# Kết quả: 9977d5f606427d0eb25970b1ce8cf23fa0232e2d7ff0fe392e80d2413d534201
+```
+*(Ghi chú trung thực theo `.agents/rules/rl-evidence.md`: Toàn bộ số liệu trên thu được trên Simulator mô phỏng giả định động học học viên và đường cong Ebbinghaus, chưa phải bằng chứng lâm sàng trên người học thật.)*

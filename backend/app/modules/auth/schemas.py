@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.db.models import UserModel
 
@@ -16,12 +16,23 @@ class RegisterRequest(BaseModel):
     display_name: str = Field(..., min_length=1, max_length=64)
     password: str = Field(..., min_length=8, max_length=128)
 
+    @field_validator("display_name")
+    @classmethod
+    def validate_display_name(cls, v: str) -> str:
+        cleaned = v.strip()
+        if not cleaned:
+            raise ValueError("Tên hiển thị không được để trống.")
+        if "<" in cleaned or ">" in cleaned:
+            raise ValueError("Tên hiển thị không được chứa ký tự HTML (< hoặc >).")
+        return cleaned
+
 
 class LoginRequest(BaseModel):
-    """Learner login payload (D-11)."""
+    """Portal-aware login payload (D-11, PL3-ROLE-01)."""
 
     username: str = Field(..., min_length=1, max_length=64)
     password: str = Field(..., min_length=1, max_length=128)
+    portal: Literal["learner", "expert", "admin"] = "learner"
 
 
 def serialize_user(user: UserModel) -> dict[str, Any]:
@@ -30,5 +41,6 @@ def serialize_user(user: UserModel) -> dict[str, Any]:
         "id": str(user.id),
         "username": user.username,
         "display_name": user.display_name,
+        "role": getattr(user, "role", "learner"),
         "state_version": user.state_version,
     }

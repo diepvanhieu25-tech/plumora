@@ -1,0 +1,150 @@
+{
+  "eval_seed": 2026,
+  "episodes": 500,
+  "checkpoint_sha256": "9977d5f606427d0eb25970b1ce8cf23fa0232e2d7ff0fe392e80d2413d534201",
+  "selected_seed": 101,
+  "scenario_a_known_domains": {
+    "heuristic_b1": {
+      "episodes": 500,
+      "mean_reward": 44.7152,
+      "std_reward": 6.2025,
+      "median_reward": 44.5289,
+      "iqr_reward": 7.6571,
+      "invalid_action_rate": 0.0,
+      "masked_violation_rate": 0.0,
+      "completion_rate": 0.024
+    },
+    "heuristic_b2": {
+      "episodes": 500,
+      "mean_reward": 0.578,
+      "std_reward": 22.886,
+      "median_reward": 0.8271,
+      "iqr_reward": 30.3139,
+      "invalid_action_rate": 0.0,
+      "masked_violation_rate": 0.0,
+      "completion_rate": 0.0
+    },
+    "heuristic_b3": {
+      "episodes": 500,
+      "mean_reward": 58.1104,
+      "std_reward": 7.8744,
+      "median_reward": 58.3076,
+      "iqr_reward": 10.5189,
+      "invalid_action_rate": 0.0,
+      "masked_violation_rate": 0.0,
+      "completion_rate": 0.012
+    },
+    "dqn_mlp_unmasked": {
+      "episodes": 500,
+      "mean_reward": -151.5628,
+      "std_reward": 5.5413,
+      "median_reward": -152.0689,
+      "iqr_reward": 7.2148,
+      "invalid_action_rate": 0.0,
+      "masked_violation_rate": 0.0,
+      "completion_rate": 0.0
+    },
+    "ppo_mlp_unmasked": {
+      "episodes": 500,
+      "mean_reward": -157.688,
+      "std_reward": 6.8729,
+      "median_reward": -157.25,
+      "iqr_reward": 10.75,
+      "invalid_action_rate": 0.0,
+      "masked_violation_rate": 0.0,
+      "completion_rate": 0.0
+    },
+    "gnn_ppo_unmasked": {
+      "episodes": 500,
+      "mean_reward": 66.6476,
+      "std_reward": 8.7348,
+      "median_reward": 67.5242,
+      "iqr_reward": 12.3104,
+      "invalid_action_rate": 0.0,
+      "masked_violation_rate": 0.0,
+      "completion_rate": 0.372
+    },
+    "gnn_ppo_masked": {
+      "episodes": 500,
+      "mean_reward": 61.7239,
+      "std_reward": 9.06,
+      "median_reward": 60.8482,
+      "iqr_reward": 12.9301,
+      "invalid_action_rate": 0.0,
+      "masked_violation_rate": 0.0,
+      "completion_rate": 0.346
+    }
+  },
+  "scenario_b_zero_shot_transfer": {
+    "heuristic_b1": {
+      "episodes": 500,
+      "mean_reward": 45.7332,
+      "std_reward": 5.9808,
+      "median_reward": 46.4571,
+      "iqr_reward": 7.8617,
+      "invalid_action_rate": 0.0,
+      "masked_violation_rate": 0.0,
+      "completion_rate": 0.004
+    },
+    "heuristic_b2": {
+      "episodes": 500,
+      "mean_reward": 2.4377,
+      "std_reward": 21.6138,
+      "median_reward": 3.2615,
+      "iqr_reward": 26.3134,
+      "invalid_action_rate": 0.0,
+      "masked_violation_rate": 0.0,
+      "completion_rate": 0.0
+    },
+    "heuristic_b3": {
+      "episodes": 500,
+      "mean_reward": 58.1649,
+      "std_reward": 7.6597,
+      "median_reward": 58.204,
+      "iqr_reward": 10.5258,
+      "invalid_action_rate": 0.0,
+      "masked_violation_rate": 0.0,
+      "completion_rate": 0.002
+    },
+    "dqn_mlp_unmasked": {
+      "episodes": 500,
+      "mean_reward": -148.2334,
+      "std_reward": 4.9309,
+      "median_reward": -149.2008,
+      "iqr_reward": 6.9818,
+      "invalid_action_rate": 0.0,
+      "masked_violation_rate": 0.0,
+      "completion_rate": 0.0
+    },
+    "ppo_mlp_unmasked": {
+      "episodes": 500,
+      "mean_reward": -148.975,
+      "std_reward": 4.2991,
+      "median_reward": -148.95,
+      "iqr_reward": 4.5,
+      "invalid_action_rate": 0.0,
+      "masked_violation_rate": 0.0,
+      "completion_rate": 0.0
+    },
+    "gnn_ppo_unmasked": {
+      "episodes": 500,
+      "mean_reward": 67.358,
+      "std_reward": 9.7991,
+      "median_reward": 65.8537,
+      "iqr_reward": 16.1586,
+      "invalid_action_rate": 0.0,
+      "masked_violation_rate": 0.0,
+      "completion_rate": 0.392
+    },
+    "gnn_ppo_masked": {
+      "episodes": 500,
+      "mean_reward": 62.0429,
+      "std_reward": 9.9426,
+      "median_reward": 60.6248,
+      "iqr_reward": 15.5398,
+      "invalid_action_rate": 0.0,
+      "masked_violation_rate": 0.0,
+      "completion_rate": 0.352
+    }
+  }
+}

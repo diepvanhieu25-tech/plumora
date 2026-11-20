@@ -1,0 +1,227 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-auth-service
+  namespace: plumora
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: user-auth-service
+  template:
+    metadata:
+      labels:
+        app: user-auth-service
+    spec:
+      containers:
+        - name: user-auth-service
+          image: plumora-backend:2.0.0
+          command: ["uvicorn", "services.user_auth_service:app", "--host", "0.0.0.0", "--port", "8001"]
+          ports:
+            - containerPort: 8001
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 5
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-auth-service
+  namespace: plumora
+spec:
+  selector:
+    app: user-auth-service
+  ports:
+    - port: 8001
+      targetPort: 8001
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: content-kg-service
+  namespace: plumora
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: content-kg-service
+  template:
+    metadata:
+      labels:
+        app: content-kg-service
+    spec:
+      containers:
+        - name: content-kg-service
+          image: plumora-backend:2.0.0
+          command: ["uvicorn", "services.content_kg_service:app", "--host", "0.0.0.0", "--port", "8002"]
+          ports:
+            - containerPort: 8002
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8002
+            initialDelaySeconds: 5
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: content-kg-service
+  namespace: plumora
+spec:
+  selector:
+    app: content-kg-service
+  ports:
+    - port: 8002
+      targetPort: 8002
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: assessment-grader-service
+  namespace: plumora
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: assessment-grader-service
+  template:
+    metadata:
+      labels:
+        app: assessment-grader-service
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: assessment-grader-service
+          image: plumora-backend:2.0.0
+          command: ["uvicorn", "services.assessment_grader_service:app", "--host", "0.0.0.0", "--port", "8003"]
+          ports:
+            - containerPort: 8003
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            initialDelaySeconds: 5
+          resources:
+            requests:
+              cpu: "150m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: assessment-grader-service
+  namespace: plumora
+spec:
+  selector:
+    app: assessment-grader-service
+  ports:
+    - port: 8003
+      targetPort: 8003
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recommendation-ai-service
+  namespace: plumora
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: recommendation-ai-service
+  template:
+    metadata:
+      labels:
+        app: recommendation-ai-service
+    spec:
+      containers:
+        - name: recommendation-ai-service
+          image: plumora-backend:2.0.0
+          command: ["uvicorn", "services.recommendation_ai_service:app", "--host", "0.0.0.0", "--port", "8004"]
+          ports:
+            - containerPort: 8004
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8004
+            initialDelaySeconds: 5
+          resources:
+            requests:
+              cpu: "150m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: recommendation-ai-service
+  namespace: plumora
+spec:
+  selector:
+    app: recommendation-ai-service
+  ports:
+    - port: 8004
+      targetPort: 8004
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: plumora
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+        - name: api-gateway
+          image: plumora-backend:2.0.0
+          command: ["uvicorn", "services.api_gateway:app", "--host", "0.0.0.0", "--port", "8000"]
+          ports:
+            - containerPort: 8000
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: plumora
+spec:
+  type: NodePort
+  selector:
+    app: api-gateway
+  ports:
+    - port: 8000
+      targetPort: 8000

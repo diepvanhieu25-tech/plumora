@@ -1,0 +1,99 @@
+{
+  "domain": {
+    "slug": "frontend",
+    "title": "Kỹ thuật Frontend & Kiến trúc Giao diện Web",
+    "description": "Lộ trình 10 khái niệm Frontend 4 tầng DAG (gồm 4 khái niệm giao thoa từ Backend/DevOps và 6 khái niệm đặc thù trình duyệt)."
+  },
+  "concepts": [
+    {
+      "node_idx": 0,
+      "slug": "net-internet",
+      "title": "Internet & Mô hình Mạng cơ bản (IP, DNS, TCP/UDP)",
+      "tier": 1,
+      "is_shared": true,
+      "prerequisites": [],
+      "lesson_markdown": "## Tổng quan Mạng Internet cho Frontend\n\nMọi ứng dụng Web đều bắt đầu từ kết nối mạng: phân giải tên miền qua **DNS**, định tuyến **IP**, bắt tay **TCP 3-Way Handshake** và đàm phán **TLS**.\n\n### Trọng tâm\n- DNS Lookup latency ảnh hưởng trực tiếp tới Time To First Byte (TTFB).\n- Preconnect (`<link rel=\"preconnect\">`) giúp rút ngắn thời gian TCP + TLS."
+    },
+    {
+      "node_idx": 1,
+      "slug": "fe-dom-events",
+      "title": "Cây DOM, Browser Rendering Pipeline & Event Loop",
+      "tier": 1,
+      "is_shared": false,
+      "prerequisites": [],
+      "lesson_markdown": "## Cây DOM & Browser Rendering Pipeline\n\nTrình duyệt chuyển HTML/CSS thành pixel qua chuỗi bước: **DOM + CSSOM $\\rightarrow$ Render Tree $\\rightarrow$ Layout (Reflow) $\\rightarrow$ Paint $\\rightarrow$ Composite**.\n\n### Trọng tâm\n- Event Bubbling & Capturing giúp triển khai Event Delegation hiệu quả.\n- Tránh Layout Thrashing bằng cách gom đọc/ghi thuộc tính kích thước DOM."
+    },
+    {
+      "node_idx": 2,
+      "slug": "web-http",
+      "title": "Giao thức HTTP/HTTPS (Methods, Status, Headers, CORS)",
+      "tier": 2,
+      "is_shared": true,
+      "prerequisites": ["net-internet"],
+      "lesson_markdown": "## HTTP/HTTPS & Cơ chế CORS trên Trình duyệt\n\nTrình duyệt áp dụng **Same-Origin Policy** và sử dụng **CORS Preflight (`OPTIONS`)** khi gọi API khác Origin.\n\n### Trọng tâm\n- Hiểu `Cache-Control`, `ETag`, `Credentials: include` và mã trạng thái `2xx/4xx/5xx`."
+    },
+    {
+      "node_idx": 3,
+      "slug": "fe-js-async",
+      "title": "Bất đồng bộ trong JavaScript (Promises, Async/Await, Microtasks)",
+      "tier": 2,
+      "is_shared": false,
+      "prerequisites": ["fe-dom-events"],
+      "lesson_markdown": "## JavaScript Event Loop: Microtasks vs Macrotasks\n\n`Promise.then` và `async/await` chạy trong **Microtask Queue**, luôn được ưu tiên rút sạch trước khi Event Loop chuyển sang **Macrotask** (`setTimeout`, `requestAnimationFrame`).\n\n### Trọng tâm\n- Xử lý song song với `Promise.all` / `Promise.allSettled` và hủy request bằng `AbortController`."
+    },
+    {
+      "node_idx": 4,
+      "slug": "fe-component-state",
+      "title": "Kiến trúc Component, Unidirectional Data Flow & State Management",
+      "tier": 2,
+      "is_shared": false,
+      "prerequisites": ["fe-dom-events"],
+      "lesson_markdown": "## Luồng Dữ liệu Một chiều & Quản lý Trạng thái\n\nTrong React/Component UI hiện đại, trạng thái (State) chảy từ trên xuống qua Props và cập nhật bất biến (Immutability) để bộ so sánh Virtual DOM nhận diện chính xác thay đổi.\n\n### Trọng tâm\n- Phân biệt Local UI State, Derived State và Server Cache State."
+    },
+    {
+      "node_idx": 5,
+      "slug": "api-rest",
+      "title": "Thiết kế & Tích hợp RESTful API chuẩn",
+      "tier": 3,
+      "is_shared": true,
+      "prerequisites": ["web-http"],
+      "lesson_markdown": "## Tích hợp RESTful API phía Client\n\nClient cần xử lý nhất quán hợp đồng phân trang, mã lỗi cấu trúc (`error_code`), Idempotency Key khi retry và hủy gọi cũ khi người dùng đổi bộ lọc."
+    },
+    {
+      "node_idx": 6,
+      "slug": "fe-data-fetching",
+      "title": "Client Data Fetching, Caching, Stale-While-Revalidate & Optimistic UI",
+      "tier": 3,
+      "is_shared": false,
+      "prerequisites": ["fe-js-async", "fe-component-state", "api-rest"],
+      "lesson_markdown": "## Chiến lược Data Fetching & Optimistic UI\n\n**Stale-While-Revalidate (SWR)** hiển thị ngay dữ liệu cache cũ trong khi âm thầm làm mới ở nền. **Optimistic UI** cập nhật giao diện tức thì và rollback chính xác nếu server trả lỗi."
+    },
+    {
+      "node_idx": 7,
+      "slug": "sec-authn",
+      "title": "Xác thực & Quản lý Phiên (HttpOnly Cookie, JWT, RBAC Flow)",
+      "tier": 4,
+      "is_shared": true,
+      "prerequisites": ["api-rest"],
+      "lesson_markdown": "## Bảo mật Phiên Đăng nhập trên Trình duyệt\n\nƯu tiên **HttpOnly, SameSite Cookie** thay vì lưu JWT trong `localStorage` để chống đánh cắp token qua XSS, kết hợp kiểm tra vai trò RBAC trên cả UI Route Guard lẫn API Server."
+    },
+    {
+      "node_idx": 8,
+      "slug": "fe-xss-csrf",
+      "title": "Bảo mật Giao diện Web (Chống XSS, CSRF, CSP & Sanitization)",
+      "tier": 4,
+      "is_shared": false,
+      "prerequisites": ["fe-component-state", "sec-authn"],
+      "lesson_markdown": "## Phòng thủ Chuyên sâu Chống XSS & CSRF\n\n- **XSS:** Escape output mặc định, cấm `dangerouslySetInnerHTML` với HTML chưa sanitize, áp dụng **Content-Security-Policy (CSP)**.\n- **CSRF:** Dùng `SameSite=Lax/Strict` và Anti-CSRF Token cho các request thay đổi trạng thái."
+    },
+    {
+      "node_idx": 9,
+      "slug": "fe-perf-caching",
+      "title": "Tối ưu Hiệu năng Web (Code Splitting, Memoization, Core Web Vitals)",
+      "tier": 4,
+      "is_shared": false,
+      "prerequisites": ["fe-data-fetching"],
+      "lesson_markdown": "## Tối ưu Core Web Vitals (LCP, INP, CLS)\n\n- Giảm JS bundle bằng **Route-based Code Splitting (`React.lazy`)**.\n- Giữ **CLS = 0** bằng khung kích thước cố định cho skeleton/media.\n- Tối ưu **INP** bằng virtualization danh sách dài và tách tác vụ nặng."
+    }
+  ]
+}

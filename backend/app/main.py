@@ -16,11 +16,12 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.config import settings
-from app.modules.assessment import router as assessment_router
+from app.modules.assessment.router_v2 import router as assessment_v2_router
 from app.modules.auth import router as auth_router
 from app.modules.content import init_db_and_seed
-from app.modules.content import router as content_router
-from app.modules.recommendation import router as recommendation_router
+from app.modules.content.router_expert import router as expert_v2_router
+from app.modules.content.router_v2 import router as content_kg_router
+from app.modules.recommendation.router_admin import router as admin_v2_router
 
 _DB_INITIALIZED = False
 
@@ -42,8 +43,8 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(
     title="Plumora API",
-    version="1.0.0",
-    description="Adaptive Backend Learning Path Recommendation & Management using RL (DQN)",
+    version="2.0.0",
+    description="Adaptive Multi-Domain Learning Path & 5-Depth Assessment Platform using GNN-PPO",
     lifespan=lifespan,
 )
 
@@ -56,9 +57,10 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
-app.include_router(content_router)
-app.include_router(assessment_router)
-app.include_router(recommendation_router)
+app.include_router(content_kg_router)
+app.include_router(assessment_v2_router)
+app.include_router(expert_v2_router)
+app.include_router(admin_v2_router)
 
 
 @app.middleware("http")
@@ -71,6 +73,7 @@ async def security_headers_middleware(
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; frame-ancestors 'self'; object-src 'none'"
     )

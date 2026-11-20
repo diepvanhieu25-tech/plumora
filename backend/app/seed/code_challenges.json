@@ -1,0 +1,164 @@
+{
+  "challenges": [
+    {
+      "id": "4a1d968a-c624-56f6-af28-b3fcf4dd1f5b",
+      "concept_slug": "net-internet",
+      "title": "Phân tích Host & Port từ URL (Mặc định HTTP 80 / HTTPS 443)",
+      "language": "python",
+      "prompt": "Hàm `parse_host_port(url: str) -> tuple[str, int]` hiện đang trả về sai port mặc định cho HTTPS và không tách được port tường minh. Hãy sửa lại hàm để pass toàn bộ test cases.",
+      "buggy_starter_code": "def parse_host_port(url: str) -> tuple[str, int]:\n    cleaned = url.split('://', 1)[-1].split('/', 1)[0]\n    return cleaned, 80\n",
+      "solution_code": "def parse_host_port(url: str) -> tuple[str, int]:\n    cleaned = url.split('://', 1)[-1].split('/', 1)[0]\n    if ':' in cleaned:\n        h, p = cleaned.split(':', 1)\n        return h, int(p)\n    return cleaned, 443 if url.startswith('https://') else 80\n",
+      "test_cases": [
+        {
+          "name": "HTTPS default port 443",
+          "call": "parse_host_port('https://api.plumora.dev/v2/domains')",
+          "expected": [
+            "api.plumora.dev",
+            443
+          ],
+          "is_hidden": false
+        },
+        {
+          "name": "HTTP default port 80",
+          "call": "parse_host_port('http://localhost/health')",
+          "expected": [
+            "localhost",
+            80
+          ],
+          "is_hidden": false
+        },
+        {
+          "name": "Explicit custom port",
+          "call": "parse_host_port('http://127.0.0.1:8000/api')",
+          "expected": [
+            "127.0.0.1",
+            8000
+          ],
+          "is_hidden": true
+        }
+      ],
+      "timeout_ms": 3000,
+      "memory_limit_mb": 128
+    },
+    {
+      "id": "2457f84e-c2e8-5440-9bb2-040baff132cd",
+      "concept_slug": "web-http",
+      "title": "Chuẩn hóa Kiểm tra CORS Origin Cho phép",
+      "language": "python",
+      "prompt": "Sửa hàm `is_allowed_origin(origin: str, allowlist: list[str]) -> bool` để không bị qua mặt bởi tiền tố giả mạo (ví dụ `https://plumora.dev.evil.com`).",
+      "buggy_starter_code": "def is_allowed_origin(origin: str, allowlist: list[str]) -> bool:\n    return any(origin.startswith(item) for item in allowlist)\n",
+      "solution_code": "def is_allowed_origin(origin: str, allowlist: list[str]) -> bool:\n    normalized = origin.rstrip('/')\n    return normalized in {item.rstrip('/') for item in allowlist}\n",
+      "test_cases": [
+        {
+          "name": "Exact origin match",
+          "call": "is_allowed_origin('https://plumora.dev', ['https://plumora.dev'])",
+          "expected": true,
+          "is_hidden": false
+        },
+        {
+          "name": "Reject suffix spoof",
+          "call": "is_allowed_origin('https://plumora.dev.evil.com', ['https://plumora.dev'])",
+          "expected": false,
+          "is_hidden": false
+        },
+        {
+          "name": "Reject http downgrade",
+          "call": "is_allowed_origin('http://plumora.dev', ['https://plumora.dev'])",
+          "expected": false,
+          "is_hidden": true
+        }
+      ],
+      "timeout_ms": 3000,
+      "memory_limit_mb": 128
+    },
+    {
+      "id": "19b8c38a-c0bd-5c2e-96b5-32b38f084464",
+      "concept_slug": "api-rest",
+      "title": "Tính Backoff An toàn cho Retry Lũy đẳng",
+      "language": "python",
+      "prompt": "Hoàn thiện hàm `compute_backoff_ms(attempt: int, base_ms: int = 100, max_ms: int = 2000) -> int` theo cấp số nhân có chặn trần `max_ms`.",
+      "buggy_starter_code": "def compute_backoff_ms(attempt: int, base_ms: int = 100, max_ms: int = 2000) -> int:\n    return base_ms * attempt\n",
+      "solution_code": "def compute_backoff_ms(attempt: int, base_ms: int = 100, max_ms: int = 2000) -> int:\n    if attempt <= 0:\n        return base_ms\n    return min(max_ms, base_ms * (2 ** attempt))\n",
+      "test_cases": [
+        {
+          "name": "Attempt 1 doubles",
+          "call": "compute_backoff_ms(1, 100, 2000)",
+          "expected": 200,
+          "is_hidden": false
+        },
+        {
+          "name": "Attempt 3 exponential",
+          "call": "compute_backoff_ms(3, 100, 2000)",
+          "expected": 800,
+          "is_hidden": false
+        },
+        {
+          "name": "Capped at max_ms",
+          "call": "compute_backoff_ms(10, 100, 2000)",
+          "expected": 2000,
+          "is_hidden": true
+        }
+      ],
+      "timeout_ms": 3000,
+      "memory_limit_mb": 128
+    },
+    {
+      "id": "2b6e6fb6-0d7f-5b0e-aff6-41e009cebe0c",
+      "concept_slug": "fe-dom-events",
+      "title": "Gom Nhóm Cập nhật DOM Tránh Layout Thrashing",
+      "language": "javascript",
+      "prompt": "Sửa hàm `batchResize(widths, factor)` để trả về mảng chiều rộng mới đã làm tròn nguyên, không đột biến mảng đầu vào.",
+      "buggy_starter_code": "function batchResize(widths, factor) {\n  for (let i = 0; i < widths.length; i++) {\n    widths[i] = widths[i] * factor;\n  }\n  return widths;\n}\n",
+      "solution_code": "function batchResize(widths, factor) {\n  return widths.map((w) => Math.round(w * factor));\n}\n",
+      "test_cases": [
+        {
+          "name": "Scale widths immutably",
+          "call": "batchResize([100, 200], 1.5)",
+          "expected": [
+            150,
+            300
+          ],
+          "is_hidden": false
+        },
+        {
+          "name": "Round fractional pixels",
+          "call": "batchResize([33], 1.5)",
+          "expected": [
+            50
+          ],
+          "is_hidden": true
+        }
+      ],
+      "timeout_ms": 3000,
+      "memory_limit_mb": 128
+    },
+    {
+      "id": "31596ee6-df8c-5f18-9bb0-c9c1cd48ee7d",
+      "concept_slug": "db-relational",
+      "title": "Truy vấn Top Khái niệm Cần Ôn tập Theo Độ bền Trí nhớ",
+      "language": "sql",
+      "prompt": "Viết câu lệnh SQL chọn `concept_slug, stability_s` từ bảng `competencies` cho các dòng có `depth_level_norm >= 0.5` và sắp xếp theo `stability_s ASC`.",
+      "buggy_starter_code": "SELECT concept_slug FROM competencies;\n",
+      "solution_code": "SELECT concept_slug, stability_s FROM competencies WHERE depth_level_norm >= 0.5 ORDER BY stability_s ASC;\n",
+      "test_cases": [
+        {
+          "name": "Filter depth >= 0.5 and order by stability_s ASC",
+          "call": "SQL_QUERY",
+          "expected": [
+            [
+              "web-http",
+              1.8
+            ],
+            [
+              "net-internet",
+              3.0
+            ]
+          ],
+          "is_hidden": false
+        }
+      ],
+      "timeout_ms": 3000,
+      "memory_limit_mb": 128
+    }
+  ]
+}

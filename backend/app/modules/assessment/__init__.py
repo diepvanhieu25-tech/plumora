@@ -1,19 +1,5 @@
-"""Assessment module public interface and backward compatibility layer."""
+"""Assessment, 5-Depth Probing, Code Sandbox, Rubric Grader & Ebbinghaus domain package."""
 
-from __future__ import annotations
+from app.modules.assessment.router_v2 import router as assessment_router
 
-from app.modules.assessment.router import router
-from app.modules.assessment.schemas import (
-    AnswerItemRequest,
-    ApplyPresetRequest,
-    SubmitAttemptRequest,
-)
-from app.modules.assessment.unit_of_work import execute_quiz_attempt_uow
-
-__all__ = [
-    "AnswerItemRequest",
-    "ApplyPresetRequest",
-    "SubmitAttemptRequest",
-    "execute_quiz_attempt_uow",
-    "router",
-]
+__all__ = ["assessment_router"]

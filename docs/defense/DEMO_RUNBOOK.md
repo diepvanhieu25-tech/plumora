@@ -146,6 +146,33 @@ sequenceDiagram
 
 ---
 
+## 4. Kịch Bản Thao Diễn Đích Giai Đoạn 3 (`v2.0.0` — 20 Màn Hình & 3 Vai Trò)
+
+### 4.1. Khởi Chạy Cụm 4 Microservices (Tùy chọn khi Demo Kiến Trúc Phân Tán)
+```bash
+docker compose -f docker-compose.microservices.yml up --build -d
+```
+- `user-auth-service` (`8001`), `content-kg-service` (`8002`), `assessment-grader-service` (`8003`), `recommendation-ai-service` (`8004`), `api-gateway` (`8000`).
+
+### 4.2. Luồng Bấm Demo 3 Vai Trò (`SCR-01`..`SCR-20`)
+1. **Vai trò `Learner` (`SCR-01` $\rightarrow$ `SCR-09`..`SCR-14`):**
+   - Đăng nhập `learner_foundation` (`PlumoraDemo#2026`) $\rightarrow$ Nhấn nút **"Đa lĩnh vực"** trên Header mở **`SCR-09` (`MultiDomainHubPage`)**: chỉ ra 3 ngành `Backend (12)`, `Frontend (10)`, `DevOps (9)` và số node giao thoa (`GitMerge`).
+   - Chọn **"Chẩn đoán Đầu vào"** trên `Frontend` mở **`SCR-10` (`AdaptivePlacementPage`)**: làm 1–2 câu nhảy tầng DAG, nhấn mạnh trần khởi tạo `75%` (`confidence = 0.60`).
+   - Vào **`SCR-11` (`MultiDomainRoadmapPage`)**: chỉ ra node giao thoa `net-internet` / `web-http` tự động sáng mở khóa; bật nút **"Mô phỏng +5 ngày (Ebbinghaus)"** để hội đồng thấy thanh $R(t)$ giảm dưới `60%` chuyển màu Hổ Phách `Cần ôn tập`; chỉ ra Banner **`GNN-PPO + Policy Guardrail`** (`SHA-256` verified).
+   - Nhấp **"Đào sâu 5 tầng"** mở **`SCR-12` (`DepthProbePage`)**: trả lời câu Tầng 3 tự luận và nhận phản hồi từ **AI Tutor & Rubric Drawer (`SCR-14`)** (huy hiệu nguồn `Deterministic Fallback` hoạt động ngay cả khi tắt mạng).
+   - Nhấp **"Code"** mở **`SCR-13` (`CodeSandboxPage`)**: sửa hàm Python `parse_host_port` (hoặc thử nộp `while True: pass` để chứng minh cắt timeout `408` trong $\le 3000\text{ms}$).
+2. **Vai trò `Expert` (`SCR-15`..`SCR-17`):**
+   - Đăng xuất $\rightarrow$ Đăng nhập `expert_demo` (`PlumoraDemo#2026`) $\rightarrow$ Mở **"Cổng Chuyên gia"**.
+   - Trên **`SCR-15`**, thử nối cạnh vòng lặp để kích hoạt `422 DAG_CYCLE_DETECTED`, sau đó sửa hợp lệ và xuất bản.
+   - Giới thiệu nhanh **`SCR-16`** (soạn Rubric tổng trọng số $= 1.0$) và **`SCR-17`** (chạy thử `solution_code` qua Sandbox trước khi lưu).
+3. **Vai trò `Admin` (`SCR-18`..`SCR-20`):**
+   - Đăng xuất $\rightarrow$ Đăng nhập `admin_demo` (`PlumoraDemo#2026`) $\rightarrow$ Mở **"Cổng Admin"**.
+   - Trên **`SCR-18`**, giới thiệu `Verified Experience Buffer` và ngưỡng `KL-divergence <= 0.02`.
+   - Trên **`SCR-19`**, chỉ ra nút **"Kích hoạt Checkpoint Mới"** bị khóa cứng đối với model `BLOCKED` (`INV-ONLINE-RL-01`) và thao diễn **`1-Click Rollback`** ($< 2000\text{ms}$).
+   - Trên **`SCR-20`**, trình chiếu trạng thái 4 Microservices, 4 Schema cô lập (`auth_svc`, `content_svc`, `assess_svc`, `rec_ai_svc`) và `Redis Streams`.
+
+---
+
 ## 3. Bộ Câu Hỏi Phản Biện Thường Gặp Của Hội Đồng & Đáp Án Thuyết Phục
 
 ### Câu hỏi 1: Tại sao lại dùng Học tăng cường (DQN) cho đồ án này mà không dùng luật đơn giản (Heuristic/Cây quyết định)?

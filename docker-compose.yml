@@ -68,6 +68,84 @@ services:
       backend:
         condition: service_healthy
 
+  user-auth-service:
+    profiles: ["microservices"]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: ["uvicorn", "services.user_auth_service:app", "--host", "0.0.0.0", "--port", "8001"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${DB_USER:-plumora_app}:${DB_PASSWORD:-plumora_dev_pass_local_only}@postgres:5432/${DB_NAME:-plumora_dev}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-plumora_local_dev_secret_key_min_32_chars_01}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  content-kg-service:
+    profiles: ["microservices"]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: ["uvicorn", "services.content_kg_service:app", "--host", "0.0.0.0", "--port", "8002"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${DB_USER:-plumora_app}:${DB_PASSWORD:-plumora_dev_pass_local_only}@postgres:5432/${DB_NAME:-plumora_dev}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-plumora_local_dev_secret_key_min_32_chars_01}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  assessment-grader-service:
+    profiles: ["microservices"]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: ["uvicorn", "services.assessment_grader_service:app", "--host", "0.0.0.0", "--port", "8003"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${DB_USER:-plumora_app}:${DB_PASSWORD:-plumora_dev_pass_local_only}@postgres:5432/${DB_NAME:-plumora_dev}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-plumora_local_dev_secret_key_min_32_chars_01}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  recommendation-ai-service:
+    profiles: ["microservices"]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: ["uvicorn", "services.recommendation_ai_service:app", "--host", "0.0.0.0", "--port", "8004"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${DB_USER:-plumora_app}:${DB_PASSWORD:-plumora_dev_pass_local_only}@postgres:5432/${DB_NAME:-plumora_dev}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-plumora_local_dev_secret_key_min_32_chars_01}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  api-gateway:
+    profiles: ["microservices"]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: ["uvicorn", "services.api_gateway:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "${GATEWAY_PORT:-8080}:8000"
+    depends_on:
+      - user-auth-service
+      - content-kg-service
+      - assessment-grader-service
+      - recommendation-ai-service
+
 volumes:
   plumora_pgdata:
   plumora_redisdata:

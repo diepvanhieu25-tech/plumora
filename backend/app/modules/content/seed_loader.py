@@ -114,10 +114,32 @@ def init_db_and_seed() -> None:
                     username=username,
                     display_name=display_name,
                     password_hash=demo_hash,
+                    role="learner",
                     state_version=1,
                 )
                 db.add(user)
                 db.flush()
                 apply_preset_to_user_in_tx(db, user, preset_key)
 
+        for staff_username, staff_display, staff_role in (
+            ("expert_demo", "Chuyên gia Nội dung & KG", "expert"),
+            ("admin_demo", "Quản trị Hệ thống & Online RL", "admin"),
+        ):
+            staff = db.scalar(select(UserModel).where(UserModel.username == staff_username))
+            if staff is None:
+                db.add(
+                    UserModel(
+                        id=uuid.uuid4(),
+                        username=staff_username,
+                        display_name=staff_display,
+                        password_hash=demo_hash,
+                        role=staff_role,
+                        state_version=1,
+                    )
+                )
+
         db.commit()
+
+        from app.modules.content.seed_v2_loader import seed_phase3_v2_data
+
+        seed_phase3_v2_data(db)
