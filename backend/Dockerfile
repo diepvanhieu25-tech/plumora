@@ -18,8 +18,8 @@ ENV PATH="/app/.venv/bin:$PATH" \
     APP_ENV=production \
     API_HOST=0.0.0.0 \
     API_PORT=8000 \
-    RL_CHECKPOINT_PATH=/app/rl/artifacts/checkpoint.zip \
-    RL_MANIFEST_PATH=/app/rl/artifacts/manifest.json
+    RL_CHECKPOINT_PATH=/app/rl/artifacts/gnn_ppo_v2_base.zip \
+    RL_MANIFEST_PATH=/app/rl/artifacts/manifest_phase3.json
 
 # Create unprivileged non-root user
 RUN groupadd -g 10001 plumora && \
@@ -28,8 +28,9 @@ RUN groupadd -g 10001 plumora && \
 # Copy virtual environment from builder
 COPY --from=builder --chown=plumora:plumora /app/.venv /app/.venv
 
-# Copy application code and RL artifacts
+# Copy application code, microservices entrypoints, and RL artifacts
 COPY --chown=plumora:plumora backend/app /app/backend/app
+COPY --chown=plumora:plumora backend/services /app/backend/services
 COPY --chown=plumora:plumora backend/pyproject.toml /app/backend/pyproject.toml
 COPY --chown=plumora:plumora rl/artifacts /app/rl/artifacts
 

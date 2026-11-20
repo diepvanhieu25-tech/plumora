@@ -1,5 +1,60 @@
 @import "tailwindcss";
 
+@theme {
+  --color-background: #f8faf7;
+  --color-surface: #f8faf7;
+  --color-surface-bright: #f8faf7;
+  --color-surface-dim: #d4dcd7;
+  --color-surface-variant: #dde4e0;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f1f5f1;
+  --color-surface-container: #eaefeb;
+  --color-surface-container-high: #e4eae5;
+  --color-surface-container-highest: #dde4e0;
+  --color-on-background: #2d3431;
+  --color-on-surface: #2d3431;
+  --color-on-surface-variant: #59615d;
+  --color-outline: #757c79;
+  --color-outline-variant: #acb4af;
+  --color-primary: #006e31;
+  --color-primary-dim: #00612a;
+  --color-on-primary: #e9ffe7;
+  --color-primary-container: #95f8a7;
+  --color-on-primary-container: #005f29;
+  --color-primary-fixed: #95f8a7;
+  --color-primary-fixed-dim: #87e99a;
+  --color-on-primary-fixed: #004a1e;
+  --color-on-primary-fixed-variant: #006a2f;
+  --color-secondary: #006b62;
+  --color-secondary-dim: #005e56;
+  --color-on-secondary: #e2fff9;
+  --color-secondary-container: #89f5e7;
+  --color-on-secondary-container: #005c54;
+  --color-secondary-fixed: #89f5e7;
+  --color-secondary-fixed-dim: #7ae7d8;
+  --color-on-secondary-fixed: #004841;
+  --color-on-secondary-fixed-variant: #00675e;
+  --color-tertiary: #914d00;
+  --color-tertiary-dim: #804300;
+  --color-on-tertiary: #fff7f4;
+  --color-tertiary-container: #fe932c;
+  --color-tertiary-fixed: #fe932c;
+  --color-tertiary-fixed-dim: #ed871e;
+  --color-on-tertiary-container: #4a2500;
+  --color-on-tertiary-fixed: #240f00;
+  --color-on-tertiary-fixed-variant: #572c00;
+  --color-error: #a73b21;
+  --color-error-dim: #791903;
+  --color-error-container: #fd795a;
+  --color-on-error: #fff7f6;
+  --color-on-error-container: #6e1400;
+  --color-inverse-surface: #0c0f0e;
+  --color-inverse-on-surface: #9b9e9b;
+  --color-inverse-primary: #98fba9;
+  --font-headline: "Plus Jakarta Sans", "Inter", system-ui, -apple-system, sans-serif;
+  --font-label: "Public Sans", "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+}
+
 :root {
   --bg-canvas: #F6F8F5;
   --bg-surface: #FFFFFF;

@@ -86,13 +86,12 @@ else
 fi
 
 echo "=== [6/6] Real Browser E2E Audit & Negative Control Verification ==="
-# 6.1 Real Chromium E2E Audit (must exit 0 with allChecksPassed=true)
-node scripts/audit_mvp_hardening.cjs
-node scripts/audit_product_realism.cjs
+# 6.1 Real Chromium E2E Audit (must exit 0)
+node scripts/audit_p3_slice1.cjs
 
 # 6.2 Negative Control Verification (must exit non-zero when conditions fail)
 echo "Running Negative-Control Audit probe (verifying failure detection)..."
-if node scripts/audit_mvp_hardening.cjs --negative-control > /dev/null 2>&1; then
+if node scripts/audit_p3_slice1.cjs --negative-control > /dev/null 2>&1; then
   echo "FATAL: Audit negative-control probe unexpectedly passed with exit 0!"
   exit 1
 else

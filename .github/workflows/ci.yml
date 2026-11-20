@@ -63,7 +63,7 @@ jobs:
 
       - name: 2. Type Check (Mypy & TypeScript)
         run: |
-          cd backend && uv run mypy app tests
+          cd backend && uv run mypy app services tests
           cd ../rl && uv run mypy src tests
           cd ../frontend && npm run typecheck
 
@@ -129,11 +129,16 @@ jobs:
             exit 1
           fi
           cd ..
-          node scripts/audit_mvp_hardening.cjs
+          node scripts/audit_p3_slice1.cjs
           echo "Running negative-control audit verification in CI..."
-          if node scripts/audit_mvp_hardening.cjs --negative-control > /dev/null 2>&1; then
+          if node scripts/audit_p3_slice1.cjs --negative-control > /dev/null 2>&1; then
             echo "FATAL: Negative-control probe unexpectedly passed!"
             exit 1
           else
             echo "Negative-control probe correctly failed with non-zero exit code as expected."
           fi
+
+      - name: 8. Validate Docker Compose Configuration
+        run: |
+          docker compose config --quiet
+          docker compose --profile microservices config --quiet

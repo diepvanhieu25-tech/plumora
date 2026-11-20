@@ -5,7 +5,7 @@ import { App } from '../App'
 describe('ENV-01 Frontend Smoke Suite', () => {
   it('renders the Botanical Sprout Plumora brand logo and zero emoji', () => {
     const { container } = render(<App />)
-    expect(screen.getByText(/Plumora — Lộ trình Backend RL/i)).toBeInTheDocument()
+    expect(screen.getByText(/Plumora — Học thích ứng Đa ngành/i)).toBeInTheDocument()
     expect(screen.getByTestId('env01-scaffold-ready')).toBeInTheDocument()
     expect(screen.getAllByAltText(/Plumora Logo/i).length).toBeGreaterThan(0)
     expect(container.querySelector('svg')).not.toBeNull()

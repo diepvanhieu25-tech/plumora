@@ -171,6 +171,57 @@ def get_learner_state_24d(
     )
 
 
+def _graph_redis_key(user_id: uuid.UUID, domain_slug: str) -> str:
+    return f"plumora:graph_state:{user_id}:{domain_slug}"
+
+
+def get_or_cache_graph_snapshot(
+    user_id: uuid.UUID,
+    domain_slug: str,
+    state_version: int,
+    computed_snapshot: list[list[float]],
+    *,
+    redis_url_override: str | None = None,
+) -> tuple[list[list[float]], str]:
+    """Read or warm N x 8 graph observation snapshot in Redis (F-G3-04).
+
+    Returns (snapshot, state_source) where state_source is:
+    - "redis_cache" when served from a fresh Redis cache entry
+    - "postgres_cache_warm" when Redis was healthy on miss and warmed
+    - "postgres_fallback" when Redis was unreachable or errored
+    """
+    client = _open_redis_client(redis_url_override)
+    key = _graph_redis_key(user_id, domain_slug)
+    try:
+        raw = client.get(key)
+        if isinstance(raw, str):
+            data = json.loads(raw)
+            cached_snap = data.get("snapshot")
+            if (
+                int(data.get("state_version", -1)) == state_version
+                and isinstance(cached_snap, list)
+                and len(cached_snap) == len(computed_snapshot)
+            ):
+                return cached_snap, "redis_cache"
+
+        client.set(
+            key,
+            json.dumps({"state_version": state_version, "snapshot": computed_snapshot}),
+            ex=settings.redis_state_ttl_seconds,
+        )
+        return computed_snapshot, "postgres_cache_warm"
+    except (redis.RedisError, OSError, ValueError, KeyError) as exc:
+        logger.warning(
+            "Redis graph snapshot cache unavailable for user %s/%s: %s",
+            user_id,
+            domain_slug,
+            exc,
+        )
+        return computed_snapshot, "postgres_fallback"
+    finally:
+        client.close()
+
+
 def get_missing_prerequisite_slugs(
     db: Session,
     user_id: uuid.UUID,

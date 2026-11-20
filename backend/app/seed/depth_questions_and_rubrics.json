@@ -1,0 +1,2952 @@
+{
+  "questions": [
+    {
+      "id": "df889fa2-cb4a-50b8-8106-664a42e7357c",
+      "concept_slug": "api-data",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Khái niệm] Mục đích cốt lõi của 'Kết nối API với Database & Query Patterns' trong hệ thống phần mềm là gì?",
+      "options": {
+        "A": "Cung cấp nền tảng chuẩn mực về n+1, join để hệ thống vận hành tin cậy.",
+        "B": "Thay thế hoàn toàn cơ sở dữ liệu quan hệ bằng biến toàn cục trong RAM.",
+        "C": "Bỏ qua kiểm tra dữ liệu đầu vào để giảm số dòng mã nguồn.",
+        "D": "Tắt mọi cơ chế bảo mật và ghi nhật ký để tăng tốc độ khởi động."
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "837c04eb-40a5-58c5-878f-5d8a253a753a",
+      "concept_slug": "api-data",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 2 — Cơ chế] Khi triển khai 'Kết nối API với Database & Query Patterns' đúng kỹ thuật, cơ chế nào sau đây quyết định tính đúng đắn?",
+      "options": {
+        "A": "Khởi tạo lại toàn bộ kết nối ở mỗi vòng lặp mà không giải phóng tài nguyên.",
+        "B": "Kiểm soát chặt chẽ pool, timeout kết hợp xử lý lỗi biên rõ ràng.",
+        "C": "Ghi đè trạng thái người dùng mà không kiểm tra phiên bản hoặc khóa.",
+        "D": "Lưu trực tiếp bí mật hệ thống vào mã nguồn phía trình duyệt."
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "29098f98-656a-5991-9510-65efeb7888d4",
+      "concept_slug": "api-data",
+      "depth_tier": 3,
+      "task_type": "troubleshooting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Chẩn đoán sự cố] Hệ thống sử dụng 'Kết nối API với Database & Query Patterns' đang gặp lỗi nghẽn hoặc sai lệch trạng thái khi tải tăng đột biến. Hãy nêu nguyên nhân gốc rễ và hướng xử lý cụ thể.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Xác định nguyên nhân gốc rễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "n+1",
+              "join",
+              "projection"
+            ]
+          },
+          {
+            "name": "Đề xuất biện pháp khắc phục",
+            "weight": 0.5,
+            "required_keywords": [
+              "pool",
+              "timeout",
+              "batch",
+              "pagination"
+            ]
+          }
+        ],
+        "reference_explanation": "Cần kiểm tra các yếu tố n+1, join, projection để khoanh vùng điểm nghẽn, sau đó áp dụng biện pháp pool, timeout, batch, pagination nhằm ổn định hệ thống."
+      }
+    },
+    {
+      "id": "c24729f0-2cb8-5fb2-80ec-9e5b3eb7d745",
+      "concept_slug": "api-data",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Đánh đổi kiến trúc] Nếu yêu cầu hệ thống thay đổi từ tải thấp sang 10x đồng thời với ràng buộc độ trễ p95 nghiêm ngặt cho 'Kết nối API với Database & Query Patterns', bạn sẽ đánh đổi phương án nào?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Phân tích đánh đổi kỹ thuật",
+            "weight": 0.5,
+            "required_keywords": [
+              "n+1",
+              "join",
+              "projection"
+            ]
+          },
+          {
+            "name": "Bảo toàn tính nhất quán & độ trễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "pool",
+              "timeout",
+              "batch",
+              "pagination"
+            ]
+          }
+        ],
+        "reference_explanation": "Khi mở rộng 10x cho Kết nối API với Database & Query Patterns, cần cân bằng giữa n+1, join, projection và pool, timeout, batch, pagination thay vì tối ưu cục bộ."
+      }
+    },
+    {
+      "id": "515ca3ef-c563-5922-9adb-939c81759a5b",
+      "concept_slug": "api-data",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Nội tại & Giải thích ngược] Hãy giải thích cơ chế nội tại sâu nhất của 'Kết nối API với Database & Query Patterns' như đang hướng dẫn một kỹ sư mới để tránh các bẫy vận hành nghiêm trọng.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Giải thích cơ chế nội tại",
+            "weight": 0.5,
+            "required_keywords": [
+              "n+1",
+              "join",
+              "projection"
+            ]
+          },
+          {
+            "name": "Cảnh báo bẫy vận hành thực tế",
+            "weight": 0.5,
+            "required_keywords": [
+              "pool",
+              "timeout",
+              "batch",
+              "pagination"
+            ]
+          }
+        ],
+        "reference_explanation": "Cơ chế nội tại của Kết nối API với Database & Query Patterns dựa trên n+1, join, projection; sai lầm phổ biến nhất là bỏ qua pool, timeout, batch, pagination."
+      }
+    },
+    {
+      "id": "741a6214-58f4-559e-8f88-32a496ccada4",
+      "concept_slug": "api-rest",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Khái niệm] Mục đích cốt lõi của 'Thiết kế RESTful API chuẩn' trong hệ thống phần mềm là gì?",
+      "options": {
+        "A": "Cung cấp nền tảng chuẩn mực về idempotency, stateless để hệ thống vận hành tin cậy.",
+        "B": "Thay thế hoàn toàn cơ sở dữ liệu quan hệ bằng biến toàn cục trong RAM.",
+        "C": "Bỏ qua kiểm tra dữ liệu đầu vào để giảm số dòng mã nguồn.",
+        "D": "Tắt mọi cơ chế bảo mật và ghi nhật ký để tăng tốc độ khởi động."
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "58c2e890-e31f-5118-98ba-f312fbd09c8b",
+      "concept_slug": "api-rest",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 2 — Cơ chế] Khi triển khai 'Thiết kế RESTful API chuẩn' đúng kỹ thuật, cơ chế nào sau đây quyết định tính đúng đắn?",
+      "options": {
+        "A": "Khởi tạo lại toàn bộ kết nối ở mỗi vòng lặp mà không giải phóng tài nguyên.",
+        "B": "Kiểm soát chặt chẽ pagination, cursor kết hợp xử lý lỗi biên rõ ràng.",
+        "C": "Ghi đè trạng thái người dùng mà không kiểm tra phiên bản hoặc khóa.",
+        "D": "Lưu trực tiếp bí mật hệ thống vào mã nguồn phía trình duyệt."
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "ba6ff1e7-4859-5fb9-92cf-4c6e1d4f519a",
+      "concept_slug": "api-rest",
+      "depth_tier": 3,
+      "task_type": "troubleshooting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Chẩn đoán sự cố] Hệ thống sử dụng 'Thiết kế RESTful API chuẩn' đang gặp lỗi nghẽn hoặc sai lệch trạng thái khi tải tăng đột biến. Hãy nêu nguyên nhân gốc rễ và hướng xử lý cụ thể.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Xác định nguyên nhân gốc rễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "idempotency",
+              "stateless",
+              "status"
+            ]
+          },
+          {
+            "name": "Đề xuất biện pháp khắc phục",
+            "weight": 0.5,
+            "required_keywords": [
+              "pagination",
+              "cursor",
+              "409",
+              "retry"
+            ]
+          }
+        ],
+        "reference_explanation": "Cần kiểm tra các yếu tố idempotency, stateless, status để khoanh vùng điểm nghẽn, sau đó áp dụng biện pháp pagination, cursor, 409, retry nhằm ổn định hệ thống."
+      }
+    },
+    {
+      "id": "83d05143-ff12-55f2-8269-2c8dfee356d5",
+      "concept_slug": "api-rest",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Đánh đổi kiến trúc] Nếu yêu cầu hệ thống thay đổi từ tải thấp sang 10x đồng thời với ràng buộc độ trễ p95 nghiêm ngặt cho 'Thiết kế RESTful API chuẩn', bạn sẽ đánh đổi phương án nào?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Phân tích đánh đổi kỹ thuật",
+            "weight": 0.5,
+            "required_keywords": [
+              "idempotency",
+              "stateless",
+              "status"
+            ]
+          },
+          {
+            "name": "Bảo toàn tính nhất quán & độ trễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "pagination",
+              "cursor",
+              "409",
+              "retry"
+            ]
+          }
+        ],
+        "reference_explanation": "Khi mở rộng 10x cho Thiết kế RESTful API chuẩn, cần cân bằng giữa idempotency, stateless, status và pagination, cursor, 409, retry thay vì tối ưu cục bộ."
+      }
+    },
+    {
+      "id": "de0d87e1-5d01-578c-81ce-c5c6ddd4d9cd",
+      "concept_slug": "api-rest",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Nội tại & Giải thích ngược] Hãy giải thích cơ chế nội tại sâu nhất của 'Thiết kế RESTful API chuẩn' như đang hướng dẫn một kỹ sư mới để tránh các bẫy vận hành nghiêm trọng.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Giải thích cơ chế nội tại",
+            "weight": 0.5,
+            "required_keywords": [
+              "idempotency",
+              "stateless",
+              "status"
+            ]
+          },
+          {
+            "name": "Cảnh báo bẫy vận hành thực tế",
+            "weight": 0.5,
+            "required_keywords": [
+              "pagination",
+              "cursor",
+              "409",
+              "retry"
+            ]
+          }
+        ],
+        "reference_explanation": "Cơ chế nội tại của Thiết kế RESTful API chuẩn dựa trên idempotency, stateless, status; sai lầm phổ biến nhất là bỏ qua pagination, cursor, 409, retry."
+      }
+    },
+    {
+      "id": "bc9d2b67-bfba-56a0-b608-bc9d48e68149",
+      "concept_slug": "api-validation",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Khái niệm] Mục đích cốt lõi của 'Validation, Serialization & Xử lý lỗi API' trong hệ thống phần mềm là gì?",
+      "options": {
+        "A": "Cung cấp nền tảng chuẩn mực về schema, pydantic để hệ thống vận hành tin cậy.",
+        "B": "Thay thế hoàn toàn cơ sở dữ liệu quan hệ bằng biến toàn cục trong RAM.",
+        "C": "Bỏ qua kiểm tra dữ liệu đầu vào để giảm số dòng mã nguồn.",
+        "D": "Tắt mọi cơ chế bảo mật và ghi nhật ký để tăng tốc độ khởi động."
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "4636c40d-22b3-5c5f-96ab-79ff577f6bb7",
+      "concept_slug": "api-validation",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 2 — Cơ chế] Khi triển khai 'Validation, Serialization & Xử lý lỗi API' đúng kỹ thuật, cơ chế nào sau đây quyết định tính đúng đắn?",
+      "options": {
+        "A": "Khởi tạo lại toàn bộ kết nối ở mỗi vòng lặp mà không giải phóng tài nguyên.",
+        "B": "Kiểm soát chặt chẽ 422, boundary kết hợp xử lý lỗi biên rõ ràng.",
+        "C": "Ghi đè trạng thái người dùng mà không kiểm tra phiên bản hoặc khóa.",
+        "D": "Lưu trực tiếp bí mật hệ thống vào mã nguồn phía trình duyệt."
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "1dabbb8b-332d-5508-99f9-458e16f2d65e",
+      "concept_slug": "api-validation",
+      "depth_tier": 3,
+      "task_type": "troubleshooting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Chẩn đoán sự cố] Hệ thống sử dụng 'Validation, Serialization & Xử lý lỗi API' đang gặp lỗi nghẽn hoặc sai lệch trạng thái khi tải tăng đột biến. Hãy nêu nguyên nhân gốc rễ và hướng xử lý cụ thể.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Xác định nguyên nhân gốc rễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "schema",
+              "pydantic",
+              "sanitize"
+            ]
+          },
+          {
+            "name": "Đề xuất biện pháp khắc phục",
+            "weight": 0.5,
+            "required_keywords": [
+              "422",
+              "boundary",
+              "allowlist",
+              "type"
+            ]
+          }
+        ],
+        "reference_explanation": "Cần kiểm tra các yếu tố schema, pydantic, sanitize để khoanh vùng điểm nghẽn, sau đó áp dụng biện pháp 422, boundary, allowlist, type nhằm ổn định hệ thống."
+      }
+    },
+    {
+      "id": "c32fb254-6cbf-5e52-a484-c9f5c09f7fb1",
+      "concept_slug": "api-validation",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Đánh đổi kiến trúc] Nếu yêu cầu hệ thống thay đổi từ tải thấp sang 10x đồng thời với ràng buộc độ trễ p95 nghiêm ngặt cho 'Validation, Serialization & Xử lý lỗi API', bạn sẽ đánh đổi phương án nào?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Phân tích đánh đổi kỹ thuật",
+            "weight": 0.5,
+            "required_keywords": [
+              "schema",
+              "pydantic",
+              "sanitize"
+            ]
+          },
+          {
+            "name": "Bảo toàn tính nhất quán & độ trễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "422",
+              "boundary",
+              "allowlist",
+              "type"
+            ]
+          }
+        ],
+        "reference_explanation": "Khi mở rộng 10x cho Validation, Serialization & Xử lý lỗi API, cần cân bằng giữa schema, pydantic, sanitize và 422, boundary, allowlist, type thay vì tối ưu cục bộ."
+      }
+    },
+    {
+      "id": "71cbcb3b-f2ab-5fe0-89d4-a620478783a3",
+      "concept_slug": "api-validation",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Nội tại & Giải thích ngược] Hãy giải thích cơ chế nội tại sâu nhất của 'Validation, Serialization & Xử lý lỗi API' như đang hướng dẫn một kỹ sư mới để tránh các bẫy vận hành nghiêm trọng.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Giải thích cơ chế nội tại",
+            "weight": 0.5,
+            "required_keywords": [
+              "schema",
+              "pydantic",
+              "sanitize"
+            ]
+          },
+          {
+            "name": "Cảnh báo bẫy vận hành thực tế",
+            "weight": 0.5,
+            "required_keywords": [
+              "422",
+              "boundary",
+              "allowlist",
+              "type"
+            ]
+          }
+        ],
+        "reference_explanation": "Cơ chế nội tại của Validation, Serialization & Xử lý lỗi API dựa trên schema, pydantic, sanitize; sai lầm phổ biến nhất là bỏ qua 422, boundary, allowlist, type."
+      }
+    },
+    {
+      "id": "13121abe-9567-5cef-bec2-d395a316643a",
+      "concept_slug": "cache-redis",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Khái niệm] Mục đích cốt lõi của 'Caching & Quản lý State với Redis' trong hệ thống phần mềm là gì?",
+      "options": {
+        "A": "Cung cấp nền tảng chuẩn mực về ttl, eviction để hệ thống vận hành tin cậy.",
+        "B": "Thay thế hoàn toàn cơ sở dữ liệu quan hệ bằng biến toàn cục trong RAM.",
+        "C": "Bỏ qua kiểm tra dữ liệu đầu vào để giảm số dòng mã nguồn.",
+        "D": "Tắt mọi cơ chế bảo mật và ghi nhật ký để tăng tốc độ khởi động."
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "3f6099f5-d697-50a5-a0dc-9f44cf46c088",
+      "concept_slug": "cache-redis",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 2 — Cơ chế] Khi triển khai 'Caching & Quản lý State với Redis' đúng kỹ thuật, cơ chế nào sau đây quyết định tính đúng đắn?",
+      "options": {
+        "A": "Khởi tạo lại toàn bộ kết nối ở mỗi vòng lặp mà không giải phóng tài nguyên.",
+        "B": "Kiểm soát chặt chẽ lru, rdb kết hợp xử lý lỗi biên rõ ràng.",
+        "C": "Ghi đè trạng thái người dùng mà không kiểm tra phiên bản hoặc khóa.",
+        "D": "Lưu trực tiếp bí mật hệ thống vào mã nguồn phía trình duyệt."
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "f0bb8b21-859f-5603-bef0-f1a903a5524f",
+      "concept_slug": "cache-redis",
+      "depth_tier": 3,
+      "task_type": "troubleshooting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Chẩn đoán sự cố] Hệ thống sử dụng 'Caching & Quản lý State với Redis' đang gặp lỗi nghẽn hoặc sai lệch trạng thái khi tải tăng đột biến. Hãy nêu nguyên nhân gốc rễ và hướng xử lý cụ thể.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Xác định nguyên nhân gốc rễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "ttl",
+              "eviction",
+              "stampede"
+            ]
+          },
+          {
+            "name": "Đề xuất biện pháp khắc phục",
+            "weight": 0.5,
+            "required_keywords": [
+              "lru",
+              "rdb",
+              "aof",
+              "lock"
+            ]
+          }
+        ],
+        "reference_explanation": "Cần kiểm tra các yếu tố ttl, eviction, stampede để khoanh vùng điểm nghẽn, sau đó áp dụng biện pháp lru, rdb, aof, lock nhằm ổn định hệ thống."
+      }
+    },
+    {
+      "id": "69f443f5-7a09-5cb1-86fd-475be993ff43",
+      "concept_slug": "cache-redis",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Đánh đổi kiến trúc] Nếu yêu cầu hệ thống thay đổi từ tải thấp sang 10x đồng thời với ràng buộc độ trễ p95 nghiêm ngặt cho 'Caching & Quản lý State với Redis', bạn sẽ đánh đổi phương án nào?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Phân tích đánh đổi kỹ thuật",
+            "weight": 0.5,
+            "required_keywords": [
+              "ttl",
+              "eviction",
+              "stampede"
+            ]
+          },
+          {
+            "name": "Bảo toàn tính nhất quán & độ trễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "lru",
+              "rdb",
+              "aof",
+              "lock"
+            ]
+          }
+        ],
+        "reference_explanation": "Khi mở rộng 10x cho Caching & Quản lý State với Redis, cần cân bằng giữa ttl, eviction, stampede và lru, rdb, aof, lock thay vì tối ưu cục bộ."
+      }
+    },
+    {
+      "id": "3e365bc8-4e08-5c2e-a0ba-ff583de3e32e",
+      "concept_slug": "cache-redis",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Nội tại & Giải thích ngược] Hãy giải thích cơ chế nội tại sâu nhất của 'Caching & Quản lý State với Redis' như đang hướng dẫn một kỹ sư mới để tránh các bẫy vận hành nghiêm trọng.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Giải thích cơ chế nội tại",
+            "weight": 0.5,
+            "required_keywords": [
+              "ttl",
+              "eviction",
+              "stampede"
+            ]
+          },
+          {
+            "name": "Cảnh báo bẫy vận hành thực tế",
+            "weight": 0.5,
+            "required_keywords": [
+              "lru",
+              "rdb",
+              "aof",
+              "lock"
+            ]
+          }
+        ],
+        "reference_explanation": "Cơ chế nội tại của Caching & Quản lý State với Redis dựa trên ttl, eviction, stampede; sai lầm phổ biến nhất là bỏ qua lru, rdb, aof, lock."
+      }
+    },
+    {
+      "id": "14ce908e-5f4e-5c32-861d-5258c20c35f9",
+      "concept_slug": "ci-cd-pipelines",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Khái niệm] Mục đích cốt lõi của 'Tự động hóa Kiểm thử, Build Artifact & Đường ống CI/CD' trong hệ thống phần mềm là gì?",
+      "options": {
+        "A": "Cung cấp nền tảng chuẩn mực về lint, test để hệ thống vận hành tin cậy.",
+        "B": "Thay thế hoàn toàn cơ sở dữ liệu quan hệ bằng biến toàn cục trong RAM.",
+        "C": "Bỏ qua kiểm tra dữ liệu đầu vào để giảm số dòng mã nguồn.",
+        "D": "Tắt mọi cơ chế bảo mật và ghi nhật ký để tăng tốc độ khởi động."
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "8e0c1e55-3346-5edb-8452-7b902de7101b",
+      "concept_slug": "ci-cd-pipelines",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 2 — Cơ chế] Khi triển khai 'Tự động hóa Kiểm thử, Build Artifact & Đường ống CI/CD' đúng kỹ thuật, cơ chế nào sau đây quyết định tính đúng đắn?",
+      "options": {
+        "A": "Khởi tạo lại toàn bộ kết nối ở mỗi vòng lặp mà không giải phóng tài nguyên.",
+        "B": "Kiểm soát chặt chẽ immutable, rollback kết hợp xử lý lỗi biên rõ ràng.",
+        "C": "Ghi đè trạng thái người dùng mà không kiểm tra phiên bản hoặc khóa.",
+        "D": "Lưu trực tiếp bí mật hệ thống vào mã nguồn phía trình duyệt."
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "f9bbb3d2-21e8-5856-afa7-b6a90ec13b1b",
+      "concept_slug": "ci-cd-pipelines",
+      "depth_tier": 3,
+      "task_type": "troubleshooting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Chẩn đoán sự cố] Hệ thống sử dụng 'Tự động hóa Kiểm thử, Build Artifact & Đường ống CI/CD' đang gặp lỗi nghẽn hoặc sai lệch trạng thái khi tải tăng đột biến. Hãy nêu nguyên nhân gốc rễ và hướng xử lý cụ thể.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Xác định nguyên nhân gốc rễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "lint",
+              "test",
+              "artifact"
+            ]
+          },
+          {
+            "name": "Đề xuất biện pháp khắc phục",
+            "weight": 0.5,
+            "required_keywords": [
+              "immutable",
+              "rollback",
+              "sha",
+              "gate"
+            ]
+          }
+        ],
+        "reference_explanation": "Cần kiểm tra các yếu tố lint, test, artifact để khoanh vùng điểm nghẽn, sau đó áp dụng biện pháp immutable, rollback, sha, gate nhằm ổn định hệ thống."
+      }
+    },
+    {
+      "id": "baac606b-8177-584d-a51b-6675af292dec",
+      "concept_slug": "ci-cd-pipelines",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Đánh đổi kiến trúc] Nếu yêu cầu hệ thống thay đổi từ tải thấp sang 10x đồng thời với ràng buộc độ trễ p95 nghiêm ngặt cho 'Tự động hóa Kiểm thử, Build Artifact & Đường ống CI/CD', bạn sẽ đánh đổi phương án nào?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Phân tích đánh đổi kỹ thuật",
+            "weight": 0.5,
+            "required_keywords": [
+              "lint",
+              "test",
+              "artifact"
+            ]
+          },
+          {
+            "name": "Bảo toàn tính nhất quán & độ trễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "immutable",
+              "rollback",
+              "sha",
+              "gate"
+            ]
+          }
+        ],
+        "reference_explanation": "Khi mở rộng 10x cho Tự động hóa Kiểm thử, Build Artifact & Đường ống CI/CD, cần cân bằng giữa lint, test, artifact và immutable, rollback, sha, gate thay vì tối ưu cục bộ."
+      }
+    },
+    {
+      "id": "20f6b7b1-19c4-5bd0-864c-1b8eee92de12",
+      "concept_slug": "ci-cd-pipelines",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Nội tại & Giải thích ngược] Hãy giải thích cơ chế nội tại sâu nhất của 'Tự động hóa Kiểm thử, Build Artifact & Đường ống CI/CD' như đang hướng dẫn một kỹ sư mới để tránh các bẫy vận hành nghiêm trọng.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Giải thích cơ chế nội tại",
+            "weight": 0.5,
+            "required_keywords": [
+              "lint",
+              "test",
+              "artifact"
+            ]
+          },
+          {
+            "name": "Cảnh báo bẫy vận hành thực tế",
+            "weight": 0.5,
+            "required_keywords": [
+              "immutable",
+              "rollback",
+              "sha",
+              "gate"
+            ]
+          }
+        ],
+        "reference_explanation": "Cơ chế nội tại của Tự động hóa Kiểm thử, Build Artifact & Đường ống CI/CD dựa trên lint, test, artifact; sai lầm phổ biến nhất là bỏ qua immutable, rollback, sha, gate."
+      }
+    },
+    {
+      "id": "31afdf4a-9cc9-5a07-9b62-3a309b33e44c",
+      "concept_slug": "db-nosql",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Khái niệm] Mục đích cốt lõi của 'CSDL NoSQL (Document & Key-Value Store)' trong hệ thống phần mềm là gì?",
+      "options": {
+        "A": "Cung cấp nền tảng chuẩn mực về partition, sharding để hệ thống vận hành tin cậy.",
+        "B": "Thay thế hoàn toàn cơ sở dữ liệu quan hệ bằng biến toàn cục trong RAM.",
+        "C": "Bỏ qua kiểm tra dữ liệu đầu vào để giảm số dòng mã nguồn.",
+        "D": "Tắt mọi cơ chế bảo mật và ghi nhật ký để tăng tốc độ khởi động."
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "153ccf2e-c8b2-5451-8721-495a1f311b15",
+      "concept_slug": "db-nosql",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 2 — Cơ chế] Khi triển khai 'CSDL NoSQL (Document & Key-Value Store)' đúng kỹ thuật, cơ chế nào sau đây quyết định tính đúng đắn?",
+      "options": {
+        "A": "Khởi tạo lại toàn bộ kết nối ở mỗi vòng lặp mà không giải phóng tài nguyên.",
+        "B": "Kiểm soát chặt chẽ eventual, consistency kết hợp xử lý lỗi biên rõ ràng.",
+        "C": "Ghi đè trạng thái người dùng mà không kiểm tra phiên bản hoặc khóa.",
+        "D": "Lưu trực tiếp bí mật hệ thống vào mã nguồn phía trình duyệt."
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "e5251a81-e0d5-5625-9845-c345fba7687c",
+      "concept_slug": "db-nosql",
+      "depth_tier": 3,
+      "task_type": "troubleshooting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Chẩn đoán sự cố] Hệ thống sử dụng 'CSDL NoSQL (Document & Key-Value Store)' đang gặp lỗi nghẽn hoặc sai lệch trạng thái khi tải tăng đột biến. Hãy nêu nguyên nhân gốc rễ và hướng xử lý cụ thể.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Xác định nguyên nhân gốc rễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "partition",
+              "sharding",
+              "cap"
+            ]
+          },
+          {
+            "name": "Đề xuất biện pháp khắc phục",
+            "weight": 0.5,
+            "required_keywords": [
+              "eventual",
+              "consistency",
+              "latency",
+              "key"
+            ]
+          }
+        ],
+        "reference_explanation": "Cần kiểm tra các yếu tố partition, sharding, cap để khoanh vùng điểm nghẽn, sau đó áp dụng biện pháp eventual, consistency, latency, key nhằm ổn định hệ thống."
+      }
+    },
+    {
+      "id": "14a246d8-9afd-5cb8-b2a7-0a32691dd510",
+      "concept_slug": "db-nosql",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Đánh đổi kiến trúc] Nếu yêu cầu hệ thống thay đổi từ tải thấp sang 10x đồng thời với ràng buộc độ trễ p95 nghiêm ngặt cho 'CSDL NoSQL (Document & Key-Value Store)', bạn sẽ đánh đổi phương án nào?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Phân tích đánh đổi kỹ thuật",
+            "weight": 0.5,
+            "required_keywords": [
+              "partition",
+              "sharding",
+              "cap"
+            ]
+          },
+          {
+            "name": "Bảo toàn tính nhất quán & độ trễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "eventual",
+              "consistency",
+              "latency",
+              "key"
+            ]
+          }
+        ],
+        "reference_explanation": "Khi mở rộng 10x cho CSDL NoSQL (Document & Key-Value Store), cần cân bằng giữa partition, sharding, cap và eventual, consistency, latency, key thay vì tối ưu cục bộ."
+      }
+    },
+    {
+      "id": "47ef884f-0f8c-52b9-9c4c-cb43e53963fe",
+      "concept_slug": "db-nosql",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Nội tại & Giải thích ngược] Hãy giải thích cơ chế nội tại sâu nhất của 'CSDL NoSQL (Document & Key-Value Store)' như đang hướng dẫn một kỹ sư mới để tránh các bẫy vận hành nghiêm trọng.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Giải thích cơ chế nội tại",
+            "weight": 0.5,
+            "required_keywords": [
+              "partition",
+              "sharding",
+              "cap"
+            ]
+          },
+          {
+            "name": "Cảnh báo bẫy vận hành thực tế",
+            "weight": 0.5,
+            "required_keywords": [
+              "eventual",
+              "consistency",
+              "latency",
+              "key"
+            ]
+          }
+        ],
+        "reference_explanation": "Cơ chế nội tại của CSDL NoSQL (Document & Key-Value Store) dựa trên partition, sharding, cap; sai lầm phổ biến nhất là bỏ qua eventual, consistency, latency, key."
+      }
+    },
+    {
+      "id": "acc6b57d-9337-5cf7-98f9-856317f8d568",
+      "concept_slug": "db-relational",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Khái niệm] Mục đích cốt lõi của 'CSDL Quan hệ & SQL cơ bản' trong hệ thống phần mềm là gì?",
+      "options": {
+        "A": "Cung cấp nền tảng chuẩn mực về index, btree để hệ thống vận hành tin cậy.",
+        "B": "Thay thế hoàn toàn cơ sở dữ liệu quan hệ bằng biến toàn cục trong RAM.",
+        "C": "Bỏ qua kiểm tra dữ liệu đầu vào để giảm số dòng mã nguồn.",
+        "D": "Tắt mọi cơ chế bảo mật và ghi nhật ký để tăng tốc độ khởi động."
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "d080b989-ae05-58e7-ac53-27406ba9661b",
+      "concept_slug": "db-relational",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 2 — Cơ chế] Khi triển khai 'CSDL Quan hệ & SQL cơ bản' đúng kỹ thuật, cơ chế nào sau đây quyết định tính đúng đắn?",
+      "options": {
+        "A": "Khởi tạo lại toàn bộ kết nối ở mỗi vòng lặp mà không giải phóng tài nguyên.",
+        "B": "Kiểm soát chặt chẽ join, scan kết hợp xử lý lỗi biên rõ ràng.",
+        "C": "Ghi đè trạng thái người dùng mà không kiểm tra phiên bản hoặc khóa.",
+        "D": "Lưu trực tiếp bí mật hệ thống vào mã nguồn phía trình duyệt."
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "3f008f18-9f46-578d-930f-58375c53a7a9",
+      "concept_slug": "db-relational",
+      "depth_tier": 3,
+      "task_type": "troubleshooting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Chẩn đoán sự cố] Hệ thống sử dụng 'CSDL Quan hệ & SQL cơ bản' đang gặp lỗi nghẽn hoặc sai lệch trạng thái khi tải tăng đột biến. Hãy nêu nguyên nhân gốc rễ và hướng xử lý cụ thể.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Xác định nguyên nhân gốc rễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "index",
+              "btree",
+              "acid"
+            ]
+          },
+          {
+            "name": "Đề xuất biện pháp khắc phục",
+            "weight": 0.5,
+            "required_keywords": [
+              "join",
+              "scan",
+              "cardinality",
+              "lock"
+            ]
+          }
+        ],
+        "reference_explanation": "Cần kiểm tra các yếu tố index, btree, acid để khoanh vùng điểm nghẽn, sau đó áp dụng biện pháp join, scan, cardinality, lock nhằm ổn định hệ thống."
+      }
+    },
+    {
+      "id": "350fe42f-8253-56fe-92a2-960e62bea52f",
+      "concept_slug": "db-relational",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Đánh đổi kiến trúc] Nếu yêu cầu hệ thống thay đổi từ tải thấp sang 10x đồng thời với ràng buộc độ trễ p95 nghiêm ngặt cho 'CSDL Quan hệ & SQL cơ bản', bạn sẽ đánh đổi phương án nào?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Phân tích đánh đổi kỹ thuật",
+            "weight": 0.5,
+            "required_keywords": [
+              "index",
+              "btree",
+              "acid"
+            ]
+          },
+          {
+            "name": "Bảo toàn tính nhất quán & độ trễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "join",
+              "scan",
+              "cardinality",
+              "lock"
+            ]
+          }
+        ],
+        "reference_explanation": "Khi mở rộng 10x cho CSDL Quan hệ & SQL cơ bản, cần cân bằng giữa index, btree, acid và join, scan, cardinality, lock thay vì tối ưu cục bộ."
+      }
+    },
+    {
+      "id": "28567bbe-8a15-5836-b9e3-caaf9b0c05d7",
+      "concept_slug": "db-relational",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Nội tại & Giải thích ngược] Hãy giải thích cơ chế nội tại sâu nhất của 'CSDL Quan hệ & SQL cơ bản' như đang hướng dẫn một kỹ sư mới để tránh các bẫy vận hành nghiêm trọng.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Giải thích cơ chế nội tại",
+            "weight": 0.5,
+            "required_keywords": [
+              "index",
+              "btree",
+              "acid"
+            ]
+          },
+          {
+            "name": "Cảnh báo bẫy vận hành thực tế",
+            "weight": 0.5,
+            "required_keywords": [
+              "join",
+              "scan",
+              "cardinality",
+              "lock"
+            ]
+          }
+        ],
+        "reference_explanation": "Cơ chế nội tại của CSDL Quan hệ & SQL cơ bản dựa trên index, btree, acid; sai lầm phổ biến nhất là bỏ qua join, scan, cardinality, lock."
+      }
+    },
+    {
+      "id": "69fabf8a-6814-5d39-9436-848a296de546",
+      "concept_slug": "db-transactions",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Khái niệm] Mục đích cốt lõi của 'Transaction (ACID) & Indexing trong RDBMS' trong hệ thống phần mềm là gì?",
+      "options": {
+        "A": "Cung cấp nền tảng chuẩn mực về acid, isolation để hệ thống vận hành tin cậy.",
+        "B": "Thay thế hoàn toàn cơ sở dữ liệu quan hệ bằng biến toàn cục trong RAM.",
+        "C": "Bỏ qua kiểm tra dữ liệu đầu vào để giảm số dòng mã nguồn.",
+        "D": "Tắt mọi cơ chế bảo mật và ghi nhật ký để tăng tốc độ khởi động."
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "3fd837c7-b319-5eb9-9145-5bf8aca92e1c",
+      "concept_slug": "db-transactions",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 2 — Cơ chế] Khi triển khai 'Transaction (ACID) & Indexing trong RDBMS' đúng kỹ thuật, cơ chế nào sau đây quyết định tính đúng đắn?",
+      "options": {
+        "A": "Khởi tạo lại toàn bộ kết nối ở mỗi vòng lặp mà không giải phóng tài nguyên.",
+        "B": "Kiểm soát chặt chẽ deadlock, phantom kết hợp xử lý lỗi biên rõ ràng.",
+        "C": "Ghi đè trạng thái người dùng mà không kiểm tra phiên bản hoặc khóa.",
+        "D": "Lưu trực tiếp bí mật hệ thống vào mã nguồn phía trình duyệt."
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "741d235f-81a4-572b-a342-76ebbe4f88a9",
+      "concept_slug": "db-transactions",
+      "depth_tier": 3,
+      "task_type": "troubleshooting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Chẩn đoán sự cố] Hệ thống sử dụng 'Transaction (ACID) & Indexing trong RDBMS' đang gặp lỗi nghẽn hoặc sai lệch trạng thái khi tải tăng đột biến. Hãy nêu nguyên nhân gốc rễ và hướng xử lý cụ thể.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Xác định nguyên nhân gốc rễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "acid",
+              "isolation",
+              "lock"
+            ]
+          },
+          {
+            "name": "Đề xuất biện pháp khắc phục",
+            "weight": 0.5,
+            "required_keywords": [
+              "deadlock",
+              "phantom",
+              "serializable",
+              "mvcc"
+            ]
+          }
+        ],
+        "reference_explanation": "Cần kiểm tra các yếu tố acid, isolation, lock để khoanh vùng điểm nghẽn, sau đó áp dụng biện pháp deadlock, phantom, serializable, mvcc nhằm ổn định hệ thống."
+      }
+    },
+    {
+      "id": "820b4a40-012b-5ee9-b4c9-60ec1d7630b7",
+      "concept_slug": "db-transactions",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Đánh đổi kiến trúc] Nếu yêu cầu hệ thống thay đổi từ tải thấp sang 10x đồng thời với ràng buộc độ trễ p95 nghiêm ngặt cho 'Transaction (ACID) & Indexing trong RDBMS', bạn sẽ đánh đổi phương án nào?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Phân tích đánh đổi kỹ thuật",
+            "weight": 0.5,
+            "required_keywords": [
+              "acid",
+              "isolation",
+              "lock"
+            ]
+          },
+          {
+            "name": "Bảo toàn tính nhất quán & độ trễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "deadlock",
+              "phantom",
+              "serializable",
+              "mvcc"
+            ]
+          }
+        ],
+        "reference_explanation": "Khi mở rộng 10x cho Transaction (ACID) & Indexing trong RDBMS, cần cân bằng giữa acid, isolation, lock và deadlock, phantom, serializable, mvcc thay vì tối ưu cục bộ."
+      }
+    },
+    {
+      "id": "5c8276ea-c10f-500a-9a7a-4469c99caaec",
+      "concept_slug": "db-transactions",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Nội tại & Giải thích ngược] Hãy giải thích cơ chế nội tại sâu nhất của 'Transaction (ACID) & Indexing trong RDBMS' như đang hướng dẫn một kỹ sư mới để tránh các bẫy vận hành nghiêm trọng.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Giải thích cơ chế nội tại",
+            "weight": 0.5,
+            "required_keywords": [
+              "acid",
+              "isolation",
+              "lock"
+            ]
+          },
+          {
+            "name": "Cảnh báo bẫy vận hành thực tế",
+            "weight": 0.5,
+            "required_keywords": [
+              "deadlock",
+              "phantom",
+              "serializable",
+              "mvcc"
+            ]
+          }
+        ],
+        "reference_explanation": "Cơ chế nội tại của Transaction (ACID) & Indexing trong RDBMS dựa trên acid, isolation, lock; sai lầm phổ biến nhất là bỏ qua deadlock, phantom, serializable, mvcc."
+      }
+    },
+    {
+      "id": "f0d9e2ff-43eb-5bab-9fe4-576058db1bb5",
+      "concept_slug": "docker-containers",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Khái niệm] Mục đích cốt lõi của 'Ảo hóa mức OS, Namespaces/Cgroups & Đóng gói Docker Container' trong hệ thống phần mềm là gì?",
+      "options": {
+        "A": "Cung cấp nền tảng chuẩn mực về namespace, cgroup để hệ thống vận hành tin cậy.",
+        "B": "Thay thế hoàn toàn cơ sở dữ liệu quan hệ bằng biến toàn cục trong RAM.",
+        "C": "Bỏ qua kiểm tra dữ liệu đầu vào để giảm số dòng mã nguồn.",
+        "D": "Tắt mọi cơ chế bảo mật và ghi nhật ký để tăng tốc độ khởi động."
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "bcebe033-fc34-5583-b3f3-2d1b7baf85d6",
+      "concept_slug": "docker-containers",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 2 — Cơ chế] Khi triển khai 'Ảo hóa mức OS, Namespaces/Cgroups & Đóng gói Docker Container' đúng kỹ thuật, cơ chế nào sau đây quyết định tính đúng đắn?",
+      "options": {
+        "A": "Khởi tạo lại toàn bộ kết nối ở mỗi vòng lặp mà không giải phóng tài nguyên.",
+        "B": "Kiểm soát chặt chẽ layer, non-root kết hợp xử lý lỗi biên rõ ràng.",
+        "C": "Ghi đè trạng thái người dùng mà không kiểm tra phiên bản hoặc khóa.",
+        "D": "Lưu trực tiếp bí mật hệ thống vào mã nguồn phía trình duyệt."
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "3d86b00d-1d19-55d9-bdbe-ba4b328d76be",
+      "concept_slug": "docker-containers",
+      "depth_tier": 3,
+      "task_type": "troubleshooting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Chẩn đoán sự cố] Hệ thống sử dụng 'Ảo hóa mức OS, Namespaces/Cgroups & Đóng gói Docker Container' đang gặp lỗi nghẽn hoặc sai lệch trạng thái khi tải tăng đột biến. Hãy nêu nguyên nhân gốc rễ và hướng xử lý cụ thể.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Xác định nguyên nhân gốc rễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "namespace",
+              "cgroup",
+              "image"
+            ]
+          },
+          {
+            "name": "Đề xuất biện pháp khắc phục",
+            "weight": 0.5,
+            "required_keywords": [
+              "layer",
+              "non-root",
+              "pids",
+              "oom"
+            ]
+          }
+        ],
+        "reference_explanation": "Cần kiểm tra các yếu tố namespace, cgroup, image để khoanh vùng điểm nghẽn, sau đó áp dụng biện pháp layer, non-root, pids, oom nhằm ổn định hệ thống."
+      }
+    },
+    {
+      "id": "d3165a6f-4615-54af-9f17-083e8f2d03ae",
+      "concept_slug": "docker-containers",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Đánh đổi kiến trúc] Nếu yêu cầu hệ thống thay đổi từ tải thấp sang 10x đồng thời với ràng buộc độ trễ p95 nghiêm ngặt cho 'Ảo hóa mức OS, Namespaces/Cgroups & Đóng gói Docker Container', bạn sẽ đánh đổi phương án nào?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Phân tích đánh đổi kỹ thuật",
+            "weight": 0.5,
+            "required_keywords": [
+              "namespace",
+              "cgroup",
+              "image"
+            ]
+          },
+          {
+            "name": "Bảo toàn tính nhất quán & độ trễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "layer",
+              "non-root",
+              "pids",
+              "oom"
+            ]
+          }
+        ],
+        "reference_explanation": "Khi mở rộng 10x cho Ảo hóa mức OS, Namespaces/Cgroups & Đóng gói Docker Container, cần cân bằng giữa namespace, cgroup, image và layer, non-root, pids, oom thay vì tối ưu cục bộ."
+      }
+    },
+    {
+      "id": "20272ddb-8352-5a72-bd6d-d70043e4f171",
+      "concept_slug": "docker-containers",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Nội tại & Giải thích ngược] Hãy giải thích cơ chế nội tại sâu nhất của 'Ảo hóa mức OS, Namespaces/Cgroups & Đóng gói Docker Container' như đang hướng dẫn một kỹ sư mới để tránh các bẫy vận hành nghiêm trọng.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Giải thích cơ chế nội tại",
+            "weight": 0.5,
+            "required_keywords": [
+              "namespace",
+              "cgroup",
+              "image"
+            ]
+          },
+          {
+            "name": "Cảnh báo bẫy vận hành thực tế",
+            "weight": 0.5,
+            "required_keywords": [
+              "layer",
+              "non-root",
+              "pids",
+              "oom"
+            ]
+          }
+        ],
+        "reference_explanation": "Cơ chế nội tại của Ảo hóa mức OS, Namespaces/Cgroups & Đóng gói Docker Container dựa trên namespace, cgroup, image; sai lầm phổ biến nhất là bỏ qua layer, non-root, pids, oom."
+      }
+    },
+    {
+      "id": "049e8464-ef07-5666-8235-1f751507e694",
+      "concept_slug": "fe-component-state",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Khái niệm] Mục đích cốt lõi của 'Kiến trúc Component, Unidirectional Data Flow & State Management' trong hệ thống phần mềm là gì?",
+      "options": {
+        "A": "Cung cấp nền tảng chuẩn mực về immutability, props để hệ thống vận hành tin cậy.",
+        "B": "Thay thế hoàn toàn cơ sở dữ liệu quan hệ bằng biến toàn cục trong RAM.",
+        "C": "Bỏ qua kiểm tra dữ liệu đầu vào để giảm số dòng mã nguồn.",
+        "D": "Tắt mọi cơ chế bảo mật và ghi nhật ký để tăng tốc độ khởi động."
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "6b2b7e2c-6946-560b-81d6-e6f0bf3727a3",
+      "concept_slug": "fe-component-state",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 2 — Cơ chế] Khi triển khai 'Kiến trúc Component, Unidirectional Data Flow & State Management' đúng kỹ thuật, cơ chế nào sau đây quyết định tính đúng đắn?",
+      "options": {
+        "A": "Khởi tạo lại toàn bộ kết nối ở mỗi vòng lặp mà không giải phóng tài nguyên.",
+        "B": "Kiểm soát chặt chẽ derived, rerender kết hợp xử lý lỗi biên rõ ràng.",
+        "C": "Ghi đè trạng thái người dùng mà không kiểm tra phiên bản hoặc khóa.",
+        "D": "Lưu trực tiếp bí mật hệ thống vào mã nguồn phía trình duyệt."
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "9c384097-1cf6-52b6-b4ec-eda1ea86488b",
+      "concept_slug": "fe-component-state",
+      "depth_tier": 3,
+      "task_type": "troubleshooting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Chẩn đoán sự cố] Hệ thống sử dụng 'Kiến trúc Component, Unidirectional Data Flow & State Management' đang gặp lỗi nghẽn hoặc sai lệch trạng thái khi tải tăng đột biến. Hãy nêu nguyên nhân gốc rễ và hướng xử lý cụ thể.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Xác định nguyên nhân gốc rễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "immutability",
+              "props",
+              "state"
+            ]
+          },
+          {
+            "name": "Đề xuất biện pháp khắc phục",
+            "weight": 0.5,
+            "required_keywords": [
+              "derived",
+              "rerender",
+              "memo",
+              "closure"
+            ]
+          }
+        ],
+        "reference_explanation": "Cần kiểm tra các yếu tố immutability, props, state để khoanh vùng điểm nghẽn, sau đó áp dụng biện pháp derived, rerender, memo, closure nhằm ổn định hệ thống."
+      }
+    },
+    {
+      "id": "6e9e9503-da91-513d-af6e-964955979958",
+      "concept_slug": "fe-component-state",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Đánh đổi kiến trúc] Nếu yêu cầu hệ thống thay đổi từ tải thấp sang 10x đồng thời với ràng buộc độ trễ p95 nghiêm ngặt cho 'Kiến trúc Component, Unidirectional Data Flow & State Management', bạn sẽ đánh đổi phương án nào?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Phân tích đánh đổi kỹ thuật",
+            "weight": 0.5,
+            "required_keywords": [
+              "immutability",
+              "props",
+              "state"
+            ]
+          },
+          {
+            "name": "Bảo toàn tính nhất quán & độ trễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "derived",
+              "rerender",
+              "memo",
+              "closure"
+            ]
+          }
+        ],
+        "reference_explanation": "Khi mở rộng 10x cho Kiến trúc Component, Unidirectional Data Flow & State Management, cần cân bằng giữa immutability, props, state và derived, rerender, memo, closure thay vì tối ưu cục bộ."
+      }
+    },
+    {
+      "id": "a645b923-5903-5771-b630-ccb07e8af95d",
+      "concept_slug": "fe-component-state",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Nội tại & Giải thích ngược] Hãy giải thích cơ chế nội tại sâu nhất của 'Kiến trúc Component, Unidirectional Data Flow & State Management' như đang hướng dẫn một kỹ sư mới để tránh các bẫy vận hành nghiêm trọng.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Giải thích cơ chế nội tại",
+            "weight": 0.5,
+            "required_keywords": [
+              "immutability",
+              "props",
+              "state"
+            ]
+          },
+          {
+            "name": "Cảnh báo bẫy vận hành thực tế",
+            "weight": 0.5,
+            "required_keywords": [
+              "derived",
+              "rerender",
+              "memo",
+              "closure"
+            ]
+          }
+        ],
+        "reference_explanation": "Cơ chế nội tại của Kiến trúc Component, Unidirectional Data Flow & State Management dựa trên immutability, props, state; sai lầm phổ biến nhất là bỏ qua derived, rerender, memo, closure."
+      }
+    },
+    {
+      "id": "91302e7e-5c23-5d56-a5c5-697ea7f6b23a",
+      "concept_slug": "fe-data-fetching",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Khái niệm] Mục đích cốt lõi của 'Client Data Fetching, Caching, Stale-While-Revalidate & Optimistic UI' trong hệ thống phần mềm là gì?",
+      "options": {
+        "A": "Cung cấp nền tảng chuẩn mực về swr, cache để hệ thống vận hành tin cậy.",
+        "B": "Thay thế hoàn toàn cơ sở dữ liệu quan hệ bằng biến toàn cục trong RAM.",
+        "C": "Bỏ qua kiểm tra dữ liệu đầu vào để giảm số dòng mã nguồn.",
+        "D": "Tắt mọi cơ chế bảo mật và ghi nhật ký để tăng tốc độ khởi động."
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "8d5a7246-2797-52ea-b1f7-b7a4a9c2b821",
+      "concept_slug": "fe-data-fetching",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 2 — Cơ chế] Khi triển khai 'Client Data Fetching, Caching, Stale-While-Revalidate & Optimistic UI' đúng kỹ thuật, cơ chế nào sau đây quyết định tính đúng đắn?",
+      "options": {
+        "A": "Khởi tạo lại toàn bộ kết nối ở mỗi vòng lặp mà không giải phóng tài nguyên.",
+        "B": "Kiểm soát chặt chẽ rollback, stale kết hợp xử lý lỗi biên rõ ràng.",
+        "C": "Ghi đè trạng thái người dùng mà không kiểm tra phiên bản hoặc khóa.",
+        "D": "Lưu trực tiếp bí mật hệ thống vào mã nguồn phía trình duyệt."
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "423ba650-d6c7-530e-88f3-bf289d8b02ac",
+      "concept_slug": "fe-data-fetching",
+      "depth_tier": 3,
+      "task_type": "troubleshooting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Chẩn đoán sự cố] Hệ thống sử dụng 'Client Data Fetching, Caching, Stale-While-Revalidate & Optimistic UI' đang gặp lỗi nghẽn hoặc sai lệch trạng thái khi tải tăng đột biến. Hãy nêu nguyên nhân gốc rễ và hướng xử lý cụ thể.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Xác định nguyên nhân gốc rễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "swr",
+              "cache",
+              "optimistic"
+            ]
+          },
+          {
+            "name": "Đề xuất biện pháp khắc phục",
+            "weight": 0.5,
+            "required_keywords": [
+              "rollback",
+              "stale",
+              "revalidate",
+              "abort"
+            ]
+          }
+        ],
+        "reference_explanation": "Cần kiểm tra các yếu tố swr, cache, optimistic để khoanh vùng điểm nghẽn, sau đó áp dụng biện pháp rollback, stale, revalidate, abort nhằm ổn định hệ thống."
+      }
+    },
+    {
+      "id": "0d768f4d-ac74-553b-802d-da4010f8135c",
+      "concept_slug": "fe-data-fetching",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Đánh đổi kiến trúc] Nếu yêu cầu hệ thống thay đổi từ tải thấp sang 10x đồng thời với ràng buộc độ trễ p95 nghiêm ngặt cho 'Client Data Fetching, Caching, Stale-While-Revalidate & Optimistic UI', bạn sẽ đánh đổi phương án nào?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Phân tích đánh đổi kỹ thuật",
+            "weight": 0.5,
+            "required_keywords": [
+              "swr",
+              "cache",
+              "optimistic"
+            ]
+          },
+          {
+            "name": "Bảo toàn tính nhất quán & độ trễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "rollback",
+              "stale",
+              "revalidate",
+              "abort"
+            ]
+          }
+        ],
+        "reference_explanation": "Khi mở rộng 10x cho Client Data Fetching, Caching, Stale-While-Revalidate & Optimistic UI, cần cân bằng giữa swr, cache, optimistic và rollback, stale, revalidate, abort thay vì tối ưu cục bộ."
+      }
+    },
+    {
+      "id": "5f4d30bb-989c-52bb-b95f-6a4f89d5f024",
+      "concept_slug": "fe-data-fetching",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Nội tại & Giải thích ngược] Hãy giải thích cơ chế nội tại sâu nhất của 'Client Data Fetching, Caching, Stale-While-Revalidate & Optimistic UI' như đang hướng dẫn một kỹ sư mới để tránh các bẫy vận hành nghiêm trọng.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Giải thích cơ chế nội tại",
+            "weight": 0.5,
+            "required_keywords": [
+              "swr",
+              "cache",
+              "optimistic"
+            ]
+          },
+          {
+            "name": "Cảnh báo bẫy vận hành thực tế",
+            "weight": 0.5,
+            "required_keywords": [
+              "rollback",
+              "stale",
+              "revalidate",
+              "abort"
+            ]
+          }
+        ],
+        "reference_explanation": "Cơ chế nội tại của Client Data Fetching, Caching, Stale-While-Revalidate & Optimistic UI dựa trên swr, cache, optimistic; sai lầm phổ biến nhất là bỏ qua rollback, stale, revalidate, abort."
+      }
+    },
+    {
+      "id": "4aa0c53a-9a06-564e-851b-41882ab973a2",
+      "concept_slug": "fe-dom-events",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Khái niệm] Mục đích cốt lõi của 'Cây DOM, Browser Rendering Pipeline & Event Loop' trong hệ thống phần mềm là gì?",
+      "options": {
+        "A": "Cung cấp nền tảng chuẩn mực về dom, reflow để hệ thống vận hành tin cậy.",
+        "B": "Thay thế hoàn toàn cơ sở dữ liệu quan hệ bằng biến toàn cục trong RAM.",
+        "C": "Bỏ qua kiểm tra dữ liệu đầu vào để giảm số dòng mã nguồn.",
+        "D": "Tắt mọi cơ chế bảo mật và ghi nhật ký để tăng tốc độ khởi động."
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "31744ade-8d67-5331-b516-915ab541da48",
+      "concept_slug": "fe-dom-events",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 2 — Cơ chế] Khi triển khai 'Cây DOM, Browser Rendering Pipeline & Event Loop' đúng kỹ thuật, cơ chế nào sau đây quyết định tính đúng đắn?",
+      "options": {
+        "A": "Khởi tạo lại toàn bộ kết nối ở mỗi vòng lặp mà không giải phóng tài nguyên.",
+        "B": "Kiểm soát chặt chẽ bubbling, composite kết hợp xử lý lỗi biên rõ ràng.",
+        "C": "Ghi đè trạng thái người dùng mà không kiểm tra phiên bản hoặc khóa.",
+        "D": "Lưu trực tiếp bí mật hệ thống vào mã nguồn phía trình duyệt."
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "3ea69bf9-7e76-580c-854b-7bdef1b989fa",
+      "concept_slug": "fe-dom-events",
+      "depth_tier": 3,
+      "task_type": "troubleshooting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Chẩn đoán sự cố] Hệ thống sử dụng 'Cây DOM, Browser Rendering Pipeline & Event Loop' đang gặp lỗi nghẽn hoặc sai lệch trạng thái khi tải tăng đột biến. Hãy nêu nguyên nhân gốc rễ và hướng xử lý cụ thể.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Xác định nguyên nhân gốc rễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "dom",
+              "reflow",
+              "delegation"
+            ]
+          },
+          {
+            "name": "Đề xuất biện pháp khắc phục",
+            "weight": 0.5,
+            "required_keywords": [
+              "bubbling",
+              "composite",
+              "layout",
+              "paint"
+            ]
+          }
+        ],
+        "reference_explanation": "Cần kiểm tra các yếu tố dom, reflow, delegation để khoanh vùng điểm nghẽn, sau đó áp dụng biện pháp bubbling, composite, layout, paint nhằm ổn định hệ thống."
+      }
+    },
+    {
+      "id": "f82c9820-4978-56aa-ba04-0e9723dcece2",
+      "concept_slug": "fe-dom-events",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Đánh đổi kiến trúc] Nếu yêu cầu hệ thống thay đổi từ tải thấp sang 10x đồng thời với ràng buộc độ trễ p95 nghiêm ngặt cho 'Cây DOM, Browser Rendering Pipeline & Event Loop', bạn sẽ đánh đổi phương án nào?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Phân tích đánh đổi kỹ thuật",
+            "weight": 0.5,
+            "required_keywords": [
+              "dom",
+              "reflow",
+              "delegation"
+            ]
+          },
+          {
+            "name": "Bảo toàn tính nhất quán & độ trễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "bubbling",
+              "composite",
+              "layout",
+              "paint"
+            ]
+          }
+        ],
+        "reference_explanation": "Khi mở rộng 10x cho Cây DOM, Browser Rendering Pipeline & Event Loop, cần cân bằng giữa dom, reflow, delegation và bubbling, composite, layout, paint thay vì tối ưu cục bộ."
+      }
+    },
+    {
+      "id": "248e8e8b-36a4-5433-91e0-f0f46fcd3604",
+      "concept_slug": "fe-dom-events",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Nội tại & Giải thích ngược] Hãy giải thích cơ chế nội tại sâu nhất của 'Cây DOM, Browser Rendering Pipeline & Event Loop' như đang hướng dẫn một kỹ sư mới để tránh các bẫy vận hành nghiêm trọng.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Giải thích cơ chế nội tại",
+            "weight": 0.5,
+            "required_keywords": [
+              "dom",
+              "reflow",
+              "delegation"
+            ]
+          },
+          {
+            "name": "Cảnh báo bẫy vận hành thực tế",
+            "weight": 0.5,
+            "required_keywords": [
+              "bubbling",
+              "composite",
+              "layout",
+              "paint"
+            ]
+          }
+        ],
+        "reference_explanation": "Cơ chế nội tại của Cây DOM, Browser Rendering Pipeline & Event Loop dựa trên dom, reflow, delegation; sai lầm phổ biến nhất là bỏ qua bubbling, composite, layout, paint."
+      }
+    },
+    {
+      "id": "caec1035-3d3b-5c8e-8f74-2de840af9c62",
+      "concept_slug": "fe-js-async",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Khái niệm] Mục đích cốt lõi của 'Bất đồng bộ trong JavaScript (Promises, Async/Await, Microtasks)' trong hệ thống phần mềm là gì?",
+      "options": {
+        "A": "Cung cấp nền tảng chuẩn mực về promise, microtask để hệ thống vận hành tin cậy.",
+        "B": "Thay thế hoàn toàn cơ sở dữ liệu quan hệ bằng biến toàn cục trong RAM.",
+        "C": "Bỏ qua kiểm tra dữ liệu đầu vào để giảm số dòng mã nguồn.",
+        "D": "Tắt mọi cơ chế bảo mật và ghi nhật ký để tăng tốc độ khởi động."
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "da62c034-0c56-5124-81ae-48c876a98e68",
+      "concept_slug": "fe-js-async",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 2 — Cơ chế] Khi triển khai 'Bất đồng bộ trong JavaScript (Promises, Async/Await, Microtasks)' đúng kỹ thuật, cơ chế nào sau đây quyết định tính đúng đắn?",
+      "options": {
+        "A": "Khởi tạo lại toàn bộ kết nối ở mỗi vòng lặp mà không giải phóng tài nguyên.",
+        "B": "Kiểm soát chặt chẽ abortcontroller, race kết hợp xử lý lỗi biên rõ ràng.",
+        "C": "Ghi đè trạng thái người dùng mà không kiểm tra phiên bản hoặc khóa.",
+        "D": "Lưu trực tiếp bí mật hệ thống vào mã nguồn phía trình duyệt."
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "0bad1a8d-918f-5339-b3de-f7b0e195f59d",
+      "concept_slug": "fe-js-async",
+      "depth_tier": 3,
+      "task_type": "troubleshooting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Chẩn đoán sự cố] Hệ thống sử dụng 'Bất đồng bộ trong JavaScript (Promises, Async/Await, Microtasks)' đang gặp lỗi nghẽn hoặc sai lệch trạng thái khi tải tăng đột biến. Hãy nêu nguyên nhân gốc rễ và hướng xử lý cụ thể.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Xác định nguyên nhân gốc rễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "promise",
+              "microtask",
+              "event loop"
+            ]
+          },
+          {
+            "name": "Đề xuất biện pháp khắc phục",
+            "weight": 0.5,
+            "required_keywords": [
+              "abortcontroller",
+              "race",
+              "async",
+              "await"
+            ]
+          }
+        ],
+        "reference_explanation": "Cần kiểm tra các yếu tố promise, microtask, event loop để khoanh vùng điểm nghẽn, sau đó áp dụng biện pháp abortcontroller, race, async, await nhằm ổn định hệ thống."
+      }
+    },
+    {
+      "id": "348f51e4-1dc0-5c27-bbc9-2503d2278f93",
+      "concept_slug": "fe-js-async",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Đánh đổi kiến trúc] Nếu yêu cầu hệ thống thay đổi từ tải thấp sang 10x đồng thời với ràng buộc độ trễ p95 nghiêm ngặt cho 'Bất đồng bộ trong JavaScript (Promises, Async/Await, Microtasks)', bạn sẽ đánh đổi phương án nào?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Phân tích đánh đổi kỹ thuật",
+            "weight": 0.5,
+            "required_keywords": [
+              "promise",
+              "microtask",
+              "event loop"
+            ]
+          },
+          {
+            "name": "Bảo toàn tính nhất quán & độ trễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "abortcontroller",
+              "race",
+              "async",
+              "await"
+            ]
+          }
+        ],
+        "reference_explanation": "Khi mở rộng 10x cho Bất đồng bộ trong JavaScript (Promises, Async/Await, Microtasks), cần cân bằng giữa promise, microtask, event loop và abortcontroller, race, async, await thay vì tối ưu cục bộ."
+      }
+    },
+    {
+      "id": "93e2df94-7ba2-5d3f-97ac-1689e07a9c78",
+      "concept_slug": "fe-js-async",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Nội tại & Giải thích ngược] Hãy giải thích cơ chế nội tại sâu nhất của 'Bất đồng bộ trong JavaScript (Promises, Async/Await, Microtasks)' như đang hướng dẫn một kỹ sư mới để tránh các bẫy vận hành nghiêm trọng.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Giải thích cơ chế nội tại",
+            "weight": 0.5,
+            "required_keywords": [
+              "promise",
+              "microtask",
+              "event loop"
+            ]
+          },
+          {
+            "name": "Cảnh báo bẫy vận hành thực tế",
+            "weight": 0.5,
+            "required_keywords": [
+              "abortcontroller",
+              "race",
+              "async",
+              "await"
+            ]
+          }
+        ],
+        "reference_explanation": "Cơ chế nội tại của Bất đồng bộ trong JavaScript (Promises, Async/Await, Microtasks) dựa trên promise, microtask, event loop; sai lầm phổ biến nhất là bỏ qua abortcontroller, race, async, await."
+      }
+    },
+    {
+      "id": "ce494616-cbb4-5a87-829c-5eba243125be",
+      "concept_slug": "fe-perf-caching",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Khái niệm] Mục đích cốt lõi của 'Tối ưu Hiệu năng Web (Code Splitting, Memoization, Core Web Vitals)' trong hệ thống phần mềm là gì?",
+      "options": {
+        "A": "Cung cấp nền tảng chuẩn mực về lcp, cls để hệ thống vận hành tin cậy.",
+        "B": "Thay thế hoàn toàn cơ sở dữ liệu quan hệ bằng biến toàn cục trong RAM.",
+        "C": "Bỏ qua kiểm tra dữ liệu đầu vào để giảm số dòng mã nguồn.",
+        "D": "Tắt mọi cơ chế bảo mật và ghi nhật ký để tăng tốc độ khởi động."
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "f9e53cf6-5372-5716-bc16-f98f9a2260c9",
+      "concept_slug": "fe-perf-caching",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 2 — Cơ chế] Khi triển khai 'Tối ưu Hiệu năng Web (Code Splitting, Memoization, Core Web Vitals)' đúng kỹ thuật, cơ chế nào sau đây quyết định tính đúng đắn?",
+      "options": {
+        "A": "Khởi tạo lại toàn bộ kết nối ở mỗi vòng lặp mà không giải phóng tài nguyên.",
+        "B": "Kiểm soát chặt chẽ code splitting, lazy kết hợp xử lý lỗi biên rõ ràng.",
+        "C": "Ghi đè trạng thái người dùng mà không kiểm tra phiên bản hoặc khóa.",
+        "D": "Lưu trực tiếp bí mật hệ thống vào mã nguồn phía trình duyệt."
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "71a3f20f-b5a9-5f6e-b540-2b507dd655e1",
+      "concept_slug": "fe-perf-caching",
+      "depth_tier": 3,
+      "task_type": "troubleshooting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Chẩn đoán sự cố] Hệ thống sử dụng 'Tối ưu Hiệu năng Web (Code Splitting, Memoization, Core Web Vitals)' đang gặp lỗi nghẽn hoặc sai lệch trạng thái khi tải tăng đột biến. Hãy nêu nguyên nhân gốc rễ và hướng xử lý cụ thể.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Xác định nguyên nhân gốc rễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "lcp",
+              "cls",
+              "inp"
+            ]
+          },
+          {
+            "name": "Đề xuất biện pháp khắc phục",
+            "weight": 0.5,
+            "required_keywords": [
+              "code splitting",
+              "lazy",
+              "memoization",
+              "bundle"
+            ]
+          }
+        ],
+        "reference_explanation": "Cần kiểm tra các yếu tố lcp, cls, inp để khoanh vùng điểm nghẽn, sau đó áp dụng biện pháp code splitting, lazy, memoization, bundle nhằm ổn định hệ thống."
+      }
+    },
+    {
+      "id": "0738fba8-2898-5e21-aad2-3499ca3a820d",
+      "concept_slug": "fe-perf-caching",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Đánh đổi kiến trúc] Nếu yêu cầu hệ thống thay đổi từ tải thấp sang 10x đồng thời với ràng buộc độ trễ p95 nghiêm ngặt cho 'Tối ưu Hiệu năng Web (Code Splitting, Memoization, Core Web Vitals)', bạn sẽ đánh đổi phương án nào?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Phân tích đánh đổi kỹ thuật",
+            "weight": 0.5,
+            "required_keywords": [
+              "lcp",
+              "cls",
+              "inp"
+            ]
+          },
+          {
+            "name": "Bảo toàn tính nhất quán & độ trễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "code splitting",
+              "lazy",
+              "memoization",
+              "bundle"
+            ]
+          }
+        ],
+        "reference_explanation": "Khi mở rộng 10x cho Tối ưu Hiệu năng Web (Code Splitting, Memoization, Core Web Vitals), cần cân bằng giữa lcp, cls, inp và code splitting, lazy, memoization, bundle thay vì tối ưu cục bộ."
+      }
+    },
+    {
+      "id": "34322e55-40e3-529f-b1a6-7367e588f678",
+      "concept_slug": "fe-perf-caching",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Nội tại & Giải thích ngược] Hãy giải thích cơ chế nội tại sâu nhất của 'Tối ưu Hiệu năng Web (Code Splitting, Memoization, Core Web Vitals)' như đang hướng dẫn một kỹ sư mới để tránh các bẫy vận hành nghiêm trọng.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Giải thích cơ chế nội tại",
+            "weight": 0.5,
+            "required_keywords": [
+              "lcp",
+              "cls",
+              "inp"
+            ]
+          },
+          {
+            "name": "Cảnh báo bẫy vận hành thực tế",
+            "weight": 0.5,
+            "required_keywords": [
+              "code splitting",
+              "lazy",
+              "memoization",
+              "bundle"
+            ]
+          }
+        ],
+        "reference_explanation": "Cơ chế nội tại của Tối ưu Hiệu năng Web (Code Splitting, Memoization, Core Web Vitals) dựa trên lcp, cls, inp; sai lầm phổ biến nhất là bỏ qua code splitting, lazy, memoization, bundle."
+      }
+    },
+    {
+      "id": "b0f31aa8-f156-5200-836d-91d5d14fba58",
+      "concept_slug": "fe-xss-csrf",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Khái niệm] Mục đích cốt lõi của 'Bảo mật Giao diện Web (Chống XSS, CSRF, CSP & Sanitization)' trong hệ thống phần mềm là gì?",
+      "options": {
+        "A": "Cung cấp nền tảng chuẩn mực về xss, csp để hệ thống vận hành tin cậy.",
+        "B": "Thay thế hoàn toàn cơ sở dữ liệu quan hệ bằng biến toàn cục trong RAM.",
+        "C": "Bỏ qua kiểm tra dữ liệu đầu vào để giảm số dòng mã nguồn.",
+        "D": "Tắt mọi cơ chế bảo mật và ghi nhật ký để tăng tốc độ khởi động."
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "1763d417-4c23-53ca-bb8c-5fb21f60509b",
+      "concept_slug": "fe-xss-csrf",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 2 — Cơ chế] Khi triển khai 'Bảo mật Giao diện Web (Chống XSS, CSRF, CSP & Sanitization)' đúng kỹ thuật, cơ chế nào sau đây quyết định tính đúng đắn?",
+      "options": {
+        "A": "Khởi tạo lại toàn bộ kết nối ở mỗi vòng lặp mà không giải phóng tài nguyên.",
+        "B": "Kiểm soát chặt chẽ csrf, samesite kết hợp xử lý lỗi biên rõ ràng.",
+        "C": "Ghi đè trạng thái người dùng mà không kiểm tra phiên bản hoặc khóa.",
+        "D": "Lưu trực tiếp bí mật hệ thống vào mã nguồn phía trình duyệt."
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "0575ef51-5425-5aa6-8beb-b1d66c33029f",
+      "concept_slug": "fe-xss-csrf",
+      "depth_tier": 3,
+      "task_type": "troubleshooting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Chẩn đoán sự cố] Hệ thống sử dụng 'Bảo mật Giao diện Web (Chống XSS, CSRF, CSP & Sanitization)' đang gặp lỗi nghẽn hoặc sai lệch trạng thái khi tải tăng đột biến. Hãy nêu nguyên nhân gốc rễ và hướng xử lý cụ thể.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Xác định nguyên nhân gốc rễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "xss",
+              "csp",
+              "sanitize"
+            ]
+          },
+          {
+            "name": "Đề xuất biện pháp khắc phục",
+            "weight": 0.5,
+            "required_keywords": [
+              "csrf",
+              "samesite",
+              "escape",
+              "httponly"
+            ]
+          }
+        ],
+        "reference_explanation": "Cần kiểm tra các yếu tố xss, csp, sanitize để khoanh vùng điểm nghẽn, sau đó áp dụng biện pháp csrf, samesite, escape, httponly nhằm ổn định hệ thống."
+      }
+    },
+    {
+      "id": "7bf108d8-2c4a-5c4a-b63a-8d26e98059e6",
+      "concept_slug": "fe-xss-csrf",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Đánh đổi kiến trúc] Nếu yêu cầu hệ thống thay đổi từ tải thấp sang 10x đồng thời với ràng buộc độ trễ p95 nghiêm ngặt cho 'Bảo mật Giao diện Web (Chống XSS, CSRF, CSP & Sanitization)', bạn sẽ đánh đổi phương án nào?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Phân tích đánh đổi kỹ thuật",
+            "weight": 0.5,
+            "required_keywords": [
+              "xss",
+              "csp",
+              "sanitize"
+            ]
+          },
+          {
+            "name": "Bảo toàn tính nhất quán & độ trễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "csrf",
+              "samesite",
+              "escape",
+              "httponly"
+            ]
+          }
+        ],
+        "reference_explanation": "Khi mở rộng 10x cho Bảo mật Giao diện Web (Chống XSS, CSRF, CSP & Sanitization), cần cân bằng giữa xss, csp, sanitize và csrf, samesite, escape, httponly thay vì tối ưu cục bộ."
+      }
+    },
+    {
+      "id": "e353052e-93d3-5445-a589-2289fe6e7649",
+      "concept_slug": "fe-xss-csrf",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Nội tại & Giải thích ngược] Hãy giải thích cơ chế nội tại sâu nhất của 'Bảo mật Giao diện Web (Chống XSS, CSRF, CSP & Sanitization)' như đang hướng dẫn một kỹ sư mới để tránh các bẫy vận hành nghiêm trọng.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Giải thích cơ chế nội tại",
+            "weight": 0.5,
+            "required_keywords": [
+              "xss",
+              "csp",
+              "sanitize"
+            ]
+          },
+          {
+            "name": "Cảnh báo bẫy vận hành thực tế",
+            "weight": 0.5,
+            "required_keywords": [
+              "csrf",
+              "samesite",
+              "escape",
+              "httponly"
+            ]
+          }
+        ],
+        "reference_explanation": "Cơ chế nội tại của Bảo mật Giao diện Web (Chống XSS, CSRF, CSP & Sanitization) dựa trên xss, csp, sanitize; sai lầm phổ biến nhất là bỏ qua csrf, samesite, escape, httponly."
+      }
+    },
+    {
+      "id": "0e43cee5-5a77-523c-a6e6-cb5a04035459",
+      "concept_slug": "k8s-orchestration",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Khái niệm] Mục đích cốt lõi của 'Điều phối Container với Kubernetes (Pods, Deployments, HPA, Readiness)' trong hệ thống phần mềm là gì?",
+      "options": {
+        "A": "Cung cấp nền tảng chuẩn mực về readiness, liveness để hệ thống vận hành tin cậy.",
+        "B": "Thay thế hoàn toàn cơ sở dữ liệu quan hệ bằng biến toàn cục trong RAM.",
+        "C": "Bỏ qua kiểm tra dữ liệu đầu vào để giảm số dòng mã nguồn.",
+        "D": "Tắt mọi cơ chế bảo mật và ghi nhật ký để tăng tốc độ khởi động."
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "1d536f60-b534-50d1-a010-dd7ded1b4170",
+      "concept_slug": "k8s-orchestration",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 2 — Cơ chế] Khi triển khai 'Điều phối Container với Kubernetes (Pods, Deployments, HPA, Readiness)' đúng kỹ thuật, cơ chế nào sau đây quyết định tính đúng đắn?",
+      "options": {
+        "A": "Khởi tạo lại toàn bộ kết nối ở mỗi vòng lặp mà không giải phóng tài nguyên.",
+        "B": "Kiểm soát chặt chẽ pod, resource kết hợp xử lý lỗi biên rõ ràng.",
+        "C": "Ghi đè trạng thái người dùng mà không kiểm tra phiên bản hoặc khóa.",
+        "D": "Lưu trực tiếp bí mật hệ thống vào mã nguồn phía trình duyệt."
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "618d0fd0-2caa-5785-a6d5-e7cca2de2674",
+      "concept_slug": "k8s-orchestration",
+      "depth_tier": 3,
+      "task_type": "troubleshooting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Chẩn đoán sự cố] Hệ thống sử dụng 'Điều phối Container với Kubernetes (Pods, Deployments, HPA, Readiness)' đang gặp lỗi nghẽn hoặc sai lệch trạng thái khi tải tăng đột biến. Hãy nêu nguyên nhân gốc rễ và hướng xử lý cụ thể.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Xác định nguyên nhân gốc rễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "readiness",
+              "liveness",
+              "hpa"
+            ]
+          },
+          {
+            "name": "Đề xuất biện pháp khắc phục",
+            "weight": 0.5,
+            "required_keywords": [
+              "pod",
+              "resource",
+              "limit",
+              "probe"
+            ]
+          }
+        ],
+        "reference_explanation": "Cần kiểm tra các yếu tố readiness, liveness, hpa để khoanh vùng điểm nghẽn, sau đó áp dụng biện pháp pod, resource, limit, probe nhằm ổn định hệ thống."
+      }
+    },
+    {
+      "id": "8e2f8746-1054-5c1c-a997-e3a25bcc67f2",
+      "concept_slug": "k8s-orchestration",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Đánh đổi kiến trúc] Nếu yêu cầu hệ thống thay đổi từ tải thấp sang 10x đồng thời với ràng buộc độ trễ p95 nghiêm ngặt cho 'Điều phối Container với Kubernetes (Pods, Deployments, HPA, Readiness)', bạn sẽ đánh đổi phương án nào?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Phân tích đánh đổi kỹ thuật",
+            "weight": 0.5,
+            "required_keywords": [
+              "readiness",
+              "liveness",
+              "hpa"
+            ]
+          },
+          {
+            "name": "Bảo toàn tính nhất quán & độ trễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "pod",
+              "resource",
+              "limit",
+              "probe"
+            ]
+          }
+        ],
+        "reference_explanation": "Khi mở rộng 10x cho Điều phối Container với Kubernetes (Pods, Deployments, HPA, Readiness), cần cân bằng giữa readiness, liveness, hpa và pod, resource, limit, probe thay vì tối ưu cục bộ."
+      }
+    },
+    {
+      "id": "25960752-31f7-59ab-af94-20caf73307ac",
+      "concept_slug": "k8s-orchestration",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Nội tại & Giải thích ngược] Hãy giải thích cơ chế nội tại sâu nhất của 'Điều phối Container với Kubernetes (Pods, Deployments, HPA, Readiness)' như đang hướng dẫn một kỹ sư mới để tránh các bẫy vận hành nghiêm trọng.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Giải thích cơ chế nội tại",
+            "weight": 0.5,
+            "required_keywords": [
+              "readiness",
+              "liveness",
+              "hpa"
+            ]
+          },
+          {
+            "name": "Cảnh báo bẫy vận hành thực tế",
+            "weight": 0.5,
+            "required_keywords": [
+              "pod",
+              "resource",
+              "limit",
+              "probe"
+            ]
+          }
+        ],
+        "reference_explanation": "Cơ chế nội tại của Điều phối Container với Kubernetes (Pods, Deployments, HPA, Readiness) dựa trên readiness, liveness, hpa; sai lầm phổ biến nhất là bỏ qua pod, resource, limit, probe."
+      }
+    },
+    {
+      "id": "d894e469-8c3b-506e-bfd6-b4da9c7a4b67",
+      "concept_slug": "net-internet",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Khái niệm] Mục đích cốt lõi của 'Internet & Mô hình Mạng cơ bản (IP, DNS, TCP/UDP)' trong hệ thống phần mềm là gì?",
+      "options": {
+        "A": "Cung cấp nền tảng chuẩn mực về dns, ip để hệ thống vận hành tin cậy.",
+        "B": "Thay thế hoàn toàn cơ sở dữ liệu quan hệ bằng biến toàn cục trong RAM.",
+        "C": "Bỏ qua kiểm tra dữ liệu đầu vào để giảm số dòng mã nguồn.",
+        "D": "Tắt mọi cơ chế bảo mật và ghi nhật ký để tăng tốc độ khởi động."
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "3cddde7b-fdd7-5ebf-84f8-13425f465717",
+      "concept_slug": "net-internet",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 2 — Cơ chế] Khi triển khai 'Internet & Mô hình Mạng cơ bản (IP, DNS, TCP/UDP)' đúng kỹ thuật, cơ chế nào sau đây quyết định tính đúng đắn?",
+      "options": {
+        "A": "Khởi tạo lại toàn bộ kết nối ở mỗi vòng lặp mà không giải phóng tài nguyên.",
+        "B": "Kiểm soát chặt chẽ handshake, syn kết hợp xử lý lỗi biên rõ ràng.",
+        "C": "Ghi đè trạng thái người dùng mà không kiểm tra phiên bản hoặc khóa.",
+        "D": "Lưu trực tiếp bí mật hệ thống vào mã nguồn phía trình duyệt."
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "f07bad5d-4ecd-5be1-86dd-e422d86d4cbd",
+      "concept_slug": "net-internet",
+      "depth_tier": 3,
+      "task_type": "troubleshooting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Chẩn đoán sự cố] Hệ thống sử dụng 'Internet & Mô hình Mạng cơ bản (IP, DNS, TCP/UDP)' đang gặp lỗi nghẽn hoặc sai lệch trạng thái khi tải tăng đột biến. Hãy nêu nguyên nhân gốc rễ và hướng xử lý cụ thể.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Xác định nguyên nhân gốc rễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "dns",
+              "ip",
+              "tcp"
+            ]
+          },
+          {
+            "name": "Đề xuất biện pháp khắc phục",
+            "weight": 0.5,
+            "required_keywords": [
+              "handshake",
+              "syn",
+              "ack",
+              "timeout"
+            ]
+          }
+        ],
+        "reference_explanation": "Cần kiểm tra các yếu tố dns, ip, tcp để khoanh vùng điểm nghẽn, sau đó áp dụng biện pháp handshake, syn, ack, timeout nhằm ổn định hệ thống."
+      }
+    },
+    {
+      "id": "fea5ea79-4131-59c0-8e6f-425f69034c06",
+      "concept_slug": "net-internet",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Đánh đổi kiến trúc] Nếu yêu cầu hệ thống thay đổi từ tải thấp sang 10x đồng thời với ràng buộc độ trễ p95 nghiêm ngặt cho 'Internet & Mô hình Mạng cơ bản (IP, DNS, TCP/UDP)', bạn sẽ đánh đổi phương án nào?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Phân tích đánh đổi kỹ thuật",
+            "weight": 0.5,
+            "required_keywords": [
+              "dns",
+              "ip",
+              "tcp"
+            ]
+          },
+          {
+            "name": "Bảo toàn tính nhất quán & độ trễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "handshake",
+              "syn",
+              "ack",
+              "timeout"
+            ]
+          }
+        ],
+        "reference_explanation": "Khi mở rộng 10x cho Internet & Mô hình Mạng cơ bản (IP, DNS, TCP/UDP), cần cân bằng giữa dns, ip, tcp và handshake, syn, ack, timeout thay vì tối ưu cục bộ."
+      }
+    },
+    {
+      "id": "f09b5be3-a08a-5799-9498-e912e9303969",
+      "concept_slug": "net-internet",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Nội tại & Giải thích ngược] Hãy giải thích cơ chế nội tại sâu nhất của 'Internet & Mô hình Mạng cơ bản (IP, DNS, TCP/UDP)' như đang hướng dẫn một kỹ sư mới để tránh các bẫy vận hành nghiêm trọng.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Giải thích cơ chế nội tại",
+            "weight": 0.5,
+            "required_keywords": [
+              "dns",
+              "ip",
+              "tcp"
+            ]
+          },
+          {
+            "name": "Cảnh báo bẫy vận hành thực tế",
+            "weight": 0.5,
+            "required_keywords": [
+              "handshake",
+              "syn",
+              "ack",
+              "timeout"
+            ]
+          }
+        ],
+        "reference_explanation": "Cơ chế nội tại của Internet & Mô hình Mạng cơ bản (IP, DNS, TCP/UDP) dựa trên dns, ip, tcp; sai lầm phổ biến nhất là bỏ qua handshake, syn, ack, timeout."
+      }
+    },
+    {
+      "id": "b9f76e13-aa95-5984-885a-c2a6bce41038",
+      "concept_slug": "os-basics",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Khái niệm] Mục đích cốt lõi của 'Hệ điều hành, Process/Thread & I/O cơ bản' trong hệ thống phần mềm là gì?",
+      "options": {
+        "A": "Cung cấp nền tảng chuẩn mực về process, thread để hệ thống vận hành tin cậy.",
+        "B": "Thay thế hoàn toàn cơ sở dữ liệu quan hệ bằng biến toàn cục trong RAM.",
+        "C": "Bỏ qua kiểm tra dữ liệu đầu vào để giảm số dòng mã nguồn.",
+        "D": "Tắt mọi cơ chế bảo mật và ghi nhật ký để tăng tốc độ khởi động."
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "a452adab-d97f-516c-9b7c-60b3852a9de7",
+      "concept_slug": "os-basics",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 2 — Cơ chế] Khi triển khai 'Hệ điều hành, Process/Thread & I/O cơ bản' đúng kỹ thuật, cơ chế nào sau đây quyết định tính đúng đắn?",
+      "options": {
+        "A": "Khởi tạo lại toàn bộ kết nối ở mỗi vòng lặp mà không giải phóng tài nguyên.",
+        "B": "Kiểm soát chặt chẽ fd, ulimit kết hợp xử lý lỗi biên rõ ràng.",
+        "C": "Ghi đè trạng thái người dùng mà không kiểm tra phiên bản hoặc khóa.",
+        "D": "Lưu trực tiếp bí mật hệ thống vào mã nguồn phía trình duyệt."
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "2c9ee032-f4a3-54d9-bc29-7fad1ffdcfd6",
+      "concept_slug": "os-basics",
+      "depth_tier": 3,
+      "task_type": "troubleshooting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Chẩn đoán sự cố] Hệ thống sử dụng 'Hệ điều hành, Process/Thread & I/O cơ bản' đang gặp lỗi nghẽn hoặc sai lệch trạng thái khi tải tăng đột biến. Hãy nêu nguyên nhân gốc rễ và hướng xử lý cụ thể.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Xác định nguyên nhân gốc rễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "process",
+              "thread",
+              "memory"
+            ]
+          },
+          {
+            "name": "Đề xuất biện pháp khắc phục",
+            "weight": 0.5,
+            "required_keywords": [
+              "fd",
+              "ulimit",
+              "sigterm",
+              "oom"
+            ]
+          }
+        ],
+        "reference_explanation": "Cần kiểm tra các yếu tố process, thread, memory để khoanh vùng điểm nghẽn, sau đó áp dụng biện pháp fd, ulimit, sigterm, oom nhằm ổn định hệ thống."
+      }
+    },
+    {
+      "id": "5bd6a9aa-df2a-59f3-a767-ca0c38189138",
+      "concept_slug": "os-basics",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Đánh đổi kiến trúc] Nếu yêu cầu hệ thống thay đổi từ tải thấp sang 10x đồng thời với ràng buộc độ trễ p95 nghiêm ngặt cho 'Hệ điều hành, Process/Thread & I/O cơ bản', bạn sẽ đánh đổi phương án nào?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Phân tích đánh đổi kỹ thuật",
+            "weight": 0.5,
+            "required_keywords": [
+              "process",
+              "thread",
+              "memory"
+            ]
+          },
+          {
+            "name": "Bảo toàn tính nhất quán & độ trễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "fd",
+              "ulimit",
+              "sigterm",
+              "oom"
+            ]
+          }
+        ],
+        "reference_explanation": "Khi mở rộng 10x cho Hệ điều hành, Process/Thread & I/O cơ bản, cần cân bằng giữa process, thread, memory và fd, ulimit, sigterm, oom thay vì tối ưu cục bộ."
+      }
+    },
+    {
+      "id": "604645be-f3e5-5b38-9651-39c9c02bfadf",
+      "concept_slug": "os-basics",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Nội tại & Giải thích ngược] Hãy giải thích cơ chế nội tại sâu nhất của 'Hệ điều hành, Process/Thread & I/O cơ bản' như đang hướng dẫn một kỹ sư mới để tránh các bẫy vận hành nghiêm trọng.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Giải thích cơ chế nội tại",
+            "weight": 0.5,
+            "required_keywords": [
+              "process",
+              "thread",
+              "memory"
+            ]
+          },
+          {
+            "name": "Cảnh báo bẫy vận hành thực tế",
+            "weight": 0.5,
+            "required_keywords": [
+              "fd",
+              "ulimit",
+              "sigterm",
+              "oom"
+            ]
+          }
+        ],
+        "reference_explanation": "Cơ chế nội tại của Hệ điều hành, Process/Thread & I/O cơ bản dựa trên process, thread, memory; sai lầm phổ biến nhất là bỏ qua fd, ulimit, sigterm, oom."
+      }
+    },
+    {
+      "id": "f725cc1a-7be9-540c-8839-bdab4d1b1d99",
+      "concept_slug": "reverse-proxy-caching",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Khái niệm] Mục đích cốt lõi của 'Reverse Proxy, Load Balancing & HTTP Edge Caching (Nginx)' trong hệ thống phần mềm là gì?",
+      "options": {
+        "A": "Cung cấp nền tảng chuẩn mực về upstream, load balancing để hệ thống vận hành tin cậy.",
+        "B": "Thay thế hoàn toàn cơ sở dữ liệu quan hệ bằng biến toàn cục trong RAM.",
+        "C": "Bỏ qua kiểm tra dữ liệu đầu vào để giảm số dòng mã nguồn.",
+        "D": "Tắt mọi cơ chế bảo mật và ghi nhật ký để tăng tốc độ khởi động."
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "968627ad-e180-55d9-a71f-dbd798c76b5c",
+      "concept_slug": "reverse-proxy-caching",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 2 — Cơ chế] Khi triển khai 'Reverse Proxy, Load Balancing & HTTP Edge Caching (Nginx)' đúng kỹ thuật, cơ chế nào sau đây quyết định tính đúng đắn?",
+      "options": {
+        "A": "Khởi tạo lại toàn bộ kết nối ở mỗi vòng lặp mà không giải phóng tài nguyên.",
+        "B": "Kiểm soát chặt chẽ healthcheck, keepalive kết hợp xử lý lỗi biên rõ ràng.",
+        "C": "Ghi đè trạng thái người dùng mà không kiểm tra phiên bản hoặc khóa.",
+        "D": "Lưu trực tiếp bí mật hệ thống vào mã nguồn phía trình duyệt."
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "2ab796e6-7275-524c-8a34-4582e289c1e8",
+      "concept_slug": "reverse-proxy-caching",
+      "depth_tier": 3,
+      "task_type": "troubleshooting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Chẩn đoán sự cố] Hệ thống sử dụng 'Reverse Proxy, Load Balancing & HTTP Edge Caching (Nginx)' đang gặp lỗi nghẽn hoặc sai lệch trạng thái khi tải tăng đột biến. Hãy nêu nguyên nhân gốc rễ và hướng xử lý cụ thể.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Xác định nguyên nhân gốc rễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "upstream",
+              "load balancing",
+              "nginx"
+            ]
+          },
+          {
+            "name": "Đề xuất biện pháp khắc phục",
+            "weight": 0.5,
+            "required_keywords": [
+              "healthcheck",
+              "keepalive",
+              "tls",
+              "cache"
+            ]
+          }
+        ],
+        "reference_explanation": "Cần kiểm tra các yếu tố upstream, load balancing, nginx để khoanh vùng điểm nghẽn, sau đó áp dụng biện pháp healthcheck, keepalive, tls, cache nhằm ổn định hệ thống."
+      }
+    },
+    {
+      "id": "a6ea6cbe-210c-56dc-835b-1e42416365cd",
+      "concept_slug": "reverse-proxy-caching",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Đánh đổi kiến trúc] Nếu yêu cầu hệ thống thay đổi từ tải thấp sang 10x đồng thời với ràng buộc độ trễ p95 nghiêm ngặt cho 'Reverse Proxy, Load Balancing & HTTP Edge Caching (Nginx)', bạn sẽ đánh đổi phương án nào?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Phân tích đánh đổi kỹ thuật",
+            "weight": 0.5,
+            "required_keywords": [
+              "upstream",
+              "load balancing",
+              "nginx"
+            ]
+          },
+          {
+            "name": "Bảo toàn tính nhất quán & độ trễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "healthcheck",
+              "keepalive",
+              "tls",
+              "cache"
+            ]
+          }
+        ],
+        "reference_explanation": "Khi mở rộng 10x cho Reverse Proxy, Load Balancing & HTTP Edge Caching (Nginx), cần cân bằng giữa upstream, load balancing, nginx và healthcheck, keepalive, tls, cache thay vì tối ưu cục bộ."
+      }
+    },
+    {
+      "id": "ad50ecd0-57a5-5606-934a-b834af72be3d",
+      "concept_slug": "reverse-proxy-caching",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Nội tại & Giải thích ngược] Hãy giải thích cơ chế nội tại sâu nhất của 'Reverse Proxy, Load Balancing & HTTP Edge Caching (Nginx)' như đang hướng dẫn một kỹ sư mới để tránh các bẫy vận hành nghiêm trọng.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Giải thích cơ chế nội tại",
+            "weight": 0.5,
+            "required_keywords": [
+              "upstream",
+              "load balancing",
+              "nginx"
+            ]
+          },
+          {
+            "name": "Cảnh báo bẫy vận hành thực tế",
+            "weight": 0.5,
+            "required_keywords": [
+              "healthcheck",
+              "keepalive",
+              "tls",
+              "cache"
+            ]
+          }
+        ],
+        "reference_explanation": "Cơ chế nội tại của Reverse Proxy, Load Balancing & HTTP Edge Caching (Nginx) dựa trên upstream, load balancing, nginx; sai lầm phổ biến nhất là bỏ qua healthcheck, keepalive, tls, cache."
+      }
+    },
+    {
+      "id": "9507b9db-1d1c-5488-8bd8-9f4c50797c46",
+      "concept_slug": "sec-api",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Khái niệm] Mục đích cốt lõi của 'Bảo mật API cơ bản (SQLi, Rate Limit, CORS)' trong hệ thống phần mềm là gì?",
+      "options": {
+        "A": "Cung cấp nền tảng chuẩn mực về rate limit, secret để hệ thống vận hành tin cậy.",
+        "B": "Thay thế hoàn toàn cơ sở dữ liệu quan hệ bằng biến toàn cục trong RAM.",
+        "C": "Bỏ qua kiểm tra dữ liệu đầu vào để giảm số dòng mã nguồn.",
+        "D": "Tắt mọi cơ chế bảo mật và ghi nhật ký để tăng tốc độ khởi động."
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "e48b8dcb-70c9-5205-8cef-bb5af98e28f8",
+      "concept_slug": "sec-api",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 2 — Cơ chế] Khi triển khai 'Bảo mật API cơ bản (SQLi, Rate Limit, CORS)' đúng kỹ thuật, cơ chế nào sau đây quyết định tính đúng đắn?",
+      "options": {
+        "A": "Khởi tạo lại toàn bộ kết nối ở mỗi vòng lặp mà không giải phóng tài nguyên.",
+        "B": "Kiểm soát chặt chẽ least privilege, audit kết hợp xử lý lỗi biên rõ ràng.",
+        "C": "Ghi đè trạng thái người dùng mà không kiểm tra phiên bản hoặc khóa.",
+        "D": "Lưu trực tiếp bí mật hệ thống vào mã nguồn phía trình duyệt."
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "288a7a95-e97f-5398-87ef-9069bc866934",
+      "concept_slug": "sec-api",
+      "depth_tier": 3,
+      "task_type": "troubleshooting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Chẩn đoán sự cố] Hệ thống sử dụng 'Bảo mật API cơ bản (SQLi, Rate Limit, CORS)' đang gặp lỗi nghẽn hoặc sai lệch trạng thái khi tải tăng đột biến. Hãy nêu nguyên nhân gốc rễ và hướng xử lý cụ thể.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Xác định nguyên nhân gốc rễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "rate limit",
+              "secret",
+              "tls"
+            ]
+          },
+          {
+            "name": "Đề xuất biện pháp khắc phục",
+            "weight": 0.5,
+            "required_keywords": [
+              "least privilege",
+              "audit",
+              "header",
+              "policy"
+            ]
+          }
+        ],
+        "reference_explanation": "Cần kiểm tra các yếu tố rate limit, secret, tls để khoanh vùng điểm nghẽn, sau đó áp dụng biện pháp least privilege, audit, header, policy nhằm ổn định hệ thống."
+      }
+    },
+    {
+      "id": "f08a4ee6-0c2a-5949-802a-dfd8a7ece475",
+      "concept_slug": "sec-api",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Đánh đổi kiến trúc] Nếu yêu cầu hệ thống thay đổi từ tải thấp sang 10x đồng thời với ràng buộc độ trễ p95 nghiêm ngặt cho 'Bảo mật API cơ bản (SQLi, Rate Limit, CORS)', bạn sẽ đánh đổi phương án nào?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Phân tích đánh đổi kỹ thuật",
+            "weight": 0.5,
+            "required_keywords": [
+              "rate limit",
+              "secret",
+              "tls"
+            ]
+          },
+          {
+            "name": "Bảo toàn tính nhất quán & độ trễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "least privilege",
+              "audit",
+              "header",
+              "policy"
+            ]
+          }
+        ],
+        "reference_explanation": "Khi mở rộng 10x cho Bảo mật API cơ bản (SQLi, Rate Limit, CORS), cần cân bằng giữa rate limit, secret, tls và least privilege, audit, header, policy thay vì tối ưu cục bộ."
+      }
+    },
+    {
+      "id": "1debf849-7005-5e8f-9b2e-1b6bdbdc1e93",
+      "concept_slug": "sec-api",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Nội tại & Giải thích ngược] Hãy giải thích cơ chế nội tại sâu nhất của 'Bảo mật API cơ bản (SQLi, Rate Limit, CORS)' như đang hướng dẫn một kỹ sư mới để tránh các bẫy vận hành nghiêm trọng.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Giải thích cơ chế nội tại",
+            "weight": 0.5,
+            "required_keywords": [
+              "rate limit",
+              "secret",
+              "tls"
+            ]
+          },
+          {
+            "name": "Cảnh báo bẫy vận hành thực tế",
+            "weight": 0.5,
+            "required_keywords": [
+              "least privilege",
+              "audit",
+              "header",
+              "policy"
+            ]
+          }
+        ],
+        "reference_explanation": "Cơ chế nội tại của Bảo mật API cơ bản (SQLi, Rate Limit, CORS) dựa trên rate limit, secret, tls; sai lầm phổ biến nhất là bỏ qua least privilege, audit, header, policy."
+      }
+    },
+    {
+      "id": "ff74b60f-b591-5092-977e-b331581e6bcd",
+      "concept_slug": "sec-authn",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Khái niệm] Mục đích cốt lõi của 'Xác thực & Phân quyền (Session/JWT, RBAC)' trong hệ thống phần mềm là gì?",
+      "options": {
+        "A": "Cung cấp nền tảng chuẩn mực về argon2, httponly để hệ thống vận hành tin cậy.",
+        "B": "Thay thế hoàn toàn cơ sở dữ liệu quan hệ bằng biến toàn cục trong RAM.",
+        "C": "Bỏ qua kiểm tra dữ liệu đầu vào để giảm số dòng mã nguồn.",
+        "D": "Tắt mọi cơ chế bảo mật và ghi nhật ký để tăng tốc độ khởi động."
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "5d817b14-d46a-5e9f-86db-210b5a24238f",
+      "concept_slug": "sec-authn",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 2 — Cơ chế] Khi triển khai 'Xác thực & Phân quyền (Session/JWT, RBAC)' đúng kỹ thuật, cơ chế nào sau đây quyết định tính đúng đắn?",
+      "options": {
+        "A": "Khởi tạo lại toàn bộ kết nối ở mỗi vòng lặp mà không giải phóng tài nguyên.",
+        "B": "Kiểm soát chặt chẽ samesite, rotation kết hợp xử lý lỗi biên rõ ràng.",
+        "C": "Ghi đè trạng thái người dùng mà không kiểm tra phiên bản hoặc khóa.",
+        "D": "Lưu trực tiếp bí mật hệ thống vào mã nguồn phía trình duyệt."
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "d7ea39a5-285f-5926-8f4e-8b24e2d9a674",
+      "concept_slug": "sec-authn",
+      "depth_tier": 3,
+      "task_type": "troubleshooting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Chẩn đoán sự cố] Hệ thống sử dụng 'Xác thực & Phân quyền (Session/JWT, RBAC)' đang gặp lỗi nghẽn hoặc sai lệch trạng thái khi tải tăng đột biến. Hãy nêu nguyên nhân gốc rễ và hướng xử lý cụ thể.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Xác định nguyên nhân gốc rễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "argon2",
+              "httponly",
+              "jwt"
+            ]
+          },
+          {
+            "name": "Đề xuất biện pháp khắc phục",
+            "weight": 0.5,
+            "required_keywords": [
+              "samesite",
+              "rotation",
+              "rbac",
+              "csrf"
+            ]
+          }
+        ],
+        "reference_explanation": "Cần kiểm tra các yếu tố argon2, httponly, jwt để khoanh vùng điểm nghẽn, sau đó áp dụng biện pháp samesite, rotation, rbac, csrf nhằm ổn định hệ thống."
+      }
+    },
+    {
+      "id": "6357c133-2c25-5e5f-a956-6b8bb203c829",
+      "concept_slug": "sec-authn",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Đánh đổi kiến trúc] Nếu yêu cầu hệ thống thay đổi từ tải thấp sang 10x đồng thời với ràng buộc độ trễ p95 nghiêm ngặt cho 'Xác thực & Phân quyền (Session/JWT, RBAC)', bạn sẽ đánh đổi phương án nào?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Phân tích đánh đổi kỹ thuật",
+            "weight": 0.5,
+            "required_keywords": [
+              "argon2",
+              "httponly",
+              "jwt"
+            ]
+          },
+          {
+            "name": "Bảo toàn tính nhất quán & độ trễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "samesite",
+              "rotation",
+              "rbac",
+              "csrf"
+            ]
+          }
+        ],
+        "reference_explanation": "Khi mở rộng 10x cho Xác thực & Phân quyền (Session/JWT, RBAC), cần cân bằng giữa argon2, httponly, jwt và samesite, rotation, rbac, csrf thay vì tối ưu cục bộ."
+      }
+    },
+    {
+      "id": "95f08fc1-6645-55d7-8c13-a17eac9eb068",
+      "concept_slug": "sec-authn",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Nội tại & Giải thích ngược] Hãy giải thích cơ chế nội tại sâu nhất của 'Xác thực & Phân quyền (Session/JWT, RBAC)' như đang hướng dẫn một kỹ sư mới để tránh các bẫy vận hành nghiêm trọng.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Giải thích cơ chế nội tại",
+            "weight": 0.5,
+            "required_keywords": [
+              "argon2",
+              "httponly",
+              "jwt"
+            ]
+          },
+          {
+            "name": "Cảnh báo bẫy vận hành thực tế",
+            "weight": 0.5,
+            "required_keywords": [
+              "samesite",
+              "rotation",
+              "rbac",
+              "csrf"
+            ]
+          }
+        ],
+        "reference_explanation": "Cơ chế nội tại của Xác thực & Phân quyền (Session/JWT, RBAC) dựa trên argon2, httponly, jwt; sai lầm phổ biến nhất là bỏ qua samesite, rotation, rbac, csrf."
+      }
+    },
+    {
+      "id": "bc7f608b-e485-543b-b6b6-0e6b3fa7a740",
+      "concept_slug": "web-http",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Khái niệm] Mục đích cốt lõi của 'Giao thức HTTP/HTTPS (Methods, Status, Headers)' trong hệ thống phần mềm là gì?",
+      "options": {
+        "A": "Cung cấp nền tảng chuẩn mực về http, status để hệ thống vận hành tin cậy.",
+        "B": "Thay thế hoàn toàn cơ sở dữ liệu quan hệ bằng biến toàn cục trong RAM.",
+        "C": "Bỏ qua kiểm tra dữ liệu đầu vào để giảm số dòng mã nguồn.",
+        "D": "Tắt mọi cơ chế bảo mật và ghi nhật ký để tăng tốc độ khởi động."
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "872d2b35-de55-5299-9d71-e570e6b3a1cf",
+      "concept_slug": "web-http",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 2 — Cơ chế] Khi triển khai 'Giao thức HTTP/HTTPS (Methods, Status, Headers)' đúng kỹ thuật, cơ chế nào sau đây quyết định tính đúng đắn?",
+      "options": {
+        "A": "Khởi tạo lại toàn bộ kết nối ở mỗi vòng lặp mà không giải phóng tài nguyên.",
+        "B": "Kiểm soát chặt chẽ cors, preflight kết hợp xử lý lỗi biên rõ ràng.",
+        "C": "Ghi đè trạng thái người dùng mà không kiểm tra phiên bản hoặc khóa.",
+        "D": "Lưu trực tiếp bí mật hệ thống vào mã nguồn phía trình duyệt."
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "3e0c0adf-6cf5-5414-9175-4812cf31c8aa",
+      "concept_slug": "web-http",
+      "depth_tier": 3,
+      "task_type": "troubleshooting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Chẩn đoán sự cố] Hệ thống sử dụng 'Giao thức HTTP/HTTPS (Methods, Status, Headers)' đang gặp lỗi nghẽn hoặc sai lệch trạng thái khi tải tăng đột biến. Hãy nêu nguyên nhân gốc rễ và hướng xử lý cụ thể.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Xác định nguyên nhân gốc rễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "http",
+              "status",
+              "header"
+            ]
+          },
+          {
+            "name": "Đề xuất biện pháp khắc phục",
+            "weight": 0.5,
+            "required_keywords": [
+              "cors",
+              "preflight",
+              "etag",
+              "cache"
+            ]
+          }
+        ],
+        "reference_explanation": "Cần kiểm tra các yếu tố http, status, header để khoanh vùng điểm nghẽn, sau đó áp dụng biện pháp cors, preflight, etag, cache nhằm ổn định hệ thống."
+      }
+    },
+    {
+      "id": "24be5b60-b227-552f-8db7-c604f1662b75",
+      "concept_slug": "web-http",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Đánh đổi kiến trúc] Nếu yêu cầu hệ thống thay đổi từ tải thấp sang 10x đồng thời với ràng buộc độ trễ p95 nghiêm ngặt cho 'Giao thức HTTP/HTTPS (Methods, Status, Headers)', bạn sẽ đánh đổi phương án nào?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Phân tích đánh đổi kỹ thuật",
+            "weight": 0.5,
+            "required_keywords": [
+              "http",
+              "status",
+              "header"
+            ]
+          },
+          {
+            "name": "Bảo toàn tính nhất quán & độ trễ",
+            "weight": 0.5,
+            "required_keywords": [
+              "cors",
+              "preflight",
+              "etag",
+              "cache"
+            ]
+          }
+        ],
+        "reference_explanation": "Khi mở rộng 10x cho Giao thức HTTP/HTTPS (Methods, Status, Headers), cần cân bằng giữa http, status, header và cors, preflight, etag, cache thay vì tối ưu cục bộ."
+      }
+    },
+    {
+      "id": "c869367c-b086-5218-9334-0ba495c5c066",
+      "concept_slug": "web-http",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Nội tại & Giải thích ngược] Hãy giải thích cơ chế nội tại sâu nhất của 'Giao thức HTTP/HTTPS (Methods, Status, Headers)' như đang hướng dẫn một kỹ sư mới để tránh các bẫy vận hành nghiêm trọng.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Giải thích cơ chế nội tại",
+            "weight": 0.5,
+            "required_keywords": [
+              "http",
+              "status",
+              "header"
+            ]
+          },
+          {
+            "name": "Cảnh báo bẫy vận hành thực tế",
+            "weight": 0.5,
+            "required_keywords": [
+              "cors",
+              "preflight",
+              "etag",
+              "cache"
+            ]
+          }
+        ],
+        "reference_explanation": "Cơ chế nội tại của Giao thức HTTP/HTTPS (Methods, Status, Headers) dựa trên http, status, header; sai lầm phổ biến nhất là bỏ qua cors, preflight, etag, cache."
+      }
+    }
+  ]
+}

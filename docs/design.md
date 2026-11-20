@@ -1,10 +1,10 @@
 # Thiết kế hệ thống Plumora (System Design)
 
-Phiên bản: `1.0.0` — **APPROVED (Gate 1 Baseline — Chủ dự án duyệt tại `D-14` / `O-10` ngày 2026-11-16)**.
-Nguồn: [Định hướng gốc (`docs/brief/project-direction.md`)](brief/project-direction.md), [Intent (`docs/intent.md`)](intent.md) (`v1.0.0`), [Đặc tả (`docs/spec.md`)](spec.md) (`v1.0.0`), [Sổ quyết định (`docs/decisions.md`)](decisions.md) (`v1.0.0`, `D-01`–`D-14`).
-Tài liệu Hệ thống Thiết kế Giao diện liên kết: **[UI Design System (`docs/ui-design-system.md`)](ui-design-system.md) (`v1.0.0` — APPROVED Gate 1 Baseline)**.
+Phiên bản: `2.0.0` — **APPROVED (Gate 1 Baseline Giai đoạn 3 — Chủ dự án duyệt tại `D-16`..`D-26` ngày 2026-11-18; bảo lưu trọn vẹn lịch sử Gate 1 Baseline MVP `v1.0.0` duyệt tại `D-14` / `O-10` ngày 2026-11-16)**.
+Nguồn: [Định hướng gốc (`docs/brief/project-direction.md`)](brief/project-direction.md), [Intent (`docs/intent.md`)](intent.md) (`v2.0.0`), [Đặc tả (`docs/spec.md`)](spec.md) (`v2.0.0`), [Phân tích Giai đoạn 3 (`docs/proposals/PHASE3_ANALYSIS.md`)](proposals/PHASE3_ANALYSIS.md), [Sổ quyết định (`docs/decisions.md`)](decisions.md) (`v2.0.0`, `D-01`–`D-26`).
+Tài liệu Hệ thống Thiết kế Giao diện liên kết: **[UI Design System (`docs/ui-design-system.md`)](ui-design-system.md) (`v2.0.0` — APPROVED Gate 1 Baseline & 20 Màn hình Stitch `SCR-01`..`SCR-20`)**.
 
-> **Lưu ý thẩm quyền:** Tài liệu này là **System Design Baseline (`v1.0.0`)** đã được chủ dự án phê duyệt tại **Gate 1 (`D-14` / `O-10`)**, liên kết hai chiều với **[Design System (`docs/ui-design-system.md`)](ui-design-system.md) (`v1.0.0`)**. Nhiệm vụ `ENV-01` đã mở khóa (`ready`); việc viết business logic trong `RL-01` và `SLICE-01` bắt buộc tuân thủ quy trình **Gate 2** (nhánh task, Day-0 CI, Docker Compose healthy và RED tests).
+> **Lưu ý thẩm quyền:** Tài liệu này bao gồm cả **System Design Baseline MVP (`v1.0.0` — Mục 1..7)** đã hoàn thành Gate 1–4 và **System Design Mở rộng Đích Giai đoạn 3 (`v2.0.0` — Mục 6 & Mục 8)** đã được chủ dự án phê duyệt tại **Gate 1 (`D-16`..`D-26`)**, liên kết hai chiều với **[Design System (`docs/ui-design-system.md`)](ui-design-system.md) (`v2.0.0`)**. Nhiệm vụ `P3-SLICE-1` đang ở trạng thái `ready`; việc viết business logic trong `P3-SLICE-1`..`P3-SLICE-4` bắt buộc tuân thủ quy trình **Gate 2** (nhánh task, Day-0 CI, Docker Compose healthy và RED tests).
 
 ---
 
@@ -200,7 +200,7 @@ sequenceDiagram
     else Lượt nộp hợp lệ mới
         API->>PG: Chấm 4 câu -> attempt_score = correct/4, passed = (score >= 0.75)
         API->>PG: mastery_after = max(mastery_before, attempt_score) [INV-MASTERY-01]
-        API->>PG: INSERT quiz_attempts; UPDATE user_concept_mastery; UPDATE users SET state_version = state_version + 1
+        API->>PG: INSERT quiz_attempts, UPDATE user_concept_mastery, UPDATE users SET state_version = state_version + 1
         API->>PG: COMMIT
         API->>RD: SETEX plumora:state:{user_id} 3600 {state_version, observation_24d} (Bắt lỗi nếu Redis Down)
         API-->>SPA: 200 OK {attempt_score, passed, mastery_before, mastery_after, state_version}
@@ -342,17 +342,25 @@ Mọi phản hồi lỗi HTTP (`4xx`, `5xx`) đều trả về cấu trúc JSON 
 
 ---
 
-## 6. Danh mục Kiểm kê Sơ đồ (`Diagram Inventory`)
+## 6. Danh mục Kiểm kê Sơ đồ (`Diagram Inventory` — `v1.0.0` & `v2.0.0`)
 
 | Mã Sơ đồ (`ID`) | Loại Sơ đồ (`View`) | Phạm vi & Mục đích | Nguồn / Phiên bản / Trạng thái | Tham chiếu `AC-ID` / Quyết định / Task | Người duyệt | Kiểm tra Render |
 | --- | --- | --- | --- | --- | --- | --- |
-| `DIAG-C4-CTX` | C4 System Context (Core) | Ranh giới hệ thống Plumora, Học viên và Pipeline RL ngoại tuyến | `docs/design.md` (`v1.0.0` — `APPROVED`) | `D-04`, `D-05`, `PL-E2E-01` | Chủ dự án duyệt G1 (`D-14`) | Mermaid source verified; CLI image render `NOT RUN` |
-| `DIAG-C4-CNT` | C4 Container View (Core) | Trách nhiệm và giao thức giữa React SPA, FastAPI, PostgreSQL, Redis, RL Artifact | `docs/design.md` (`v1.0.0` — `APPROVED`) | `D-09`, `D-10`, `D-11`, `ENV-01`, `SLICE-01` | Chủ dự án duyệt G1 (`D-14`) | Mermaid source verified; CLI image render `NOT RUN` |
-| `DIAG-DEPLOY` | Deployment Topology (Core) | Ánh xạ các container vào Local Docker Compose và môi trường train Local CPU / Colab | `docs/design.md` (`v1.0.0` — `APPROVED`) | `D-04`, `ENV-01` | Chủ dự án duyệt G1 (`D-14`) | Mermaid source verified; CLI image render `NOT RUN` |
-| `DIAG-ERD` | Entity Relationship Diagram (Core) | Mô hình dữ liệu 7 bảng PostgreSQL (PK/FK/UK/CHECK) và liên kết ownership | `docs/design.md` (`v1.0.0` — `APPROVED`) | `D-05`, `D-06`, `D-10`, `D-11`, `PL-PROGRESS-01` | Chủ dự án duyệt G1 (`D-14`) | Mermaid source verified; CLI image render `NOT RUN` |
-| `DIAG-SEQ-01` | Sequence Diagram (Core) | Luồng Học $\rightarrow$ Quiz $\rightarrow$ ACID Tx $\rightarrow$ Mastery $\rightarrow$ Redis $\rightarrow$ DQN & các nhánh lỗi | `docs/design.md` (`v1.0.0` — `APPROVED`) | `PL-QUIZ-01`, `PL-PROGRESS-01`, `PL-REC-01`, `PL-REC-02` | Chủ dự án duyệt G1 (`D-14`) | Mermaid source verified; CLI image render `NOT RUN` |
-| `DIAG-SEQ-02` | Data Flow / Pipeline RL (Conditional — ML Trigger) | Luồng Simulator $\rightarrow$ Train $\rightarrow$ Val $\rightarrow$ Eval vs Baselines $\rightarrow$ Checkpoint $\rightarrow$ Serving | `docs/design.md` (`v1.0.0` — `APPROVED`) & `docs/research/RL_PLAN.md` | `D-04`, `D-07`, `D-08`, `PL-RL-01`, `RL-01` | Chủ dự án duyệt G1 (`D-14`) | Mermaid source verified; CLI image render `NOT RUN` |
-| `DIAG-UX-FLOW` | UX Activity / Journey Flow (Conditional — UI Trigger) | Luồng màn hình `SCR-01`..`SCR-08`, rẽ nhánh lỗi và trạng thái `Disabled`/`Locked` | `docs/ui-design-system.md` (`v1.0.0` — `APPROVED`) | `D-09`, `D-12`, `D-13`, `PL-CONTENT-01`, `PL-E2E-01` | Chủ dự án duyệt G1 (`D-13`, `D-14`) | Mermaid source verified; CLI image render `NOT RUN` |
+| `DIAG-C4-CTX` | C4 System Context (Core — MVP) | Ranh giới hệ thống Plumora, Học viên và Pipeline RL ngoại tuyến | `docs/design.md` (`v1.0.0` — `APPROVED`) | `D-04`, `D-05`, `PL-E2E-01` | Chủ dự án duyệt G1 (`D-14`) | Mermaid source verified; CLI image render `NOT RUN` |
+| `DIAG-C4-CNT` | C4 Container View (Core — MVP) | Trách nhiệm và giao thức giữa React SPA, FastAPI, PostgreSQL, Redis, RL Artifact | `docs/design.md` (`v1.0.0` — `APPROVED`) | `D-09`, `D-10`, `D-11`, `ENV-01`, `SLICE-01` | Chủ dự án duyệt G1 (`D-14`) | Mermaid source verified; CLI image render `NOT RUN` |
+| `DIAG-DEPLOY` | Deployment Topology (Core — MVP) | Ánh xạ các container vào Local Docker Compose và môi trường train Local CPU / Colab | `docs/design.md` (`v1.0.0` — `APPROVED`) | `D-04`, `ENV-01` | Chủ dự án duyệt G1 (`D-14`) | Mermaid source verified; CLI image render `NOT RUN` |
+| `DIAG-ERD` | Entity Relationship Diagram (Core — MVP) | Mô hình dữ liệu 7 bảng PostgreSQL (PK/FK/UK/CHECK) và liên kết ownership | `docs/design.md` (`v1.0.0` — `APPROVED`) | `D-05`, `D-06`, `D-10`, `D-11`, `PL-PROGRESS-01` | Chủ dự án duyệt G1 (`D-14`) | Mermaid source verified; CLI image render `NOT RUN` |
+| `DIAG-SEQ-01` | Sequence Diagram (Core — MVP) | Luồng Học $\rightarrow$ Quiz $\rightarrow$ ACID Tx $\rightarrow$ Mastery $\rightarrow$ Redis $\rightarrow$ DQN & các nhánh lỗi | `docs/design.md` (`v1.0.0` — `APPROVED`) | `PL-QUIZ-01`, `PL-PROGRESS-01`, `PL-REC-01`, `PL-REC-02` | Chủ dự án duyệt G1 (`D-14`) | Mermaid source verified; CLI image render `NOT RUN` |
+| `DIAG-SEQ-02` | Data Flow / Pipeline RL (Conditional — ML Trigger MVP) | Luồng Simulator $\rightarrow$ Train $\rightarrow$ Val $\rightarrow$ Eval vs Baselines $\rightarrow$ Checkpoint $\rightarrow$ Serving | `docs/design.md` (`v1.0.0` — `APPROVED`) & `docs/research/RL_PLAN.md` | `D-04`, `D-07`, `D-08`, `PL-RL-01`, `RL-01` | Chủ dự án duyệt G1 (`D-14`) | Mermaid source verified; CLI image render `NOT RUN` |
+| `DIAG-UX-FLOW` | UX Activity / Journey Flow (Conditional — UI Trigger MVP) | Luồng màn hình `SCR-01`..`SCR-08`, rẽ nhánh lỗi và trạng thái `Disabled`/`Locked` | `docs/ui-design-system.md` (`v1.0.0` — `APPROVED`) | `D-09`, `D-12`, `D-13`, `PL-CONTENT-01`, `PL-E2E-01` | Chủ dự án duyệt G1 (`D-13`, `D-14`) | Mermaid source verified; CLI image render `NOT RUN` |
+| `DIAG-C4-CNT-V2` | C4 Container View (Core — Phase 3) | Kiến trúc 4 Microservices sau API Gateway, Isolated Code Sandbox, LLM Adapter, 4 PG Schemas & Redis Streams (`SCR-01`..`SCR-20`) | `docs/design.md` (`v2.0.0` — `APPROVED`) | `D-22`, `D-23`, `PL3-ARCH-01`, `P3-SLICE-3` | Chủ dự án duyệt G1 (`D-25`, `D-26`) | Mermaid v11 parse & SVG render verified in headless Chromium (`0` errors) |
+| `DIAG-DEPLOY-V2` | Deployment Topology (Core — Phase 3) | Sơ đồ triển khai Cụm 4 Microservices + Sandbox Worker trên Local Docker Compose và Kubernetes Manifests (`k8s/` HPA) | `docs/design.md` (`v2.0.0` — `APPROVED`) | `D-22`, `PL3-GRADER-01`, `PL3-ARCH-01`, `P3-SLICE-3` | Chủ dự án duyệt G1 (`D-25`, `D-26`) | Mermaid v11 parse & SVG render verified in headless Chromium (`0` errors) |
+| `DIAG-ERD-V2` | Entity Relationship Diagram (Core — Phase 3) | Mô hình dữ liệu phân tách 4 Schema PostgreSQL (`auth_svc`, `content_svc`, `assess_svc`, `rec_ai_svc`) không khóa ngoại chéo schema | `docs/design.md` (`v2.0.0` — `APPROVED`) | `D-18`, `D-19`, `D-22`, `PL3-KG-01`, `PL3-ARCH-01` | Chủ dự án duyệt G1 (`D-25`, `D-26`) | Mermaid v11 parse & SVG render verified in headless Chromium (`0` errors) |
+| `DIAG-SEQ-V2` | Sequence Diagram (Core — Phase 3) | Luồng Đánh giá 5 tầng, Code Sandbox, LLM Adapter/Circuit Breaker, Outbox/Redis Streams & `GNN-PPO` (đủ nhánh lỗi `alt/else`) | `docs/design.md` (`v2.0.0` — `APPROVED`) | `PL3-ASSESS-01`, `PL3-GRADER-01`, `PL3-TUTOR-01`, `PL3-GUARD-01` | Chủ dự án duyệt G1 (`D-25`, `D-26`) | Mermaid v11 parse & SVG render verified in headless Chromium (`0` errors) |
+| `DIAG-SM-ASSESS` | State Machine Diagram (Conditional — State Trigger Phase 3) | Máy trạng thái `Adaptive Placement` (tối đa 5–6 câu, trần `0.75`) và `5-Depth Probing State Machine` (Tầng 1..5, `Knowledge Ceiling`, `Insufficient Evidence`) | `docs/design.md` (`v2.0.0` — `APPROVED`) | `D-19`, `PL3-ASSESS-01`, `INV-DEPTH-01`, `P3-SLICE-1` | Chủ dự án duyệt G1 (`D-25`, `D-26`) | Mermaid v11 parse & SVG render verified in headless Chromium (`0` errors) |
+| `DIAG-SEC-V2` | Security & Trust Boundary Diagram (Conditional — Security Trigger Phase 3) | Ranh giới tin cậy: RBAC 3 vai trò (`learner`/`expert`/`admin`), cô lập Code Sandbox (`network_mode: none`, `timeout <= 3000ms`), cô lập 4 Schema DB | `docs/design.md` (`v2.0.0` — `APPROVED`) | `D-17`, `D-22`, `PL3-ROLE-01`, `PL3-GRADER-01`, `INV-SANDBOX-01` | Chủ dự án duyệt G1 (`D-25`, `D-26`) | Mermaid v11 parse & SVG render verified in headless Chromium (`0` errors) |
+| `DIAG-DFD-RL-V2` | Data Flow / Pipeline RL (Conditional — ML Trigger Phase 3) | Luồng Multi-Domain Simulator $\rightarrow$ Đối sánh 4 cấp & *Zero-shot Transfer* (`heldout_data_eng_graph`) $\rightarrow$ `Safe Micro-batch Online RL` & `Safety Gate` | `docs/design.md` (`v2.0.0` — `APPROVED`) & `docs/research/RL_PLAN.md` | `D-20`, `D-21`, `PL3-RL-01`, `INV-ONLINE-RL-01`, `P3-SLICE-2` | Chủ dự án duyệt G1 (`D-25`, `D-26`) | Mermaid v11 parse & SVG render verified in headless Chromium (`0` errors) |
+| `DIAG-UX-FLOW-V2` | UX Activity / Journey Flow (Conditional — UI Trigger Phase 3) | Luồng hành trình 3 vai trò (`Learner`, `Expert`, `Admin`) qua 12 màn hình mới `SCR-09`..`SCR-20` và các nhánh lỗi/fallback | `docs/ui-design-system.md` (`v2.0.0` — `APPROVED`) | `D-17`, `D-23`, `D-26`, `PL3-KG-01`..`PL3-ROLE-01` | Chủ dự án duyệt G1 (`D-25`, `D-26`) | Mermaid v11 parse & SVG render verified in headless Chromium (`0` errors) |
 
 ---
 
@@ -368,3 +376,473 @@ Mọi phản hồi lỗi HTTP (`4xx`, `5xx`) đều trả về cấu trúc JSON 
 | `PL-REC-01`, `PL-REC-02` (Khuyến nghị RL & Fallback) | `SCR-02`: `/roadmap`<br>`SCR-06`: Drawer bằng chứng<br>`SCR-07`: Hoàn thành 12/12 | `AiRecommendationBanner`, `ProvenanceBadge`, `RlProvenanceDrawer` | `POST /api/v1/recommendations` (`current_user.id`) | Đọc 24-dim từ `Redis` (`plumora:state:{user_id}`), fallback `PostgreSQL`; ghi `recommendation_logs` (`INV-RL-01`) | `RL-01`, `SLICE-01` (Test `dqn`, `dqn_masked_q`, `fallback_rule`, tắt Redis) | **Đã duyệt G1 (`D-14`)** — `ENV-01 ready` |
 | `PL-RL-01` (Huấn luyện & Đánh giá Ngoại tuyến) | Hiển thị tóm tắt trong `SCR-06` Drawer & Báo cáo nghiên cứu | — (Chạy qua CLI ngoại tuyến) | CLI `plumora_rl.train` & `plumora_rl.evaluate` | Xuất `rl/artifacts/checkpoint.zip`, `manifest.json` (`SHA-256`), `evaluation_report.json` | `RL-01` (`pytest` simulator invariants + benchmark `eval_seed=2026`) | **Đã duyệt G1 (`D-14`)** — Chờ `ENV-01 (G2)` |
 | `PL-E2E-01` (Hành trình Vàng Đầu-Cuối) | Toàn bộ `SCR-01` $\rightarrow$ `SCR-02` $\rightarrow$ `SCR-03` $\rightarrow$ `SCR-04` $\rightarrow$ `SCR-02` | Toàn bộ Component trên hệ thống thật | Chuỗi API thực tế trên Docker Compose | PostgreSQL + Redis + Checkpoint `DQN` thật 100% (không fake DOM/SUT) | `SLICE-01` (`Playwright` E2E Golden Journey) | **Đã duyệt G1 (`D-14`)** — Chờ `ENV-01 (G2)` & `RL-01` |
+
+---
+
+## 8. Thiết kế Mở rộng Giai đoạn 3: Kiến trúc Microservices, Đánh giá 5 Tầng, Code Sandbox & `GNN-PPO` (`v2.0.0` — APPROVED tại `D-16`..`D-26`)
+
+- **Nguồn căn cứ:** [intent.md](intent.md) (`v2.0.0`), [spec.md](spec.md) (`v2.0.0`), [ui-design-system.md](ui-design-system.md) (`v2.0.0`), [research/RL_PLAN.md](research/RL_PLAN.md) (`v2.0.0`) và các quyết định `D-16`–`D-26` trong [decisions.md](decisions.md) (Chủ dự án phê duyệt ngày `2026-11-18`).
+
+### 8.1. Ranh giới 4 Microservices, Quyền Sở hữu Schema DB & Cơ chế Đồng bộ Không Truy vấn Chéo Schema (`PL3-ARCH-01`, `D-22`, `D-23`)
+
+| Dịch vụ (`Microservice`) | Trách nhiệm cốt lõi | Schema PostgreSQL sở hữu (`Strict Write Owner`) | Mẫu thiết kế áp dụng (`Design Patterns`) |
+| --- | --- | --- | --- |
+| **1. `user-auth-service`** | Đăng ký, đăng nhập (`Argon2id` + `HttpOnly Cookie / JWT`), quản lý tài khoản và phân quyền RBAC 3 vai trò (`learner`, `expert`, `admin`). | Schema `auth_svc`: `users`, `user_roles`, `audit_sessions` | `Repository`, `RBAC Security Guard` |
+| **2. `content-kg-service`** | Quản lý đa lĩnh vực (`backend` 12 node, `frontend` 10 node, `devops` 9 node & lĩnh vực do `Expert` tạo), các node khái niệm giao thoa, kiểm tra chu trình DAG, lưu bài học Markdown, ngân hàng đề 5 tầng sâu & Rubric chấm điểm. | Schema `content_svc`: `domains`, `concepts`, `domain_concept_map`, `concept_prerequisites`, `depth_questions`, `grading_rubrics`, `code_challenges`, `outbox_events` | `DAG Validator Strategy`, `Versioned Content Repository`, `Transactional Outbox` |
+| **3. `assessment-grader-service`** | Điều khiển *Adaptive Placement* & phiên đào sâu 5 tầng (`5-Depth State Machine`), chấm bài thực hành qua **Isolated Code Sandbox Worker**, chấm tự luận ngắn & sinh giải thích **AI Tutor** qua `LLM Adapter` (có fallback deterministic), tính suy giảm trí nhớ *Ebbinghaus* $R(t) = e^{-\Delta t / S}$ và phát sự kiện cập nhật năng lực. | Schema `assess_svc`: `user_node_competency` (lưu `depth_level_norm`, `confidence`, `stability_s`, `last_practiced_at`, `code_score`), `assessment_sessions`, `attempt_records`, `outbox_events`, `consumed_events` | `Unit of Work` (`SELECT ... FOR UPDATE`), `State Machine` (5 tầng sâu), `Adapter + DI` (LLM & Sandbox), `Transactional Outbox`, `Circuit Breaker` |
+| **4. `recommendation-ai-service`** | Dựng biểu diễn đồ thị 8 chiều/node từ Redis Graph-State Cache (hoặc sự kiện đồng bộ), suy luận mô hình **`GNN-PPO`** chọn cặp `(concept_slug, learning_mode)`, áp dụng **`Policy Guardrail`** tự động, thu thập `Experience Buffer`, chạy **`Safe Micro-batch Online RL`** + `Safety Evaluation Gate`, phục vụ `Admin` duyệt/rollback checkpoint 1-click. | Schema `rec_ai_svc`: `recommendation_logs`, `rl_experience_buffer`, `model_registry`, `online_eval_runs`, `consumed_events` | `Strategy + Policy Guardrail Decorator`, `Read/Write-Through Graph Cache`, `Safe Model Registry & Rollback` |
+
+#### A. Cơ chế Đồng bộ Đồ thị, Đề bài & Rubric giữa các Microservices (Cấm tuyệt đối SQL JOIN chéo Schema)
+1. **Nguyên tắc Cô lập Dữ liệu (`Strict Schema Isolation`):** Mỗi Microservice kết nối PostgreSQL bằng DB role riêng chỉ có quyền `SELECT, INSERT, UPDATE, DELETE` trên đúng schema của mình (`search_path = <service_schema>`). Mọi truy vấn SQL chéo schema (`SELECT ... FROM content_svc.concepts` từ `assess_svc` hoặc `rec_ai_svc`) đều bị chặn ở mức phân quyền PostgreSQL (`42501 insufficient_privilege`).
+2. **Read-Through Redis Cache cho Cấu trúc Đồ thị & Gói Nội dung Chấm điểm (`plumora:kg:{domain_slug}`):**
+   - `content-kg-service` xuất bản gói cấu trúc đồ thị chuẩn hóa (danh sách node `slug`, `tier`, `is_shared`, ma trận cạnh kề DAG `adjacency_edges`, tóm tắt Rubric và bộ test cases) vào Redis key `plumora:kg:{domain_slug}` kèm `graph_version` (`TTL = 3600s`).
+   - Khi `assessment-grader-service` hoặc `recommendation-ai-service` cần cấu trúc DAG / Rubric / Test Cases:
+     - **Bước 1 (Cache Hit):** Đọc trực tiếp từ Redis key `plumora:kg:{domain_slug}` ($< 2\text{ms}$).
+     - **Bước 2 (Cache Miss / Redis Down):** Gọi Internal REST API nội bộ `GET http://content-kg-service:8002/internal/v2/domains/{domain_slug}/bundle` (timeout `500ms`, có bộ đệm in-memory LRU ngắn hạn `60s`) để lấy gói dữ liệu và làm ấm lại Redis.
+3. **Đồng bộ Bất đồng bộ qua Sự kiện (`DomainGraphUpdatedEvent`):**
+   - Khi `Expert` cập nhật đồ thị, câu hỏi 5 tầng hoặc Rubric trên `content-kg-service`, giao dịch ACID ghi đồng thời vào bảng `content_svc.outbox_events` và phát sự kiện `DomainGraphUpdatedEvent` lên `Redis Streams` (`plumora:stream:domain_events`).
+   - `content-kg-service` cập nhật ngay key `plumora:kg:{domain_slug}`; `assessment-grader-service` và `recommendation-ai-service` tiêu thụ sự kiện (idempotent theo `event_id` trong bảng `consumed_events`) để xóa bộ đệm cục bộ và nạp `graph_version` mới.
+
+#### B. Chiến lược Chuyển đổi Cơ sở Dữ liệu (`Expand & Contract Migration Strategy`: `P3-SLICE-1` $\rightarrow$ `P3-SLICE-3`)
+- **Giai đoạn 1 — `Expand` tại `P3-SLICE-1` (Tương thích ngược 100% với Monolith MVP):**
+  - Giữ nguyên các bảng MVP (`users`, `concepts`, `concept_prerequisites`, `quiz_questions`, `user_concept_mastery`, `quiz_attempts`, `recommendation_logs`) để toàn bộ CI/E2E của `/api/v1/*` tiếp tục xanh 100%.
+  - Mở rộng thêm các bảng mới có tiền tố module rõ ràng (`domains`, `domain_concept_map`, `depth_questions`, `grading_rubrics`, `code_challenges`, `user_node_competency`, `assessment_sessions`, `attempt_records`) qua migration có phiên bản trong `backend/app/db/migrations.py`. Đồng bộ hai chiều giữa `user_concept_mastery` (12 node Backend) và `user_node_competency` trong cùng Unit of Work.
+- **Giai đoạn 2 — `Logical Partition & Dual-Schema View` tại `P3-SLICE-2`:**
+  - Bổ sung các bảng `rl_experience_buffer`, `model_registry`, `online_eval_runs` và `outbox_events`. Thiết lập ranh giới Repository tách biệt hoàn toàn theo 4 module (`auth`, `content_kg`, `assessment_grader`, `recommendation_ai`) không dùng ORM relationship chéo module.
+- **Giai đoạn 3 — `Contract & Physical Schema Isolation` tại `P3-SLICE-3`:**
+  - Script migration khởi tạo 4 schema vật lý (`CREATE SCHEMA IF NOT EXISTS auth_svc, content_svc, assess_svc, rec_ai_svc`), di chuyển/ánh xạ bảng về đúng schema sở hữu, thu hồi quyền truy cập chéo (`REVOKE ALL ON SCHEMA ...`) và chuyển toàn bộ giao tiếp liên dịch vụ sang `Transactional Outbox` + `Redis Streams` + Internal REST API.
+
+### 8.2. Hệ thống Sơ đồ Kiến trúc, Dữ liệu, Máy trạng thái, Bảo mật & Luồng RL Giai đoạn 3
+
+#### 1. Sơ đồ C4 Container Mở rộng Giai đoạn 3 (`DIAG-C4-CNT-V2`)
+
+```mermaid
+flowchart TB
+    Learner["Học viên (Learner)"]
+    Expert["Chuyên gia Nội dung (Expert)"]
+    Admin["Quản trị Mô hình (Admin)"]
+
+    subgraph PlumoraPhase3["Hệ thống Plumora Giai đoạn 3 (Docker Compose Runtime & Kubernetes Manifests)"]
+        SPA["React SPA Frontend\n(SCR-01..SCR-20: Đa lĩnh vực, Đánh giá 5 tầng,\nCode Sandbox UI, AI Tutor, Cổng Expert & Admin)"]
+        GW["API Gateway / Reverse Proxy\n(Định tuyến /api/v1 & /api/v2, Xác thực & Rate Limit)"]
+
+        AuthSvc["1. user-auth-service\n(Auth & RBAC: learner/expert/admin)"]
+        ContentSvc["2. content-kg-service\n(Multi-Domain KG, 5-Depth Bank & Rubrics)"]
+        AssessSvc["3. assessment-grader-service\n(5-Depth State Machine, Ebbinghaus & Outbox)"]
+        RecAiSvc["4. recommendation-ai-service\n(GNN-PPO Serving, Guardrail & Safe Online RL)"]
+
+        SandboxWorker["Isolated Code Sandbox Worker\n(No-Net, Read-Only FS, RAM<=128MB, Timeout<=3000ms)"]
+        LLMAdapter["LLM & Deterministic Rubric Adapter\n(External LLM API + Circuit Breaker Fallback)"]
+
+        PG[("PostgreSQL 16\n4 Isolated Schemas:\nauth_svc | content_svc | assess_svc | rec_ai_svc")]
+        RD[("Redis 7\nGraph-State Cache (plumora:kg:* / plumora:graph_state:*) +\nRedis Streams Event Bus")]
+    end
+
+    Learner & Expert & Admin --> SPA --> GW
+    GW --> AuthSvc & ContentSvc & AssessSvc & RecAiSvc
+    AssessSvc --> SandboxWorker
+    AssessSvc --> LLMAdapter
+    AssessSvc -. "Internal REST Fallback (/internal/v2/domains/*/bundle)" .-> ContentSvc
+    RecAiSvc -. "Internal REST Fallback (/internal/v2/domains/*/bundle)" .-> ContentSvc
+    AuthSvc & ContentSvc & AssessSvc & RecAiSvc --> PG
+    ContentSvc & AssessSvc & RecAiSvc --> RD
+```
+
+#### 2. Sơ đồ Triển khai Hạ tầng Docker Compose & Kubernetes (`DIAG-DEPLOY-V2`)
+
+```mermaid
+flowchart TB
+    subgraph LocalDockerHost["Môi trường Chạy Thực tế: Local Docker Compose (D-22, P3-SLICE-3)"]
+        subgraph PublicNet["Mạng Frontend & Gateway (plumora_edge_net)"]
+            FE["plumora-frontend (Nginx / Vite SPA)\nPort: 5173 (SCR-01..SCR-20)"]
+            GW_Node["plumora-gateway (FastAPI / Nginx Proxy)\nPort: 8000 (/api/v1/* & /api/v2/*)"]
+        end
+
+        subgraph InternalAppNet["Mạng Dịch vụ Nội bộ (plumora_service_net)"]
+            S1["user-auth-service (:8001)\nDB Role: auth_role (schema: auth_svc)"]
+            S2["content-kg-service (:8002)\nDB Role: content_role (schema: content_svc)"]
+            S3["assessment-grader-service (:8003)\nDB Role: assess_role (schema: assess_svc)"]
+            S4["recommendation-ai-service (:8004)\nDB Role: rec_ai_role (schema: rec_ai_svc)\nMount: rl/artifacts (:ro)"]
+            PG16[("plumora-postgres (PostgreSQL 16)\nBind: 127.0.0.1:5432 | Volume: pg_data")]
+            RD7[("plumora-redis (Redis 7)\nBind: 127.0.0.1:6379 | Volume: redis_data")]
+        end
+
+        subgraph IsolatedSandboxNet["Mạng Cô lập Thực thi Mã (network_mode: none — INV-SANDBOX-01)"]
+            SB_Worker["plumora-sandbox-worker\nread_only: true | tmpfs: /tmp (16MB, noexec)\nmem_limit: 128m | cpus: 0.5 | pids_limit: 64\nHard Timeout: <= 3000ms"]
+        end
+    end
+
+    subgraph K8sManifests["Bộ Manifests Kubernetes Chuẩn (Thư mục k8s/ — Chứng minh Auto-scale)"]
+        K8s_Ingress["Ingress + Service Mesh Routing"]
+        K8s_HPA_AI["HPA: recommendation-ai-deployment\n(minReplicas: 2, maxReplicas: 6, CPU target: 70%)"]
+        K8s_HPA_Assess["HPA: assessment-grader-deployment\n(minReplicas: 2, maxReplicas: 8)"]
+        K8s_Stateful["StatefulSet: postgres & redis + ConfigMap/Secret"]
+    end
+
+    FE --> GW_Node
+    GW_Node --> S1 & S2 & S3 & S4
+    S1 & S2 & S3 & S4 --> PG16
+    S2 & S3 & S4 --> RD7
+    S3 -->|"IPC / Restricted Worker Exec (<=3000ms)"| SB_Worker
+    K8s_Ingress --> K8s_HPA_AI & K8s_HPA_Assess --> K8s_Stateful
+```
+
+#### 3. Sơ đồ Thực thể Liên kết 4 Schema Độc lập (`DIAG-ERD-V2`)
+
+```mermaid
+erDiagram
+    AUTH_SVC__USERS ||--o{ AUTH_SVC__USER_ROLES : "có vai trò RBAC"
+    CONTENT_SVC__DOMAINS ||--o{ CONTENT_SVC__DOMAIN_CONCEPT_MAP : "ánh xạ N-N"
+    CONTENT_SVC__CONCEPTS ||--o{ CONTENT_SVC__DOMAIN_CONCEPT_MAP : "thuộc lĩnh vực (is_shared)"
+    CONTENT_SVC__CONCEPTS ||--o{ CONTENT_SVC__CONCEPT_PREREQUISITES : "tiên quyết DAG"
+    CONTENT_SVC__CONCEPTS ||--o{ CONTENT_SVC__DEPTH_QUESTIONS : "chứa đề 5 tầng"
+    CONTENT_SVC__DEPTH_QUESTIONS ||--o| CONTENT_SVC__GRADING_RUBRICS : "chấm theo Rubric"
+    CONTENT_SVC__CONCEPTS ||--o{ CONTENT_SVC__CODE_CHALLENGES : "chứa bài Code Sandbox"
+    ASSESS_SVC__ASSESSMENT_SESSIONS ||--o{ ASSESS_SVC__ATTEMPT_RECORDS : "ghi nhận từng bước"
+    REC_AI_SVC__MODEL_REGISTRY ||--o{ REC_AI_SVC__ONLINE_EVAL_RUNS : "kiểm định Safety Gate"
+
+    AUTH_SVC__USERS {
+        uuid id PK
+        varchar_32 username UK "NOT NULL, UNIQUE"
+        varchar_64 display_name "NOT NULL"
+        varchar_255 password_hash "NOT NULL (Argon2id)"
+        int state_version "NOT NULL DEFAULT 1"
+        timestamptz created_at "NOT NULL"
+    }
+    AUTH_SVC__USER_ROLES {
+        uuid user_id PK, FK "FK -> auth_svc.users.id"
+        varchar_16 role PK "CHECK IN ('learner','expert','admin')"
+        timestamptz granted_at "NOT NULL"
+    }
+    CONTENT_SVC__DOMAINS {
+        varchar_32 slug PK "backend | frontend | devops | custom"
+        varchar_128 title "NOT NULL"
+        int graph_version "NOT NULL DEFAULT 1"
+        boolean is_published "NOT NULL DEFAULT true"
+    }
+    CONTENT_SVC__CONCEPTS {
+        varchar_64 slug PK "vd: web-http, fe-dom-events, docker-containers"
+        varchar_128 title "NOT NULL"
+        boolean is_shared "NOT NULL DEFAULT false (node giao thoa)"
+        text lesson_markdown "NOT NULL"
+    }
+    CONTENT_SVC__DOMAIN_CONCEPT_MAP {
+        varchar_32 domain_slug PK, FK
+        varchar_64 concept_slug PK, FK
+        int node_idx "NOT NULL (0..N-1 trong lĩnh vực)"
+        int tier "NOT NULL CHECK (tier BETWEEN 1 AND 4)"
+    }
+    CONTENT_SVC__CONCEPT_PREREQUISITES {
+        varchar_32 domain_slug PK, FK
+        varchar_64 concept_slug PK, FK
+        varchar_64 prereq_slug PK, FK "CHECK (prereq_slug != concept_slug)"
+    }
+    CONTENT_SVC__DEPTH_QUESTIONS {
+        uuid id PK
+        varchar_64 concept_slug FK
+        int depth_tier "NOT NULL CHECK (depth_tier BETWEEN 1 AND 5)"
+        varchar_32 task_type "mcq | troubleshooting | constraint_shift | reverse_explain"
+        text prompt "NOT NULL"
+        jsonb options_or_context_json "NOT NULL"
+    }
+    CONTENT_SVC__GRADING_RUBRICS {
+        uuid id PK
+        uuid question_id FK "UNIQUE"
+        jsonb criteria_weights_json "NOT NULL ([{id, desc, weight, required_keywords}])"
+        text reference_explanation "NOT NULL (dùng cho AI Tutor & Deterministic Fallback)"
+    }
+    CONTENT_SVC__CODE_CHALLENGES {
+        uuid id PK
+        varchar_64 concept_slug FK
+        varchar_16 language "CHECK IN ('python','sql','javascript')"
+        text buggy_starter_code "NOT NULL"
+        jsonb test_cases_json "NOT NULL (public & hidden assertions)"
+        int timeout_ms "NOT NULL DEFAULT 3000 CHECK (timeout_ms <= 3000)"
+    }
+    ASSESS_SVC__USER_NODE_COMPETENCY {
+        uuid user_id PK "Logical ref -> auth_svc.users.id"
+        varchar_64 concept_slug PK "Logical ref -> content_svc.concepts.slug"
+        float depth_level_norm "NOT NULL DEFAULT 0.0 IN (0.0, 0.25, 0.5, 0.75, 1.0)"
+        float peak_depth_level_norm "NOT NULL DEFAULT 0.0 (High-water mark INV-MASTERY-01)"
+        float confidence "NOT NULL DEFAULT 0.0 CHECK (0.0 <= confidence <= 1.0)"
+        float stability_s "NOT NULL DEFAULT 3.0 CHECK (1.5 <= stability_s <= 60.0)"
+        float code_practice_score "NOT NULL DEFAULT 0.0"
+        timestamptz last_practiced_at "NULLABLE"
+    }
+    ASSESS_SVC__ASSESSMENT_SESSIONS {
+        uuid id PK
+        uuid user_id "NOT NULL, index"
+        varchar_32 domain_slug "NOT NULL"
+        varchar_64 concept_slug "NULLABLE (NULL khi là Adaptive Placement)"
+        varchar_24 session_mode "placement | depth_probe | code_practice | spaced_review"
+        int current_depth_tier "NOT NULL DEFAULT 1 CHECK (1..5)"
+        int consecutive_failures_in_tier "NOT NULL DEFAULT 0"
+        varchar_24 status "active | completed | ceiling_reached | insufficient_evidence"
+    }
+    ASSESS_SVC__ATTEMPT_RECORDS {
+        uuid id PK
+        uuid user_id "NOT NULL"
+        uuid submission_id "NOT NULL, UNIQUE(user_id, submission_id) (INV-IDEMP-01)"
+        uuid session_id FK
+        int depth_tier "NOT NULL"
+        float verified_score "NOT NULL CHECK (0.0 <= verified_score <= 1.0)"
+        varchar_32 grader_source "deterministic_mcq | sandbox_tests | llm_rubric | deterministic_fallback"
+        jsonb tutor_feedback_json "NOT NULL"
+    }
+    ASSESS_SVC__OUTBOX_EVENTS {
+        uuid event_id PK "Idempotency key cho Redis Streams consumer"
+        varchar_64 event_type "CompetencyUpdatedEvent"
+        jsonb payload_json "NOT NULL"
+        boolean published "NOT NULL DEFAULT false"
+        timestamptz created_at "NOT NULL"
+    }
+    REC_AI_SVC__RL_EXPERIENCE_BUFFER {
+        uuid id PK
+        uuid source_event_id UK "UNIQUE (chống nạp trùng từ Redis Streams)"
+        uuid user_id "NOT NULL"
+        varchar_32 domain_slug "NOT NULL"
+        jsonb graph_obs_before_json "NOT NULL (N x 8)"
+        varchar_64 action_concept_slug "NOT NULL"
+        varchar_24 action_learning_mode "Learn_New | Deep_Probe | Code_Practice | Spaced_Review"
+        float verified_reward "NOT NULL (INV-DEPTH-01)"
+        jsonb graph_obs_after_json "NOT NULL (N x 8)"
+    }
+    REC_AI_SVC__MODEL_REGISTRY {
+        uuid id PK
+        varchar_64 version_tag UK "vd: gnn-ppo-v2.0.0-base, gnn-ppo-online-b1"
+        varchar_64 checkpoint_sha256 "NOT NULL"
+        varchar_16 status "active_prod | candidate | archived | rolled_back"
+        boolean safety_gate_passed "NOT NULL DEFAULT false"
+        timestamptz activated_at "NULLABLE"
+    }
+    REC_AI_SVC__ONLINE_EVAL_RUNS {
+        uuid id PK
+        uuid candidate_model_id FK
+        float invalid_action_rate_unmasked "NOT NULL (< 0.05 để PASS)"
+        float masked_violation_rate "NOT NULL (== 0.00 để PASS)"
+        float mean_reward_ratio_vs_prod "NOT NULL (>= 0.98 để PASS)"
+        float kl_divergence "NOT NULL (<= delta_max)"
+        varchar_16 gate_verdict "PASSED | BLOCKED"
+    }
+```
+
+#### 4. Sơ đồ Máy Trạng thái Đánh giá Chẩn đoán & Đào sâu 5 Tầng (`DIAG-SM-ASSESS`)
+
+```mermaid
+stateDiagram-v2
+    [*] --> ModeSelection : Học viên bắt đầu đánh giá
+
+    state "Chế độ 1: Adaptive Placement (Tối đa 5-6 câu)" as PlacementMode {
+        [*] --> SampleTier1 : Lấy mẫu Root Node Tầng 1
+        SampleTier1 --> StepUpTier2 : Đạt (score >= 0.75) -> Cấp depth=0.75, conf=0.60
+        SampleTier1 --> BranchStop1 : Chưa đạt (< 0.75) -> Giữ depth=0.00, dừng nhánh con
+        StepUpTier2 --> StepUpTier3 : Đạt (score >= 0.75) -> Xác nhận tiên quyết & nhảy Tầng 3
+        StepUpTier2 --> BranchStop2 : Chưa đạt (< 0.75) -> Dừng nhánh tại Tầng 2
+        StepUpTier3 --> PlacementDone : Đạt đủ 5-6 câu hoặc hết nhánh khảo sát
+        BranchStop1 --> PlacementDone
+        BranchStop2 --> PlacementDone
+        PlacementDone --> [*] : Khởi tạo lộ trình (Trần tối đa: Deep Understanding = 0.75, conf = 0.60, S0 = 3.0d)
+    }
+
+    state "Chế độ 2: 5-Depth Probing State Machine (Đào sâu Tầng 1..5)" as DepthProbeMode {
+        [*] --> Tier1_What : Bắt đầu (hoặc nhảy vào Tầng ứng với mức hiểu hiện tại)
+        Tier1_What --> Tier2_How : step_score >= 0.75 (Đạt Tầng 1)
+        Tier1_What --> Ceiling_d0 : Sai 2 lượt liên tiếp tại Tầng 1 (Knowledge Ceiling d=0)
+
+        Tier2_How --> Tier3_Pitfalls : step_score >= 0.75 (Đạt Tầng 2)
+        Tier2_How --> Ceiling_d1 : Sai 2 lượt liên tiếp tại Tầng 2 -> Chốt Surface (0.25, conf=0.65)
+
+        Tier3_Pitfalls --> Tier4_Tradeoffs : Điểm Rubric/Sandbox >= 0.75 (Đạt Tầng 3)
+        Tier3_Pitfalls --> Ceiling_d2 : Sai 2 lượt liên tiếp tại Tầng 3 -> Chốt Applied (0.50, conf=0.75)
+
+        Tier4_Tradeoffs --> Tier5_Internals : Điểm Rubric/Sandbox >= 0.75 (Đạt Tầng 4)
+        Tier4_Tradeoffs --> Ceiling_d3_4 : Sai 2 lượt liên tiếp tại Tầng 4 -> Chốt Deep Understanding (0.75, conf=0.85, Mở khóa DAG)
+
+        Tier5_Internals --> Completed_Mastery : Đạt Tầng 4-5 VÀ (Pass 100% Code Sandbox HOẶC Internals Rubric >= 0.85) -> Chốt Mastery (1.00, conf=0.95)
+        Tier5_Internals --> Ceiling_d3_4 : Sai 2 lượt tại Tầng 5 -> Chốt Deep Understanding (0.75, conf=0.85)
+
+        Tier1_What --> InsufficientEv : Bỏ dở (< 2 bước) hoặc conf < 0.50
+        Tier2_How --> InsufficientEv : Bỏ dở mà chưa chạm trần
+    }
+
+    ModeSelection --> PlacementMode : Chọn Chẩn đoán đầu vào (SCR-10)
+    ModeSelection --> DepthProbeMode : Chọn Đào sâu khái niệm / Thực hành (SCR-12, SCR-13)
+    PlacementMode --> [*]
+    DepthProbeMode --> [*]
+```
+
+#### 5. Sơ đồ Tuần tự Luồng Đánh giá 5 Tầng, Chấm Đa phương thức, Outbox & Khuyến nghị `GNN-PPO` (`DIAG-SEQ-V2` — Đầy đủ Nhánh Lỗi `alt/else`)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor L as Học viên (Learner)
+    participant SPA as React SPA (SCR-11..14)
+    participant AS as assessment-grader-service
+    participant SB as Isolated Code Sandbox Worker
+    participant LLM as LLM Adapter & Circuit Breaker
+    participant PG as PostgreSQL (assess_svc)
+    participant RS as Redis (Cache + Streams)
+    participant AI as recommendation-ai-service
+
+    L->>SPA: Nộp câu trả lời tự luận / mã nguồn ở Tầng d (kèm submission_id)
+    SPA->>AS: POST /api/v2/assessments/{session_id}/submit {submission_id, answer_or_code}
+    AS->>PG: BEGIN ACID Tx (SELECT FOR UPDATE session & user_node_competency)
+
+    alt Đã tồn tại (user_id, submission_id) [Idempotent Replay - INV-IDEMP-01]
+        PG-->>AS: Trả bản ghi attempt_records đã lưu (hoặc 409 nếu khác session_id)
+        AS->>PG: COMMIT
+        AS-->>SPA: 200 OK {idempotent_replay: true, attempt_record, tutor_feedback}
+    else Bài nộp Code Sandbox (Code Review & Refactoring)
+        AS->>SB: Thực thi mã với test cases (network_mode: none, RAM<=128MB, timeout<=3000ms)
+        alt Mã chạy hoàn tất trong <= 3000ms
+            SB-->>AS: {passed_tests, total_tests, runtime_ms, code_score} (grader_source = "sandbox_tests")
+        else Mã chứa vòng lặp vô hạn hoặc vượt quá 3000ms / 128MB [INV-SANDBOX-01]
+            SB-->>AS: Hủy container/worker tức thì -> {status: "SANDBOX_TIMEOUT", code_score: 0.0}
+            AS-->>SPA: 408 Request Timeout {error_code: "SANDBOX_TIMEOUT", timeout_ms: 3000}
+        end
+    else Bài nộp Tự luận ngắn / Tình huống Tầng 3..5 (Chấm theo Rubric)
+        AS->>LLM: Chấm theo GradingRubric (timeout = 4000ms)
+        alt LLM API phản hồi hợp lệ & Circuit Breaker CLOSED
+            LLM-->>AS: {rubric_score, criteria_breakdown, ai_tutor_explanation, grader_source: "llm_rubric"}
+        else LLM Offline / Timeout / Lỗi 5xx -> Circuit Breaker OPEN [Graceful Fallback]
+            LLM->>LLM: Chuyển sang DeterministicRubricGrader (đối sánh từ khóa & cấu trúc Rubric)
+            LLM-->>AS: {rubric_score, criteria_breakdown, reference_explanation, grader_source: "deterministic_fallback"}
+        end
+    end
+
+    AS->>PG: Cập nhật 5-Depth State Machine (tầng kế tiếp, Knowledge Ceiling hoặc insufficient_evidence)<br/>Cập nhật peak_depth_level_norm = max(old, new), Ebbinghaus S_new & INSERT outbox_events (event_id)
+    AS->>PG: COMMIT
+    AS->>RS: SETEX plumora:graph_state:{user_id}:{domain} & XADD plumora:stream:competency (event_id)
+    AS-->>SPA: 200 OK {verified_score, depth_level_norm, confidence, stability_s, retention_r, grader_source, tutor_feedback}
+
+    RS-->>AI: Consumer đọc CompetencyUpdatedEvent (event_id)
+    alt event_id đã tồn tại trong rec_ai_svc.consumed_events [Idempotent Consumer]
+        AI->>AI: Bỏ qua sự kiện trùng (XACK ngay lập tức)
+    else Sự kiện mới hợp lệ
+        AI->>AI: Tính verified_reward (INV-DEPTH-01) -> Ghi vào rl_experience_buffer & consumed_events
+    end
+
+    L->>SPA: Xin khuyến nghị bước học tiếp theo trên đồ thị đa lĩnh vực
+    SPA->>AI: POST /api/v2/recommendations {domain_slug}
+    AI->>RS: Đọc Graph Observation (N nodes x 8 features) + Cấu trúc DAG (plumora:kg:{domain_slug})
+    AI->>AI: Suy luận 3 lớp GNN-PPO -> (concept_slug, learning_mode)
+
+    alt Đề xuất của GNN-PPO hợp lệ DAG & không bỏ sót bài suy giảm nhớ
+        AI-->>SPA: 200 OK {concept_slug, learning_mode, policy_source: "gnn_ppo", guardrail_applied: false, checkpoint_sha256}
+    else Có node suy giảm nhớ R(t) < 0.60 hoặc GNN-PPO chọn node Locked [Policy Guardrail - INV-ONLINE-RL-01]
+        AI->>AI: Lọc logit hợp lệ DAG / Ưu tiên(node có R(t)<0.60, mode="Spaced_Review")
+        AI-->>SPA: 200 OK {concept_slug, learning_mode, policy_source: "gnn_ppo_masked", guardrail_applied: true, checkpoint_sha256}
+    end
+```
+
+#### 6. Sơ đồ Ranh giới Bảo mật & Cô lập Thực thi (`DIAG-SEC-V2`)
+
+```mermaid
+flowchart LR
+    subgraph UntrustedZone["Vùng Không Tin Cậy (Public / Browser Client)"]
+        Browser["Trình duyệt Người dùng\n(Learner / Expert / Admin)\n[Untrusted Input & User Code]"]
+    end
+
+    subgraph EdgeBoundary["Ranh giới 1: API Gateway & RBAC Guard"]
+        GW["API Gateway (:8000)\n• Xác thực HttpOnly Cookie / JWT (HS256)\n• Kiểm tra RBAC: learner | expert | admin\n• Chống IDOR (chỉ lấy current_user.id từ Token)\n• Rate Limiting & Payload Validation"]
+    end
+
+    subgraph AppTrustZone["Ranh giới 2: Mạng Dịch vụ Nội bộ (plumora_service_net)"]
+        Auth["user-auth-service"]
+        Content["content-kg-service\n(DAG Cycle Check)"]
+        Assess["assessment-grader-service\n(Idempotency & Outbox)"]
+        RecAI["recommendation-ai-service\n(Policy Guardrail & Safety Gate)"]
+    end
+
+    subgraph DataTrustZone["Ranh giới 3: Cô lập 4 Schema PostgreSQL & Redis"]
+        PG_Schemas[("PostgreSQL 16\n• auth_role -> auth_svc ONLY\n• content_role -> content_svc ONLY\n• assess_role -> assess_svc ONLY\n• rec_ai_role -> rec_ai_svc ONLY\n(Cấm truy vấn SQL chéo Schema)")]
+        Redis_Bus[("Redis 7 (127.0.0.1)\nGraph Cache + Streams")]
+    end
+
+    subgraph SandboxJailZone["Ranh giới 4: Hộp Cát Cô lập Tuyệt đối (INV-SANDBOX-01)"]
+        Jail["Isolated Code Sandbox Worker\n• network_mode: none (Cấm Internet/LAN)\n• User: nobody (UID 65534, Non-root)\n• RootFS: read_only (tmpfs /tmp 16MB, noexec)\n• Không mount docker.sock\n• cgroups: RAM <= 128MB, CPU <= 0.5, pids <= 64\n• Hard Kill Timeout: <= 3000ms"]
+    end
+
+    Browser -->|"HTTPS/HTTP JSON"| GW
+    GW -->|"Đã xác thực Role & User ID"| Auth & Content & Assess & RecAI
+    Auth & Content & Assess & RecAI --> PG_Schemas
+    Content & Assess & RecAI --> Redis_Bus
+    Assess -->|"Chỉ truyền Code chuỗi + Test JSON\n(Không chia sẻ biến môi trường/DB)"| Jail
+```
+
+#### 7. Sơ đồ Luồng Dữ liệu Huấn luyện Đa lĩnh vực, Đối sánh 4 Cấp & `Safe Micro-batch Online RL` (`DIAG-DFD-RL-V2`)
+
+```mermaid
+flowchart TB
+    subgraph MultiDomainKG["1. Đồ thị Đa Lĩnh vực & Đồ thị Kiểm thử Độc lập"]
+        TrainGraphs["3 Đồ thị Huấn luyện & Đánh giá Nội miền:\n• backend (12 node)\n• frontend (10 node — 4 shared)\n• devops (9 node — 5 shared)"]
+        HeldoutGraph["Đồ thị Kiểm thử Thứ 4 (Zero-shot Transfer):\n• heldout_data_eng_graph (10 node chia 4 tầng)"]
+    end
+
+    subgraph OfflineBenchmark["2. Simulator Đa lĩnh vực & Thực nghiệm Đối sánh 4 Cấp (P3-SLICE-2)"]
+        SimV2["MultiDomainStudentSimulatorEnv\n• Node Features: N x 8 chiều\n• Action: (v in 0..N-1, m in 4 modes)\n• Ebbinghaus Decay + 5-Depth Transition"]
+        FourTiers["Đối sánh 4 Cấp (train_seeds=[101,202,303], val=999, eval=2026 x 500 ep):\n1. Heuristics (B1/B2/B3 + Spaced Review)\n2. DQN-MLP (Padded N_max=16 + Action Mask)\n3. PPO-MLP (Padded N_max=16 + Action Mask)\n4. GNN-PPO (3-Layer PyTorch Directed Message Passing)"]
+        BaseCkpt["Checkpoint Gốc Đã Kiểm chứng\n(gnn_ppo_v2_base.zip + SHA-256 + Report)"]
+    end
+
+    subgraph SafeOnlineLoop["3. Vòng lặp Safe Micro-batch Online RL & Rollback (P3-SLICE-3)"]
+        ExpBuf[("Verified Experience Buffer\n(rl_experience_buffer)\nChỉ nhận reward từ mức hiểu đã kiểm chứng")]
+        KLFineTune["KL-Constrained PPO Micro-batch Updater\nD_KL(pi_prod || pi_cand) <= delta_max"]
+        SafetyGate{"Automated Safety Evaluation Gate\n(200 episodes chuẩn)\n• unmasked_invalid < 5.0%\n• masked_violation == 0.0%\n• reward >= 0.98 * prod"}
+        AdminApprove["Cổng Admin (SCR-18 / SCR-19):\n• Duyệt Activate Candidate\n• Hoặc 1-Click Rollback (< 2s)"]
+    end
+
+    TrainGraphs --> SimV2
+    HeldoutGraph --> SimV2
+    SimV2 --> FourTiers --> BaseCkpt
+    BaseCkpt --> KLFineTune
+    ExpBuf --> KLFineTune --> SafetyGate
+    SafetyGate -- "PASSED" --> AdminApprove
+    SafetyGate -- "BLOCKED (Tự động từ chối)" --> ExpBuf
+```
+
+### 8.3. Hợp đồng REST API `/api/v2/*` & Hợp đồng Sự kiện `Redis Streams` (`PL3-KG-01`..`PL3-ARCH-01`)
+
+#### A. Bảng Hợp đồng REST API `/api/v2/*`
+
+| Phân hệ / Dịch vụ | Endpoint | Quyền RBAC | Đầu vào (`Request Contract`) | Đầu ra thành công (`200`/`201`) | Mã lỗi & Bất biến bảo toàn | Tiêu chí (`AC-ID`) |
+| --- | --- | --- | --- | --- | --- | --- |
+| **Learner — Đa lĩnh vực** (`content-kg` + `assess`) | `GET /api/v2/domains` | `learner`, `expert`, `admin` | Header/Cookie xác thực | `200`: `{domains: [{slug, title, total_nodes, shared_nodes_count, user_summary: {surface_count, applied_count, deep_count, mastery_count, needs_review_count, placement_completed}}]}` | `401 AUTH_REQUIRED` | `PL3-KG-01`, `PL3-MEMORY-01` |
+| **Learner — Bản đồ KG & *Ebbinghaus*** | `GET /api/v2/domains/{slug}/roadmap` | `learner`, `expert`, `admin` | Path `slug`, Query tùy chọn `simulated_time_offset_days` (chỉ bật ở `dev`/`test`) | `200`: `{domain_slug, graph_version, nodes: [{node_idx, slug, title, tier, is_shared, prerequisites, depth_level_norm, depth_label, confidence, stability_s, retention_ebbinghaus, is_eligible, needs_review, code_practice_score}]}` | `401 AUTH_REQUIRED`, `404 DOMAIN_NOT_FOUND` | `PL3-KG-01`, `PL3-MEMORY-01` |
+| **Learner — Chẩn đoán đầu vào (`SCR-10`)** | `POST /api/v2/domains/{slug}/placement/start` | `learner` | Path `slug` | `201`: `{session_id, domain_slug, max_questions: 6, current_question: {question_id, concept_slug, tier, prompt, options}}` | `401 AUTH_REQUIRED`, `404 DOMAIN_NOT_FOUND` | `PL3-ASSESS-01` |
+| **Learner — Nộp câu Chẩn đoán (`SCR-10`)** | `POST /api/v2/domains/{slug}/placement/{session_id}/answer` | `learner` | `{submission_id: UUID, question_id: UUID, selected_option: "A"\|"B"\|"C"\|"D"}` | `200`: `{step_passed, placement_status: "in_progress"\|"completed", next_question: {...}\|null, initialized_nodes: [{concept_slug, depth_level_norm (<=0.75), confidence: 0.60 (khi đạt) \| 0.30 (khi dừng nhánh), stability_s: 3.0}]}` | `401`, `404`, `409 SUBMISSION_ID_CONFLICT`, `422` | `PL3-ASSESS-01` |
+| **Learner — Khởi tạo Phiên Đào sâu 5 tầng / Ôn tập (`SCR-12`, `SCR-14`)** | `POST /api/v2/assessments/start` | `learner` | `{domain_slug: str, concept_slug: str, session_mode: "depth_probe"\|"spaced_review"}` | `201`: `{session_id, concept_slug, session_mode, current_depth_tier: 1..5, step_item: {question_id, depth_tier, task_type, prompt, options_or_context, rubric_summary}}` | `401 AUTH_REQUIRED`, `403 CONCEPT_LOCKED` (`INV-DAG-01`) | `PL3-ASSESS-01`, `PL3-MEMORY-01` |
+| **Learner — Nộp bước Đào sâu 5 tầng & AI Tutor (`SCR-12`, `SCR-14`)** | `POST /api/v2/assessments/{session_id}/submit` | `learner` | `{submission_id: UUID, question_id: UUID, selected_option: str\|null, written_explanation: str\|null}` | `200`: `{attempt_id, idempotent_replay: bool, step_score, step_passed, grader_source: "deterministic_mcq"\|"llm_rubric"\|"deterministic_fallback", session_status: "active"\|"ceiling_reached"\|"completed"\|"insufficient_evidence", next_depth_tier: int\|null, next_step_item: {...}\|null, updated_competency: {depth_level_norm, depth_label, confidence, stability_s, retention_ebbinghaus}, tutor_feedback: {summary, criteria_results: [...]}}` | `401`, `403`, `404`, `409 SUBMISSION_ID_CONFLICT`, `422` (`INV-DEPTH-01`) | `PL3-ASSESS-01`, `PL3-TUTOR-01`, `PL3-MEMORY-01` |
+| **Learner — Chấm Code Sandbox Cô lập (`SCR-13`)** | `POST /api/v2/concepts/{slug}/code-sandbox/submit` | `learner` | `{submission_id: UUID, challenge_id: UUID, language: "python"\|"sql"\|"javascript", source_code: str}` | `200`: `{attempt_id, idempotent_replay: bool, passed_tests: int, total_tests: int, code_score: float, runtime_ms: int, memory_kb: int, test_results: [...], updated_competency: {depth_level_norm, confidence, stability_s}}` | `401`, `403 CONCEPT_LOCKED`, `408 SANDBOX_TIMEOUT` ($>3000\text{ms}$, `INV-SANDBOX-01`), `422 SANDBOX_SECURITY_VIOLATION` | `PL3-GRADER-01`, `PL3-ASSESS-01` |
+| **Learner — Khuyến nghị `GNN-PPO` (`SCR-11`)** | `POST /api/v2/recommendations` | `learner` | `{domain_slug: str}` | `200`: `{domain_slug, status: "active"\|"completed", recommended_action: {concept_slug, title, tier, learning_mode: "Learn_New"\|"Deep_Probe"\|"Code_Practice"\|"Spaced_Review", reason_vi}, policy_source: "gnn_ppo"\|"gnn_ppo_masked"\|"fallback_rule", state_source: "redis_graph_cache"\|"postgres_fallback", guardrail_applied: bool, retention_alert: bool, checkpoint_sha256: str, node_features_snapshot: [...]}` | `401 AUTH_REQUIRED` (Tự động fallback trả `200` nếu thiếu checkpoint hoặc lỗi Redis, $p95 < 250\text{ms}$) | `PL3-RL-01`, `PL3-GUARD-01` |
+| **Expert — Quản lý Lĩnh vực & Đồ thị DAG (`SCR-15`)** | `POST /api/v2/expert/domains`<br>`PUT /api/v2/expert/domains/{slug}/graph` | `expert`, `admin` | `{slug, title, nodes: [{slug, title, tier, is_shared, lesson_markdown}], edges: [{concept_slug, prereq_slug}]}` | `200`/`201`: `{domain_slug, graph_version, dag_valid: true, total_nodes, shared_nodes_count, published_event_id}` | `401`, `403 FORBIDDEN_ROLE` (nếu là `learner`), `422 DAG_CYCLE_DETECTED` (kèm `cycle_path`) | `PL3-KG-01`, `PL3-ROLE-01` |
+| **Expert — Biên soạn Đề 5 Tầng, Rubric & Code Challenge (`SCR-16`, `SCR-17`)** | `POST /api/v2/expert/concepts/{slug}/questions`<br>`POST /api/v2/expert/concepts/{slug}/code-challenges` | `expert`, `admin` | `{depth_tier: 1..5, task_type, prompt, rubric: {criteria_weights, reference_explanation}}` hoặc `{language, buggy_starter_code, solution_code, test_cases, timeout_ms: <=3000}` | `201`: `{item_id, concept_slug, validation_run: {solution_passed_all_tests: true, runtime_ms}}` | `401`, `403 FORBIDDEN_ROLE`, `422 RUBRIC_WEIGHT_SUM_INVALID` ($\sum w_j \ne 1.0$) | `PL3-ASSESS-01`, `PL3-GRADER-01`, `PL3-TUTOR-01`, `PL3-ROLE-01` |
+| **Admin — Giám sát `Online RL` & Chạy Lô Tinh chỉnh (`SCR-18`)** | `GET /api/v2/admin/online-rl/status`<br>`POST /api/v2/admin/online-rl/micro-batch` | `admin` | `{batch_size: int (default 128), kl_target_max: float (default 0.02)}` | `200`: `{candidate_model_id, version_tag, checkpoint_sha256, kl_divergence, safety_eval: {gate_verdict: "PASSED"\|"BLOCKED", invalid_action_rate_unmasked, masked_violation_rate, mean_reward_ratio_vs_prod}}` | `401`, `403 FORBIDDEN_ROLE` (nếu là `learner` hoặc `expert`), `409 INSUFFICIENT_BUFFER_SAMPLES` | `PL3-RL-01`, `PL3-GUARD-01`, `PL3-ROLE-01` |
+| **Admin — Duyệt Phát hành & `1-Click Rollback` (`SCR-19`)** | `POST /api/v2/admin/models/{model_id}/activate`<br>`POST /api/v2/admin/models/rollback` | `admin` | `{reason: str}` | `200`: `{active_model_id, previous_model_id, active_checkpoint_sha256, switched_at, switch_latency_ms (<2000ms)}` | `401`, `403 FORBIDDEN_ROLE`, `422 SAFETY_GATE_NOT_PASSED` (`INV-ONLINE-RL-01` — cấm kích hoạt model `BLOCKED`) | `PL3-RL-01`, `PL3-ROLE-01` |
+| **Admin — Sức khỏe Cụm 4 Microservices & Outbox (`SCR-20`)** | `GET /api/v2/admin/system-health` | `admin` | — | `200`: `{services: {auth: "up", content_kg: "up", assessment_grader: "up", recommendation_ai: "up"}, schemas_isolated: true, outbox_pending_count: int, redis_stream_lag_ms: float (<500ms), graph_cache_hit_rate: float}` | `401`, `403 FORBIDDEN_ROLE` | `PL3-ARCH-01`, `PL3-ROLE-01` |
+
+#### B. Hợp đồng Sự kiện `Redis Streams` & `Transactional Outbox` (`Idempotent Event Contract`)
+
+| Tên Sự kiện (`event_type`) | Kênh `Redis Streams` | Dịch vụ Phát (`Producer`) | Dịch vụ Tiêu thụ (`Consumer`) | Cấu trúc Payload Chuẩn (`JSON Schema`) | Cơ chế Chống xử lý trùng & Chịu lỗi (`Idempotency & Retry`) |
+| --- | --- | --- | --- | --- | --- |
+| **`CompetencyUpdatedEvent`** | `plumora:stream:competency` (Consumer Group: `rec_ai_cg`) | `assessment-grader-service` (ghi vào `assess_svc.outbox_events` trong cùng ACID Tx chấm bài) | `recommendation-ai-service` | `{event_id: UUID, occurred_at: ISO8601, user_id: UUID, domain_slug: str, concept_slug: str, session_mode: str, depth_before: float, depth_after: float, confidence: float, stability_s: float, retention_recovered: float, code_score_delta: float, verified_reward: float, graph_obs_before: float[N][8], graph_obs_after: float[N][8]}` | Consumer kiểm tra `event_id` trong bảng `rec_ai_svc.consumed_events` (`UNIQUE (event_id)`) trong cùng transaction ghi `rl_experience_buffer`. Nếu đã tồn tại $\rightarrow$ bỏ qua và gửi `XACK`. Độ trễ đích $p95 < 500\text{ms}$. |
+| **`DomainGraphUpdatedEvent`** | `plumora:stream:domain_events` (Consumer Groups: `assess_cg`, `rec_ai_cg`) | `content-kg-service` (ghi vào `content_svc.outbox_events` khi `Expert` xuất bản đồ thị/Rubric/Code Challenge) | `assessment-grader-service`, `recommendation-ai-service` | `{event_id: UUID, occurred_at: ISO8601, domain_slug: str, graph_version: int, updated_by_expert_id: UUID, change_summary: str}` | Cập nhật ngay Redis key `plumora:kg:{domain_slug}`; các consumer kiểm tra `event_id` trong `consumed_events`, làm mới cache đồ thị in-memory và gửi `XACK`. |
+
+### 8.4. Đặc tả 6 Yếu tố cho các Mẫu Thiết kế Phần mềm Mới Giai đoạn 3 (`P3-07`, `D-23`)
+
+| Mẫu Thiết kế (`Design Pattern`) | 1. Vấn đề (`Problem`) | 2. Phương án đơn giản đã loại bỏ (`Simpler Alternative`) | 3. Mẫu được chọn (`Selected Pattern`) | 4. Thành phần tham gia (`Participants`) | 5. Đánh đổi (`Trade-offs`) | 6. Bằng chứng kiểm thử (`Verification Evidence`) |
+| --- | --- | --- | --- | --- | --- | --- |
+| **1. `5-Depth Probing State Machine`** (`PL3-ASSESS-01`) | Phiên đánh giá đào sâu cần điều hướng linh hoạt qua 5 tầng (*What $\rightarrow$ Internals*) và dừng đúng lúc học viên chạm *Knowledge Ceiling* hoặc báo `insufficient_evidence` khi bỏ dở, đồng thời không làm phình không gian hành động của RL. | Dùng hàm `if/else` tĩnh hoặc giao luôn việc chọn từng câu hỏi tầng 1..5 cho RL (làm không gian hành động tăng gấp $5\times$, khó hội tụ và dễ hỏi câu Tầng 5 khi chưa biết Tầng 1). | **State Machine Pattern** tất định điều khiển luồng câu hỏi bên trong phiên đánh giá và ánh xạ 3 chiều sang `(depth_level_norm, confidence)`. | `AssessmentSessionStateMachine`, `PlacementSampler`, `DepthStepTransition`, `CeilingDetector`, `CompetencyMapper` (trong `assessment-grader-service`). | Tăng thêm bảng trạng thái phiên `assessment_sessions`, nhưng tách bạch hoàn hảo quyết định cấp lộ trình $(v, m)$ của RL với quyết định bóc tách chiều sâu từng khái niệm. | `pytest tests/test_depth_state_machine.py`: kiểm chứng chuyển tầng $1 \rightarrow 5$, dừng khi sai 2 lần liên tiếp cùng tầng (`ceiling_reached`), trần Placement `0.75` và nhánh `insufficient_evidence`. |
+| **2. `Adapter + Dependency Injection + Circuit Breaker`** (`PL3-GRADER-01`, `PL3-TUTOR-01`) | Hệ thống cần chấm tự luận theo Rubric qua LLM ngoài và chấm code qua Sandbox Worker, nhưng khi bảo vệ đồ án offline hoặc khi LLM/Sandbox quá tải thì hệ thống tuyệt đối không được sập `500`. | Gọi trực tiếp SDK của nhà cung cấp LLM hoặc chạy `subprocess` trực tiếp trong controller API (gây khóa luồng, phụ thuộc cứng vào mạng và mất an toàn thực thi). | **Adapter Pattern + DI + Circuit Breaker**: định nghĩa giao diện trừu tượng `RubricGraderPort` và `CodeSandboxPort`; bọc LLM bằng `CircuitBreaker` tự động chuyển sang `DeterministicRubricGrader` khi lỗi/offline. | `RubricGraderPort`, `LlmRubricGraderAdapter`, `DeterministicRubricGrader`, `CircuitBreakerGuard`, `IsolatedSandboxWorkerAdapter`. | Cần duy trì bộ từ khóa & giải thích mẫu trong `grading_rubrics` để phục vụ fallback, đổi lại hệ thống đạt độ sẵn sàng 100% khi offline và minh bạch qua trường `grader_source`. | `pytest tests/test_llm_rubric_adapter.py` & `test_code_sandbox_security.py`: ngắt mạng ép Circuit Breaker mở $\rightarrow$ xác nhận trả `grader_source = "deterministic_fallback"` (`200 OK`); gửi `while True` $\rightarrow$ xác nhận cắt trong $\le 3000\text{ms}$. |
+| **3. `Transactional Outbox + Idempotent Stream Consumer`** (`PL3-ARCH-01`) | Khi tách thành 4 Microservices với 4 Schema DB riêng, nếu `assessment-grader-service` cập nhật DB xong nhưng mất kết nối Redis trước khi gửi sự kiện thì `recommendation-ai-service` sẽ mất mẫu `Experience Buffer` (lỗi Dual-Write). | Gửi trực tiếp sự kiện lên Redis hoặc gọi HTTP đồng bộ sang `recommendation-ai-service` ngay sau lệnh `db.commit()` (dễ mất sự kiện khi mạng chập chờn hoặc gây nhân bản dữ liệu khi retry). | **Transactional Outbox + Idempotent Consumer**: ghi bản ghi vào `assess_svc.outbox_events` trong cùng ACID Transaction với `attempt_records`, relay sang `Redis Streams` và chống xử lý trùng bằng `event_id` tại `rec_ai_svc.consumed_events`. | `AssessmentUnitOfWork`, `OutboxRelayWorker`, `RedisStreamPublisher`, `IdempotentExperienceConsumer` (`consumed_events`). | Phát sinh độ trễ bất đồng bộ nhỏ ($p95 < 500\text{ms}$) và bảng `outbox_events`/`consumed_events`, nhưng bảo đảm tính nhất quán *At-least-once Delivery* + *Exactly-once Processing*. | `pytest tests/test_microservices_outbox_streams.py`: giả lập lỗi Redis lúc commit $\rightarrow$ relay tự phát bù khi Redis sống lại; phát lặp cùng `event_id` 3 lần $\rightarrow$ `rl_experience_buffer` chỉ ghi đúng 1 dòng. |
+| **4. `Strategy + Policy Guardrail Decorator & Safe Model Registry`** (`PL3-RL-01`, `PL3-GUARD-01`, `INV-ONLINE-RL-01`) | Mô hình `GNN-PPO` và các bản cập nhật `Online RL` có thể đề xuất bài vi phạm tiên quyết DAG, bỏ sót bài suy giảm nhớ $R(t) < 0.60$, hoặc suy giảm chất lượng sau khi fine-tune. | Tin tưởng tuyệt đối đầu ra của mạng nơ-ron và ghi đè trực tiếp file `checkpoint.zip` đang chạy khi có lô dữ liệu mới (rủi ro quên thảm khốc và phá vỡ luật sư phạm DAG). | **Strategy + Guardrail Decorator & Safe Model Registry**: bọc chiến lược `GnnPpoStrategy` trong `PolicyGuardrailDecorator` (ép luật DAG + ưu tiên `Spaced_Review`); quản lý vòng đời `candidate` $\rightarrow$ `Safety Evaluation Gate` $\rightarrow$ `Admin Activate` / `1-Click Rollback`. | `RecommendationStrategyPort`, `GnnPpoStrategy`, `PolicyGuardrailDecorator`, `SafeOnlineRlTrainer`, `SafetyEvaluationGate`, `ModelRegistryService`. | Cần lưu trữ nhiều phiên bản checkpoint và chạy 200 episodes kiểm định trước khi kích hoạt, đổi lại đảm bảo `masked_violation_rate == 0.0%` và khôi phục tức thì $< 2000\text{ms}$. | `pytest tests/test_gnn_ppo_guardrail_serving.py` & `test_rbac_expert_admin.py`: kiểm chứng chặn 100% action Locked, ưu tiên node $R(t)<0.60$, từ chối kích hoạt checkpoint `BLOCKED` (`422`) và test `1-Click Rollback`. |
+
+### 8.5. Ma trận Liên kết Mở rộng Giai đoạn 3 (`System Design` $\leftrightarrow$ `UI Design System` $\leftrightarrow$ `4 Lát cắt`)
+
+| `AC-ID` | Màn hình chuyên biệt (`ui-design-system.md` `SCR-09`..`SCR-20`) | Dịch vụ & API Chính | Lưu trữ & Bất biến | Lát cắt (`plan.md`) |
+| --- | --- | --- | --- | --- |
+| `PL3-KG-01`, `PL3-MEMORY-01` | `SCR-09`: Trung tâm Đa lĩnh vực (`/domains`)<br>`SCR-11`: Bản đồ KG Đa lĩnh vực & *Ebbinghaus* (`/domains/:domain/roadmap`) | `GET /api/v2/domains`, `GET /api/v2/domains/{slug}/roadmap` | `domains`, `domain_concept_map`, `user_node_competency` ($R(t) = e^{-\Delta t/S}$, $S_0 = 3.0$) | `P3-SLICE-1` |
+| `PL3-ASSESS-01`, `PL3-GRADER-01`, `PL3-TUTOR-01` | `SCR-10`: Chẩn đoán Đầu vào (`/domains/:domain/placement`)<br>`SCR-12`: Phòng Đào sâu 5 Tầng (`/concepts/:slug/depth-probe`)<br>`SCR-13`: Phòng Code Sandbox (`/concepts/:slug/code-sandbox`)<br>`SCR-14`: Ngăn kéo AI Tutor, Rubric & Ôn tập *Ebbinghaus* | `POST /api/v2/domains/{slug}/placement/*`, `POST /api/v2/assessments/*`, `POST /api/v2/concepts/{slug}/code-sandbox/submit` | `assessment_sessions`, `attempt_records`; `INV-DEPTH-01`, `INV-SANDBOX-01` | `P3-SLICE-1` |
+| `PL3-RL-01`, `PL3-GUARD-01` | `SCR-11` Banner `GNN-PPO` & `SCR-06` Mở rộng (Graph Provenance 8 features/node) | `POST /api/v2/recommendations` & CLI `plumora_rl.train_gnn_ppo` / `evaluate_phase3` | `rl_experience_buffer`, `model_registry`; `INV-RL-01`, `INV-ONLINE-RL-01` | `P3-SLICE-2` |
+| `PL3-ROLE-01`, `PL3-ARCH-01` | **Phân hệ `Expert`:** `SCR-15` (Đồ thị DAG), `SCR-16` (Đề 5 tầng & Rubric), `SCR-17` (Code Challenge & Tests)<br>**Phân hệ `Admin`:** `SCR-18` (Online RL & Buffer), `SCR-19` (Safety Gate & Rollback), `SCR-20` (4 Microservices & Outbox Health) | `/api/v2/expert/*`, `/api/v2/admin/*` | 4 Schema PG (`auth_svc`, `content_svc`, `assess_svc`, `rec_ai_svc`) + `outbox_events` + Redis Streams + K8s manifests (`k8s/`) | `P3-SLICE-3`, `P3-SLICE-4` |

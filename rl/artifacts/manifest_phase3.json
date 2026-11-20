@@ -1,0 +1,14 @@
+{
+  "checkpoint_file": "gnn_ppo_v2_base.zip",
+  "checkpoint_sha256": "9977d5f606427d0eb25970b1ce8cf23fa0232e2d7ff0fe392e80d2413d534201",
+  "selected_seed": 101,
+  "train_seeds": [
+    101,
+    202,
+    303
+  ],
+  "val_seed": 999,
+  "eval_seed": 2026,
+  "eval_episodes": 500,
+  "created_at": "2026-11-19T08:30:34.704003+00:00"
+}

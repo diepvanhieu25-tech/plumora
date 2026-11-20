@@ -15,8 +15,10 @@ from app.db.redis_store import write_through_state_cache
 from app.modules.auth.schemas import LoginRequest, RegisterRequest, serialize_user
 from app.modules.auth.security import (
     create_access_token,
+    extract_all_raw_tokens,
     extract_current_user,
     hash_password,
+    revoke_token,
     set_auth_cookie,
     verify_password,
 )
@@ -94,6 +96,35 @@ def login_user(
             },
         )
 
+    user_role = getattr(user, "role", "learner")
+    if payload.portal == "admin" and user_role != "admin":
+        return JSONResponse(
+            status_code=403,
+            content={
+                "error_code": "FORBIDDEN_ROLE",
+                "message": "Tài khoản không có quyền truy cập Cổng Quản trị (Admin).",
+                "details": {"role": user_role, "portal": payload.portal},
+            },
+        )
+    if payload.portal == "expert" and user_role not in ("expert", "admin"):
+        return JSONResponse(
+            status_code=403,
+            content={
+                "error_code": "FORBIDDEN_ROLE",
+                "message": "Tài khoản không có quyền truy cập Cổng Chuyên gia (Expert).",
+                "details": {"role": user_role, "portal": payload.portal},
+            },
+        )
+    if payload.portal == "learner" and user_role != "learner":
+        return JSONResponse(
+            status_code=403,
+            content={
+                "error_code": "FORBIDDEN_ROLE",
+                "message": "Tài khoản Quản trị/Chuyên gia vui lòng đăng nhập tại cổng riêng (/admin/login hoặc /expert/login).",
+                "details": {"role": user_role, "portal": payload.portal},
+            },
+        )
+
     write_through_state_cache(db, user.id)
     token = create_access_token(user.id, user.username)
     res = JSONResponse(
@@ -109,7 +140,7 @@ def logout_user(
     request: Request,
     db: DbSession,
 ) -> JSONResponse:
-    """Clear the authenticated learner session cookie."""
+    """Revoke the JWT token (Redis JTI blocklist + local fallback) and clear session cookie."""
     user = extract_current_user(request, db)
     if user is None:
         return JSONResponse(
@@ -120,6 +151,8 @@ def logout_user(
                 "details": {},
             },
         )
+    for token in extract_all_raw_tokens(request):
+        revoke_token(token)
     res = JSONResponse(status_code=200, content={"logged_out": True})
     res.delete_cookie(key=settings.effective_session_cookie_name, path="/")
     res.delete_cookie(key="plumora_session", path="/")

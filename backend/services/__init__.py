@@ -1,0 +1,1 @@
+"""Microservice entrypoints for 4-Service + API Gateway topology (PL3-ARCH-01)."""

@@ -1,0 +1,90 @@
+{
+  "domain": {
+    "slug": "devops",
+    "title": "Kỹ thuật DevOps, Container & Điều phối Hạ tầng",
+    "description": "Lộ trình 9 khái niệm DevOps 4 tầng DAG (gồm 5 khái niệm giao thoa từ Backend/Frontend và 4 khái niệm đặc thù hạ tầng)."
+  },
+  "concepts": [
+    {
+      "node_idx": 0,
+      "slug": "os-basics",
+      "title": "Hệ điều hành Linux, Process/Thread, Filesystem & I/O cơ bản",
+      "tier": 1,
+      "is_shared": true,
+      "prerequisites": [],
+      "lesson_markdown": "## Hệ điều hành Linux cho Hạ tầng DevOps\n\nHiểu tiến trình, tín hiệu (`SIGTERM` vs `SIGKILL`), file descriptors (`ulimit`), bộ nhớ ảo và I/O giúp vận hành container và xử lý sự cố OOMKill chính xác."
+    },
+    {
+      "node_idx": 1,
+      "slug": "net-internet",
+      "title": "Internet & Mô hình Mạng cơ bản (IP, DNS, TCP/UDP, Routing)",
+      "tier": 1,
+      "is_shared": true,
+      "prerequisites": [],
+      "lesson_markdown": "## Mạng Hạ tầng: IP, DNS, Port & Routing\n\nNắm vững Subnet, NAT, DNS Service Discovery nội bộ cụm và kiểm tra kết nối qua `ss`, `dig`, `curl`."
+    },
+    {
+      "node_idx": 2,
+      "slug": "web-http",
+      "title": "Giao thức HTTP/HTTPS & TLS Termination",
+      "tier": 2,
+      "is_shared": true,
+      "prerequisites": ["net-internet"],
+      "lesson_markdown": "## HTTP/HTTPS & TLS Termination tại Edge\n\nHiểu cơ chế giải mã TLS ở Reverse Proxy/Ingress, chuyển tiếp header `X-Forwarded-For`, `X-Forwarded-Proto` và keep-alive connection pooling."
+    },
+    {
+      "node_idx": 3,
+      "slug": "docker-containers",
+      "title": "Ảo hóa mức OS, Namespaces/Cgroups & Đóng gói Docker Container",
+      "tier": 2,
+      "is_shared": false,
+      "prerequisites": ["os-basics", "net-internet"],
+      "lesson_markdown": "## Kiến trúc Docker: Namespaces, Cgroups & Multi-stage Build\n\nContainer không phải máy ảo nặng nề mà là tiến trình Linux được cô lập tầm nhìn bằng **Namespaces** (PID, Net, Mount) và giới hạn tài nguyên bằng **Cgroups** (CPU, Memory, PIDs)."
+    },
+    {
+      "node_idx": 4,
+      "slug": "reverse-proxy-caching",
+      "title": "Reverse Proxy, Load Balancing & HTTP Edge Caching (Nginx)",
+      "tier": 3,
+      "is_shared": false,
+      "prerequisites": ["web-http", "docker-containers"],
+      "lesson_markdown": "## Reverse Proxy & Cân bằng tải (Nginx / Envoy)\n\nCấu hình Round-Robin, Least Connections, Health Checks chủ động, Proxy Buffering và HTTP Edge Caching giảm tải cho Backend."
+    },
+    {
+      "node_idx": 5,
+      "slug": "cache-redis",
+      "title": "Vận hành Redis Cluster, Persistence (RDB/AOF) & State Store",
+      "tier": 3,
+      "is_shared": true,
+      "prerequisites": ["docker-containers", "web-http"],
+      "lesson_markdown": "## Vận hành Redis Bền vững trong Cụm Dịch vụ\n\nPhân biệt **RDB Snapshot** và **AOF Append-Only File**, chính sách thu hồi bộ nhớ (`allkeys-lru`), và cấu hình Redis Streams Consumer Groups."
+    },
+    {
+      "node_idx": 6,
+      "slug": "ci-cd-pipelines",
+      "title": "Tự động hóa Kiểm thử, Build Artifact & Đường ống CI/CD",
+      "tier": 3,
+      "is_shared": false,
+      "prerequisites": ["docker-containers"],
+      "lesson_markdown": "## Đường ống CI/CD Tin cậy & Bất biến\n\nTách bạch giai đoạn Lint $\\rightarrow$ Typecheck $\\rightarrow$ Unit/Integration Tests $\\rightarrow$ Build Docker Image gắn tag SHA bất biến $\\rightarrow$ Triển khai có kiểm tra healthcheck."
+    },
+    {
+      "node_idx": 7,
+      "slug": "k8s-orchestration",
+      "title": "Điều phối Container với Kubernetes (Pods, Deployments, HPA, Readiness)",
+      "tier": 4,
+      "is_shared": false,
+      "prerequisites": ["reverse-proxy-caching", "ci-cd-pipelines", "cache-redis"],
+      "lesson_markdown": "## Kubernetes Production-Ready\n\nPhân biệt **`readinessProbe`** (nhận traffic) và **`livenessProbe`** (khởi động lại container), thiết lập `requests/limits` và **HorizontalPodAutoscaler (HPA)**."
+    },
+    {
+      "node_idx": 8,
+      "slug": "sec-api",
+      "title": "Bảo mật Hạ tầng & API Gateway (Rate Limit, Secret Management, Network Policy)",
+      "tier": 4,
+      "is_shared": true,
+      "prerequisites": ["reverse-proxy-caching", "k8s-orchestration"],
+      "lesson_markdown": "## Bảo mật Hạ tầng & Zero-Trust Network Policy\n\nÁp dụng nguyên tắc đặc quyền tối thiểu (non-root container, read-only rootfs), Kubernetes `NetworkPolicy` chặn kết nối ngang trái phép và quản lý Secrets an toàn."
+    }
+  ]
+}

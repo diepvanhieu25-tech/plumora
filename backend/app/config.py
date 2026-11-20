@@ -34,9 +34,9 @@ class Settings(BaseSettings):
     redis_state_ttl_seconds: int = 3600
 
     session_cookie_name: str = "__Host-plumora_session"
-    enable_dev_presets: bool = True
-    rl_checkpoint_path: str = str(REPO_ROOT / "rl" / "artifacts" / "checkpoint.zip")
-    rl_manifest_path: str = str(REPO_ROOT / "rl" / "artifacts" / "manifest.json")
+    enable_dev_presets: bool = False
+    rl_checkpoint_path: str = str(REPO_ROOT / "rl" / "artifacts" / "gnn_ppo_v2_base.zip")
+    rl_manifest_path: str = str(REPO_ROOT / "rl" / "artifacts" / "manifest_phase3.json")
 
     @property
     def cookie_secure(self) -> bool:

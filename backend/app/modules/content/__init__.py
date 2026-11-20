@@ -1,15 +1,7 @@
-"""Content module public interface and backward compatibility layer."""
+"""Content & Multi-Domain Knowledge Graph domain package."""
 
-from __future__ import annotations
+from app.modules.content.router_expert import router as expert_router
+from app.modules.content.router_v2 import router as content_router
+from app.modules.content.seed_loader import init_db_and_seed
 
-from app.modules.content.dag_engine import build_roadmap_payload
-from app.modules.content.router import router
-from app.modules.content.seed_loader import SEED_FILE_PATH, SEED_USERS, init_db_and_seed
-
-__all__ = [
-    "SEED_FILE_PATH",
-    "SEED_USERS",
-    "build_roadmap_payload",
-    "init_db_and_seed",
-    "router",
-]
+__all__ = ["content_router", "expert_router", "init_db_and_seed"]

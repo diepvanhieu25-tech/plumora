@@ -1,29 +1,6 @@
-"""Recommendation module public interface and backward compatibility layer."""
+"""Recommendation (GNN-PPO + Policy Guardrail) & Admin Safe Online RL domain package."""
 
-from __future__ import annotations
+from app.modules.recommendation.router_admin import router as admin_router
+from app.modules.recommendation.service_v2 import recommend_gnn_ppo_v2
 
-from app.modules.recommendation.checkpoint import (
-    VerifiedDqnCheckpoint,
-    load_verified_dqn_checkpoint,
-    resolve_repo_path,
-)
-from app.modules.recommendation.router import router
-from app.modules.recommendation.service import compute_recommendation
-from app.modules.recommendation.strategies import (
-    DagTierFallbackStrategy,
-    DqnDirectStrategy,
-    DqnMaskedQStrategy,
-    RecommendationStrategy,
-)
-
-__all__ = [
-    "DagTierFallbackStrategy",
-    "DqnDirectStrategy",
-    "DqnMaskedQStrategy",
-    "RecommendationStrategy",
-    "VerifiedDqnCheckpoint",
-    "compute_recommendation",
-    "load_verified_dqn_checkpoint",
-    "resolve_repo_path",
-    "router",
-]
+__all__ = ["admin_router", "recommend_gnn_ppo_v2"]

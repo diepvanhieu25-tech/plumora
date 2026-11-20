@@ -10,35 +10,13 @@ import {
   Layers,
   Lock,
   ShieldCheck,
-  SlidersHorizontal,
   User,
 } from 'lucide-react'
-
-const SEEDED_PROFILES = [
-  {
-    username: 'learner_new',
-    label: 'Học viên Mới bắt đầu',
-    desc: '0/12 khái niệm hoàn thành (0%)',
-    badge: 'Tầng 1 mở khóa sẵn (net-internet, os-basics)',
-    recommendedSlug: null,
-  },
-  {
-    username: 'learner_foundation',
-    label: 'Đã hoàn thành Nền tảng',
-    desc: '4/12 khái niệm ≥ 75% thông thạo',
-    badge: 'DQN đang đề xuất: [4] db-transactions',
-    recommendedSlug: 'db-transactions',
-  },
-  {
-    username: 'learner_api_stage',
-    label: 'Đang học Tầng 3 API',
-    desc: '7/12 khái niệm ≥ 75% thông thạo',
-    badge: 'DQN đang đề xuất: [8] api-data',
-    recommendedSlug: 'api-data',
-  },
-]
+import type { PortalKind } from '../types'
 
 interface AuthPageProps {
+  portal?: PortalKind
+  onSwitchPortal?: (portal: PortalKind) => void
   authMode: 'login' | 'register'
   setAuthMode: (mode: 'login' | 'register') => void
   usernameInput: string
@@ -50,37 +28,32 @@ interface AuthPageProps {
   authError: string | null
   isLoading: boolean
   onSubmit: (e: React.FormEvent) => Promise<void>
-  onQuickPickSeedAccount?: (username: string) => Promise<void>
 }
 
-const BACKEND_TIERS_OVERVIEW = [
+const PHASE3_DOMAINS_OVERVIEW = [
   {
-    tier: 1,
-    title: 'Tầng 1 — Nền tảng (Foundations)',
-    concepts: ['Mạng Internet, IP, DNS', 'Hệ điều hành, Process, I/O'],
+    title: 'Backend Engineering',
+    count: '12 khái niệm',
+    summary: 'Mạng, OS, HTTP, SQL/ACID, NoSQL, REST API, Redis & Bảo mật JWT/API',
     color: 'border-l-[#15803D]',
   },
   {
-    tier: 2,
-    title: 'Tầng 2 — Giao thức & Cơ sở dữ liệu',
-    concepts: ['Giao thức HTTP/HTTPS', 'CSDL Quan hệ & SQL', 'Transaction (ACID) & Index', 'CSDL NoSQL'],
+    title: 'Frontend Engineering',
+    count: '10 khái niệm',
+    summary: 'HTML/DOM, CSS Layout, JS Async, React State, Auth & Performance',
     color: 'border-l-[#0D9488]',
   },
   {
-    tier: 3,
-    title: 'Tầng 3 — Thiết kế API & Trạng thái',
-    concepts: ['Thiết kế RESTful API', 'Validation & Serialization', 'Kết nối DB & Query Patterns', 'Caching với Redis'],
+    title: 'DevOps & Cloud',
+    count: '9 khái niệm',
+    summary: 'Linux/Networking, Docker, CI/CD, Kubernetes, Observability & Security',
     color: 'border-l-[#D97706]',
-  },
-  {
-    tier: 4,
-    title: 'Tầng 4 — Bảo mật Backend cơ bản',
-    concepts: ['Xác thực JWT & Session', 'Bảo mật API (SQLi, Rate Limit)'],
-    color: 'border-l-[#991B1B]',
   },
 ]
 
 export function AuthPage({
+  portal = 'learner',
+  onSwitchPortal,
   authMode,
   setAuthMode,
   usernameInput,
@@ -92,15 +65,42 @@ export function AuthPage({
   authError,
   isLoading,
   onSubmit,
-  onQuickPickSeedAccount,
 }: AuthPageProps) {
   const [showPassword, setShowPassword] = useState(false)
+  const isStaffPortal = portal === 'admin' || portal === 'expert'
+  const effectiveMode = isStaffPortal ? 'login' : authMode
+
+  const portalBadge =
+    portal === 'admin'
+      ? 'ADMIN PORTAL • QUẢN TRỊ HỆ THỐNG & ONLINE RL'
+      : portal === 'expert'
+        ? 'EXPERT PORTAL • BIÊN SOẠN KNOWLEDGE GRAPH & RUBRIC'
+        : 'PL-AUTH-01 • CỔNG HỌC VIÊN THÍCH ỨNG'
+
+  const portalHeading =
+    portal === 'admin'
+      ? 'Đăng nhập Cổng Quản trị'
+      : portal === 'expert'
+        ? 'Đăng nhập Cổng Chuyên gia'
+        : effectiveMode === 'login'
+          ? 'Chào mừng trở lại'
+          : 'Tạo tài khoản học viên mới'
+
+  const portalSubtitle =
+    portal === 'admin'
+      ? 'Khu vực dành riêng cho Quản trị viên vận hành Safe Online RL, Safety Gate và cụm Microservices.'
+      : portal === 'expert'
+        ? 'Khu vực dành riêng cho Chuyên gia thiết kế đồ thị DAG, câu hỏi 5 tầng và Code Sandbox.'
+        : effectiveMode === 'login'
+          ? 'Đăng nhập để tiếp tục lộ trình đa ngành với mô hình GNN-PPO.'
+          : 'Đăng ký tài khoản học viên để bắt đầu chẩn đoán năng lực và lộ trình cá nhân hóa.'
 
   return (
-    <div
-      aria-label="SCR-01 Đăng nhập và Đăng ký Học viên"
+    <main
+      aria-label="SCR-01 Đăng nhập"
       className="w-full max-w-5xl mx-auto my-6 bg-white rounded-2xl border border-[#D8E2D8] shadow-sm overflow-hidden"
       data-testid="scr01-auth-section"
+      data-portal={portal}
     >
       <div className="grid grid-cols-1 lg:grid-cols-12">
         {/* Left Column: Standard Authentication Form (PL-AUTH-01) */}
@@ -121,51 +121,58 @@ export function AuthPage({
                     <ShieldCheck className="w-3.5 h-3.5 text-[#15803D]" aria-hidden="true" />
                   </span>
                   <span className="text-[11px] font-mono font-bold text-[#15803D] uppercase tracking-wider">
-                    PL-AUTH-01 • XÁC THỰC PHIÊN HỌC VIÊN
+                    {portalBadge}
                   </span>
                 </div>
                 <span className="text-xs text-[#57534E] font-medium block">
-                  Hệ thống Lộ trình Học Backend Thích ứng AI
+                  Nền tảng Học thích ứng Đa ngành &amp; Đánh giá 5 tầng
                 </span>
               </div>
             </div>
 
             <h1 className="text-2xl md:text-3xl font-extrabold text-[#14241B] tracking-tight">
-              {authMode === 'login' ? 'Chào mừng trở lại' : 'Tạo tài khoản học viên mới'}
+              {portalHeading}
             </h1>
             <p className="text-sm text-[#3F5247] mt-1.5 font-normal leading-relaxed">
-              {authMode === 'login'
-                ? 'Đăng nhập để tiếp tục lộ trình học tập cá nhân hóa với mô hình DQN.'
-                : 'Đăng ký tài khoản để bắt đầu với tiến độ của riêng bạn (0/12 khái niệm).'}
+              {portalSubtitle}
             </p>
 
-            {/* Segmented Toggle Tab */}
-            <div className="mt-6 p-1 bg-[#F6F8F5] rounded-xl border border-[#D8E2D8] flex items-center">
-              <button
-                type="button"
-                onClick={() => setAuthMode('login')}
-                className={`flex-1 py-2 px-3 text-xs sm:text-sm font-semibold rounded-lg text-center transition-all cursor-pointer ${
-                  authMode === 'login'
-                    ? 'bg-[#15803D] text-white shadow-xs'
-                    : 'text-[#3F5247] hover:text-[#14241B]'
-                }`}
-                data-testid="tab-login-btn"
+            {/* Segmented Toggle Tab — ONLY on Learner Portal */}
+            {!isStaffPortal ? (
+              <div className="mt-6 p-1 bg-[#F6F8F5] rounded-xl border border-[#D8E2D8] flex items-center">
+                <button
+                  type="button"
+                  onClick={() => setAuthMode('login')}
+                  className={`flex-1 py-2 px-3 text-xs sm:text-sm font-semibold rounded-lg text-center transition-all cursor-pointer ${
+                    effectiveMode === 'login'
+                      ? 'bg-[#15803D] text-white shadow-xs'
+                      : 'text-[#3F5247] hover:text-[#14241B]'
+                  }`}
+                  data-testid="tab-login-btn"
+                >
+                  Đăng nhập
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAuthMode('register')}
+                  className={`flex-1 py-2 px-3 text-xs sm:text-sm font-semibold rounded-lg text-center transition-all cursor-pointer ${
+                    effectiveMode === 'register'
+                      ? 'bg-[#15803D] text-white shadow-xs'
+                      : 'text-[#3F5247] hover:text-[#14241B]'
+                  }`}
+                  data-testid="tab-register-btn"
+                >
+                  Đăng ký học viên mới
+                </button>
+              </div>
+            ) : (
+              <div
+                className="mt-5 p-3 rounded-xl bg-[#FFFBEB] border border-[#F59E0B] text-xs text-[#92400E] font-medium"
+                data-testid="staff-portal-notice"
               >
-                Đăng nhập
-              </button>
-              <button
-                type="button"
-                onClick={() => setAuthMode('register')}
-                className={`flex-1 py-2 px-3 text-xs sm:text-sm font-semibold rounded-lg text-center transition-all cursor-pointer ${
-                  authMode === 'register'
-                    ? 'bg-[#15803D] text-white shadow-xs'
-                    : 'text-[#3F5247] hover:text-[#14241B]'
-                }`}
-                data-testid="tab-register-btn"
-              >
-                Đăng ký học viên mới
-              </button>
-            </div>
+                Cổng nội bộ không hỗ trợ tự đăng ký tài khoản. Hệ thống từ chối đăng nhập sai vai trò với mã HTTP 403.
+              </div>
+            )}
 
             {/* Auth Error Banner */}
             {authError ? (
@@ -207,7 +214,7 @@ export function AuthPage({
               </div>
 
               {/* Display Name Field (Register Mode) */}
-              {authMode === 'register' ? (
+              {effectiveMode === 'register' ? (
                 <div>
                   <label
                     htmlFor="auth-display-name"
@@ -280,8 +287,12 @@ export function AuthPage({
                 <span>
                   {isLoading
                     ? 'Đang xử lý...'
-                    : authMode === 'login'
-                    ? 'Đăng nhập vào Lộ trình Học'
+                    : effectiveMode === 'login'
+                    ? portal === 'admin'
+                      ? 'Đăng nhập Cổng Quản trị'
+                      : portal === 'expert'
+                        ? 'Đăng nhập Cổng Chuyên gia'
+                        : 'Đăng nhập vào Lộ trình Học'
                     : 'Tạo tài khoản & Bắt đầu Lộ trình'}
                 </span>
                 <ArrowRight className="w-4 h-4" aria-hidden="true" />
@@ -289,15 +300,55 @@ export function AuthPage({
             </form>
           </div>
 
-          {/* Security Badge at Card Footing */}
-          <div className="mt-8 pt-4 border-t border-[#D8E2D8] flex items-center justify-between text-xs text-[#3F5247]">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-[#15803D]" aria-hidden="true" />
-              <span className="font-medium">Chuẩn xác thực D-11 • Session HttpOnly</span>
+          {/* Security Badge & Portal Switcher at Card Footing */}
+          <div className="mt-8 pt-4 border-t border-[#D8E2D8] space-y-3 text-xs text-[#3F5247]">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-[#15803D]" aria-hidden="true" />
+                <span className="font-medium">Chuẩn xác thực D-11 • Session HttpOnly</span>
+              </div>
+              <span className="font-mono text-[#57534E] text-[11px]">
+                Chống CSRF &amp; Replay
+              </span>
             </div>
-            <span className="font-mono text-[#57534E] text-[11px]">
-              Chống CSRF &amp; Session Replay
-            </span>
+            {onSwitchPortal && (
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#F1F5F9] text-[11px]">
+                <span className="text-[#57534E] font-medium">Chuyển cổng:</span>
+                <button
+                  type="button"
+                  onClick={() => onSwitchPortal('learner')}
+                  className={`min-h-[44px] px-3 py-2 rounded-lg border cursor-pointer ${
+                    portal === 'learner'
+                      ? 'bg-[#F0FDF4] text-[#15803D] border-[#86EFAC] font-bold'
+                      : 'bg-white text-[#57534E] border-[#D8E2D8] hover:text-[#14241B]'
+                  }`}
+                >
+                  Học viên (/)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSwitchPortal('expert')}
+                  className={`min-h-[44px] px-3 py-2 rounded-lg border cursor-pointer ${
+                    portal === 'expert'
+                      ? 'bg-[#EFF6FF] text-[#1D4ED8] border-[#93C5FD] font-bold'
+                      : 'bg-white text-[#57534E] border-[#D8E2D8] hover:text-[#14241B]'
+                  }`}
+                >
+                  Chuyên gia (/expert/login)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSwitchPortal('admin')}
+                  className={`min-h-[44px] px-3 py-2 rounded-lg border cursor-pointer ${
+                    portal === 'admin'
+                      ? 'bg-[#FFFBEB] text-[#B45309] border-[#F59E0B] font-bold'
+                      : 'bg-white text-[#57534E] border-[#D8E2D8] hover:text-[#14241B]'
+                  }`}
+                >
+                  Quản trị (/admin/login)
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -310,34 +361,27 @@ export function AuthPage({
                 <Layers className="w-4 h-4 text-[#15803D]" aria-hidden="true" />
               </span>
               <h2 className="text-base font-extrabold text-[#14241B]">
-                Lộ trình 12 Khái niệm Backend &amp; Trí tuệ DQN
+                Đồ thị Tri thức Đa ngành &amp; Trí tuệ GNN-PPO
               </h2>
             </div>
             <p className="text-xs text-[#3F5247] font-normal leading-relaxed mb-4">
-              Hệ thống được thiết kế theo mô hình đồ thị có hướng không chu trình (DAG), kết hợp giải thuật Học tăng cường (DQN) để định hướng lộ trình học thích ứng với năng lực thực tế của từng học viên:
+              Hệ thống đánh giá năng lực 5 tầng, chấm Code Sandbox cô lập và đồng bộ trí nhớ Ebbinghaus qua 3 lĩnh vực liên thông (7 khái niệm giao thoa):
             </p>
 
-            {/* 4 Tier Overview Cards */}
+            {/* 3 Domain Overview Cards */}
             <div className="space-y-2.5">
-              {BACKEND_TIERS_OVERVIEW.map((tier) => (
+              {PHASE3_DOMAINS_OVERVIEW.map((domain) => (
                 <div
-                  key={tier.tier}
-                  className={`bg-white rounded-xl p-3 border border-[#D8E2D8] border-l-4 ${tier.color} shadow-2xs space-y-1`}
+                  key={domain.title}
+                  className={`bg-white rounded-xl p-3 border border-[#D8E2D8] border-l-4 ${domain.color} shadow-2xs space-y-1`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs text-[#14241B]">{tier.title}</span>
+                    <span className="font-bold text-xs text-[#14241B]">{domain.title}</span>
                     <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-[#F6F8F5] text-[#57534E] border border-[#D8E2D8]">
-                      {tier.concepts.length} khái niệm
+                      {domain.count}
                     </span>
                   </div>
-                  <div className="flex flex-wrap gap-1 text-[11px] text-[#57534E]">
-                    {tier.concepts.map((c, idx) => (
-                      <span key={idx} className="inline-flex items-center gap-1">
-                        <span className="text-[#15803D] font-bold">•</span>
-                        <span>{c}</span>
-                      </span>
-                    ))}
-                  </div>
+                  <p className="text-[11px] text-[#57534E] leading-snug">{domain.summary}</p>
                 </div>
               ))}
             </div>
@@ -347,73 +391,34 @@ export function AuthPage({
               <div className="bg-white p-2.5 rounded-lg border border-[#D8E2D8] space-y-1">
                 <div className="flex items-center gap-1 text-[#15803D] font-bold">
                   <Cpu className="w-3.5 h-3.5" aria-hidden="true" />
-                  <span>DQN Policy</span>
+                  <span>GNN-PPO + Guardrail</span>
                 </div>
                 <p className="text-[11px] text-[#57534E] leading-snug">
-                  Đánh giá vector 24 chiều để gợi ý bài học tối ưu theo điều kiện tiên quyết.
+                  Mạng GNN-PPO 3 lớp gợi ý khái niệm tối ưu và bảo toàn Zero-shot giữa các ngành.
                 </p>
               </div>
 
               <div className="bg-white p-2.5 rounded-lg border border-[#D8E2D8] space-y-1">
                 <div className="flex items-center gap-1 text-[#0D9488] font-bold">
                   <Compass className="w-3.5 h-3.5" aria-hidden="true" />
-                  <span>Tự do Lựa chọn</span>
+                  <span>Đánh giá 5 tầng &amp; Sandbox</span>
                 </div>
                 <p className="text-[11px] text-[#57534E] leading-snug">
-                  Người học hoàn toàn tự do khám phá bất kỳ khái niệm nào đã mở khóa.
+                  Kiểm tra từ Nhận biết đến Kiến trúc, chấm Rubric AI &amp; Code Sandbox cô lập.
                 </p>
               </div>
             </div>
 
-            {/* Collapsible Testing & Seed Accounts Drawer (Separated from normal learner flow) */}
-            <details
-              className="mt-4 bg-white rounded-xl border border-[#D8E2D8] p-3 text-xs"
-              data-testid="dev-seed-accounts-details"
-            >
-              <summary className="font-bold text-[#57534E] hover:text-[#15803D] cursor-pointer flex items-center justify-between select-none">
-                <div className="flex items-center gap-1.5">
-                  <SlidersHorizontal className="w-3.5 h-3.5 text-[#15803D]" aria-hidden="true" />
-                  <span>Tài khoản Học viên Mẫu (Seeded trong PostgreSQL)</span>
-                </div>
-                <span className="text-[10px] bg-[#F6F8F5] text-[#57534E] px-1.5 py-0.5 rounded border border-[#D8E2D8]">
-                  Thử nghiệm
-                </span>
-              </summary>
-              <p className="text-[11px] text-[#78716C] mt-2 mb-2 leading-relaxed">
-                Các tài khoản kiểm thử đã khởi tạo sẵn để đánh giá thử nghiệm quyết định của mô hình DQN:
-              </p>
-              <div className="space-y-2 mt-2">
-                {SEEDED_PROFILES.map((prof) => (
-                  <div
-                    key={prof.username}
-                    className="p-2.5 rounded-lg border border-[#D8E2D8] bg-[#F6F8F5] flex items-center justify-between"
-                  >
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-mono font-bold text-xs text-[#14241B]">
-                          {prof.username}
-                        </span>
-                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-white text-[#15803D] border border-[#BBF7D0] font-semibold">
-                          {prof.label}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-[#57534E]">{prof.desc}</p>
-                    </div>
-                    {onQuickPickSeedAccount && (
-                      <button
-                        type="button"
-                        onClick={() => onQuickPickSeedAccount(prof.username)}
-                        className="px-2.5 py-1 bg-white hover:bg-[#F0FDF4] border border-[#D8E2D8] hover:border-[#15803D] text-[#15803D] font-bold text-[11px] rounded transition-colors cursor-pointer"
-                        data-testid={`seed-login-${prof.username}`}
-                        title={`Đăng nhập với ${prof.username}`}
-                      >
-                        Chọn
-                      </button>
-                    )}
-                  </div>
-                ))}
+            {/* Role Access Summary */}
+            <div className="mt-4 bg-white rounded-xl border border-[#D8E2D8] p-3 text-xs space-y-1.5">
+              <div className="flex items-center gap-1.5 font-bold text-[#14241B]">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#15803D]" aria-hidden="true" />
+                <span>Điều hướng Phân quyền Tự động (RBAC)</span>
               </div>
-            </details>
+              <p className="text-[11px] text-[#57534E] leading-relaxed">
+                Hệ thống tự động định tuyến theo vai trò tài khoản sau khi xác thực: Học viên (Lộ trình &amp; Đánh giá), Chuyên gia (Quản trị KG &amp; Rubric), hoặc Quản trị (Safe Online RL &amp; Cụm dịch vụ).
+              </p>
+            </div>
           </div>
 
           {/* Bottom Backend Runtime Verification */}
@@ -425,6 +430,6 @@ export function AuthPage({
           </div>
         </div>
       </div>
-    </div>
+    </main>
   )
 }
