@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="docs/assets/plumora-banner.jpg" alt="Plumora — Adaptive Learning Path & Multi-Domain Competency Engine" width="100%" />
+  <img src="docs/assets/plumora-banner.jpg" alt="Plumora — Adaptive Personalized Learning Path Platform" width="100%" />
 </p>
 
 # Plumora (`v2.0.0`)
 
 **Hệ thống Quản lý và Khuyến nghị Lộ trình Học Cá nhân hóa Đa lĩnh vực bằng Học Tăng cường Đồ thị (`GNN-PPO`)**<br/>
-*Adaptive Multi-Domain Learning Path Recommendation & Competency Assessment Platform*
+*Adaptive Personalized Learning Path Platform — Inspired by the Plumule*
 
 [![Day-0 CI](https://img.shields.io/badge/CI-Passing-15803D?style=flat-square&logo=githubactions&logoColor=white)](.github/workflows/ci.yml)
 [![Gate 3](https://img.shields.io/badge/Gate%203-APPROVED-15803D?style=flat-square)](docs/verification/VERIFICATION_GATE3_POST_POLISH.md)
@@ -13,133 +13,151 @@
 [![Python](https://img.shields.io/badge/Python-3.12-3B82F6?style=flat-square&logo=python&logoColor=white)](backend/pyproject.toml)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](frontend/package.json)
 [![Docker](https://img.shields.io/badge/Docker-Compose%20Ready-2496ED?style=flat-square&logo=docker&logoColor=white)](docker-compose.yml)
-[![Kubernetes](https://img.shields.io/badge/Kubernetes-Manifests-326CE5?style=flat-square&logo=kubernetes&logoColor=white)](k8s/)
 
 ---
 
-## 1. Giới thiệu Dự án
+## 1. Giới thiệu & Ý tưởng Cốt lõi
 
-**Plumora** (lấy cảm hứng từ *Plumule* — chồi cây non) là đồ án tốt nghiệp đại học xây dựng nền tảng học tập thích ứng cá nhân hóa đa lĩnh vực, kết hợp **Knowledge Graph có hướng không chu trình (DAG)**, **đánh giá năng lực 5 tầng chiều sâu**, **thực hành Code Sandbox cô lập** và **Học tăng cường Đồ thị (`GNN-PPO`)**:
+Tên gọi **Plumora** bắt nguồn từ *Plumule* (chồi cây non) — biểu tượng của một mầm tri thức biết cảm nhận và thích ứng với môi trường xung quanh để vươn lên vững chắc. Trong hệ thống hiện tại, triết lý đó được hiện thực hóa qua:
 
-- **Đồ thị Tri thức Đa lĩnh vực (Multi-Domain KG):** Gồm **31 khái niệm** thuộc 3 lĩnh vực (`backend`: 12, `frontend`: 10, `devops`: 9) với **7 khái niệm giao thoa liên thông** (*Isomorphic Shared Nodes*) cho phép kế thừa năng lực giữa các ngành.
-- **Đánh giá Chiều sâu 2 Chế độ & Playbook Lý thuyết:**
-  - *Adaptive Placement* (chẩn đoán đầu vào thích ứng, giới hạn trần `<= 0.75`).
-  - *Playbook Lý thuyết* toàn màn hình (`/concepts/:slug/playbook`) kèm bảng so sánh và mã nguồn mẫu.
-  - *5-Depth Probing State Machine* (Tầng 1 Nhận biết $\rightarrow$ Tầng 5 Tự giải thích) kết hợp *LLM Rubric Adapter* (có *Deterministic Fallback* khi ngoại tuyến) và *AI Tutor Drawer*.
-  - *Isolated Code Sandbox*: Thực thi mã Python/JavaScript cô lập với AST Guardrail, `RLIMIT_AS` 128MB và timeout `<= 3000ms`.
-- **Suy giảm Trí nhớ Ebbinghaus & `GNN-PPO`:** Mô hình hóa độ duy trì trí nhớ $R(t) = e^{-\Delta t/S}$ ($S_0 = 3.0$) và khuyến nghị bước học tối ưu qua mạng `GNN-PPO` 3 lớp kết hợp `Policy Guardrail` (`0.0%` vi phạm tiên quyết).
-- **Quản trị An toàn (`Safe Online RL`) & Phân tách Cổng RBAC:** Hỗ trợ 3 vai trò độc lập (`learner`, `expert`, `admin`), tinh chỉnh *Micro-batch* ràng buộc `KL-Divergence`, kiểm định *Safety Evaluation Gate* và *1-Click Rollback* (`< 2000ms`).
+- **Đồ thị Tri thức Đa lĩnh vực (Multi-Domain Knowledge Graph):** Hệ thống quản lý **31 khái niệm** chia thành **3 lĩnh vực** (`backend`: 12, `frontend`: 10, `devops`: 9) theo Đồ thị Có hướng Không chu trình (**DAG** 4 tầng), trong đó có **7 khái niệm giao thoa** cho phép đồng bộ năng lực giữa các ngành.
+- **Thích ứng theo Năng lực Thực tế (`GNN-PPO` + Ebbinghaus):**
+  - Xác định điểm xuất phát phù hợp qua *Đánh giá Định vị Đầu vào* (*Adaptive Placement*, trần `<= 0.75`).
+  - Gợi ý bài học và hình thức học tiếp theo bằng mô hình `GNN-PPO` 3 lớp kết hợp *Policy Guardrail* (đảm bảo không nhảy cóc điều kiện tiên quyết) và mô hình suy giảm trí nhớ *Ebbinghaus* $R(t) = e^{-\Delta t/S}$.
+- **Chu trình Học tập Đầy đủ tại Mỗi Khái niệm:** *Đọc Playbook Lý thuyết* $\rightarrow$ *Đánh giá Chiều sâu 5 Tầng* (kèm *AI Tutor & Rubric*) $\rightarrow$ *Thực hành Code Sandbox* cô lập (Python/JavaScript, giới hạn RAM `128MB`, timeout `<= 3000ms`).
 
 ---
 
-## 2. Kiến trúc Hệ thống
+## 2. Luồng Nghiệp vụ Hệ thống
+
+### 2.1. Luồng Nghiệp vụ Học viên (Learner Flow)
 
 ```mermaid
 flowchart TD
-    subgraph Client_SPA [Frontend SPA - React 19 + TypeScript + Tailwind CSS v4]
-        L[Cong Hoc vien: /login, /domains, /playbook, /depth-probe, /code-sandbox]
-        E[Cong Chuyen gia: /expert/login, /expert/domains, /questions, /code-challenges]
-        A[Cong Quan tri: /admin/login, /online-rl, /model-registry, /system-health]
-    end
+    Start([Truy cap /login]) --> Auth[Dang nhap hoac Dang ky tai khoan]
+    Auth --> Hub[Trung tam Da linh vuc /domains]
 
-    subgraph Backend_Platform [FastAPI API Gateway & 4 Bounded Contexts]
-        Auth[user-auth-service: Argon2id, JWT jti Revocation, RBAC]
-        Content[content-kg-service: Kahn DAG Validator, Multi-Domain KG]
-        Assess[assessment-grader-service: 5-Depth SM, Code Sandbox, Rubric, Outbox]
-        Rec[recommendation-ai-service: GNN-PPO Serving, Policy Guardrail, Safe Online RL]
-    end
+    Hub -->|Hoc vien moi / muon do trinh do| Place[Danh gia Dinh vi Thich ung /domains/:slug/placement]
+    Place -->|Khoi tao nang luc tran <= 0.75| Roadmap
 
-    subgraph Data_Bus [Persistence & Event Streaming]
-        PG[(PostgreSQL 16: auth_svc, content_svc, assess_svc, rec_ai_svc)]
-        RD[(Redis 7: State Cache, Revoked JTI, Redis Streams)]
-        CKPT[GNN-PPO Checkpoint: gnn_ppo_v2_base.zip]
-    end
+    Hub -->|Chon linh vuc hoc| Roadmap[Ban do Lo trinh & Goi y GNN-PPO /domains/:slug/roadmap]
+    Roadmap -->|Xem ly do chon bai| Explain[Giai thich De xuat AI]
+    Roadmap -->|Chon khac phuc quen lang| Review[On tap Ebbinghaus]
 
-    Client_SPA -->|HTTP JSON / HttpOnly Cookie| Backend_Platform
-    Auth & Content & Assess & Rec --> PG
-    Assess -->|Transactional Outbox| RD
-    Rec <-->|Read/Write Graph State| RD
-    Rec -->|Inference| CKPT
+    Roadmap -->|Hoc ly thuyet truoc| Playbook[Trang Playbook Ly thuyet /concepts/:slug/playbook]
+    Playbook --> DepthProbe[Danh gia Chieu sau 5 Tang /concepts/:slug/depth-probe]
+    Playbook --> Sandbox[Thuc hanh Code Sandbox /concepts/:slug/code-sandbox]
+
+    Roadmap -->|Hoac vao truc tiep| DepthProbe
+    Roadmap -->|Hoac vao truc tiep| Sandbox
+
+    DepthProbe -->|Cham diem Rubric + AI Tutor| Update[Cap nhat Nang luc & Outbox Event]
+    Sandbox -->|AST Guardrail + Unit Tests| Update
+    Review --> DepthProbe
+    Update -->|Mo khoa node tiep theo| Roadmap
 ```
 
-- **PostgreSQL 16 (Single Source of Truth):** Phân tách 4 schema cô lập (`auth_svc`, `content_svc`, `assess_svc`, `rec_ai_svc`) cùng khóa bi quan `SELECT ... FOR UPDATE` và `submission_id` chống nộp trùng lặp.
-- **Redis 7 (State Cache & Streams):** Lưu trạng thái đồ thị người học, danh sách thu hồi JWT (`jti`) và truyền sự kiện bất đồng bộ qua `Transactional Outbox` + `Redis Streams`.
-- **Triển khai Linh hoạt:** Hỗ trợ cả chế độ Monolith tiêu chuẩn và cụm 4 Microservices (`docker-compose.yml --profile microservices`) cùng manifests Kubernetes (`k8s/` với `HPA` và `NetworkPolicy`).
+### 2.2. Luồng Nghiệp vụ Chuyên gia & Quản trị (Expert & Admin Flow)
+
+```mermaid
+flowchart LR
+    subgraph Expert_Portal [Cong Chuyen gia - /expert/login]
+        E1[Quan ly Linh vuc & Do thi DAG /expert/domains] -->|Kiem tra chu trinh Kahn| E2[Ngan hang De 5 Tang & Rubric /expert/questions]
+        E2 -->|Tong trong so Rubric = 1.0| E3[Thiet ke Code Challenge /expert/code-challenges]
+        E3 -->|Dry-run qua Sandbox| E_Save[(Luu vao content_svc)]
+    end
+
+    subgraph Admin_Portal [Cong Quan tri - /admin/login]
+        A1[Giam sat Online RL & Buffer /admin/online-rl] -->|Chay Micro-batch KL <= 0.02| A2[Safety Gate & Model Registry /admin/model-registry]
+        A2 -->|Activate / 1-Click Rollback < 2000ms| A3[Giam sat 4 Dich vu & Outbox /admin/system-health]
+    end
+```
 
 ---
 
-## 3. Khởi chạy Nhanh Bằng Docker Compose
+## 3. Kiến trúc Kỹ thuật Đang Vận hành
 
-Yêu cầu duy nhất: đã cài **Docker** và **Docker Compose**.
+```mermaid
+flowchart TD
+    UI[React 19 + TypeScript + Tailwind CSS v4] -->|HTTP JSON / HttpOnly Cookie| API[FastAPI API :8000]
+
+    subgraph Bounded_Contexts [4 Bounded Contexts]
+        Auth[Auth: Argon2id + JWT jti Revocation + RBAC 403]
+        Content[Content KG: 31 Concepts + Kahn DAG Validator]
+        Assess[Assessment: 5-Depth SM + Code Sandbox + Rubric + Outbox]
+        Rec[Recommendation: GNN-PPO Serving + Guardrail + Safe Online RL]
+    end
+
+    API --> Auth & Content & Assess & Rec
+    Auth & Content & Assess & Rec --> PG[(PostgreSQL 16: auth_svc, content_svc, assess_svc, rec_ai_svc)]
+    Assess -->|Transactional Outbox| RD[(Redis 7: State Cache, Revoked JTI, Streams)]
+    Rec <-->|Graph State Cache| RD
+    Rec -->|Inference| CKPT[gnn_ppo_v2_base.zip]
+```
+
+- **PostgreSQL 16:** Lưu trữ toàn bộ dữ liệu nghiệp vụ, tách 4 schema (`auth_svc`, `content_svc`, `assess_svc`, `rec_ai_svc`), bảo toàn giao dịch bằng `SELECT ... FOR UPDATE` và chống nộp trùng qua `submission_id`.
+- **Redis 7:** Lưu cache trạng thái đồ thị, danh sách thu hồi JWT (`jti`) sau đăng xuất và luồng sự kiện `Redis Streams` từ `Transactional Outbox`.
+- **Chế độ Chạy Hỗ trợ:** Hỗ trợ chạy cụm Monolith tiêu chuẩn (`docker compose up -d --build`) hoặc cụm 4 Microservices + API Gateway (`docker compose --profile microservices up -d --build`) cùng manifests Kubernetes (`k8s/`).
+
+---
+
+## 4. Khởi chạy Bằng Docker Compose
+
+Yêu cầu: đã cài **Docker** và **Docker Compose**.
 
 ```bash
-# 1. Khởi chạy cụm dịch vụ tiêu chuẩn (PostgreSQL 16, Redis 7, FastAPI Backend, Nginx Frontend)
+# 1. Build và khởi chạy cụm 4 container (postgres, redis, backend, frontend)
 docker compose up -d --build
 
-# 2. Kiểm tra trạng thái container (tất cả đều Up / healthy)
+# 2. Kiểm tra trạng thái hoạt động (tất cả Up / healthy)
 docker compose ps
 ```
 
-*(Tùy chọn)* Chạy chế độ **4 Microservices + API Gateway**:
-```bash
-docker compose --profile microservices up -d --build
-```
-
 - **Giao diện Web:** [http://localhost:3000](http://localhost:3000)
-- **API Swagger Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
-- **Health Probe:**
+- **Tài liệu API Swagger:** [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Health Check:**
   ```bash
   curl -s http://127.0.0.1:8000/api/v1/health
   ```
 
 ---
 
-## 4. Cổng Truy cập & Tài khoản Seeded Thật
+## 5. Tài khoản Seeded Thật Theo Từng Cổng
 
-Hệ thống khởi tạo sẵn các tài khoản thật trong PostgreSQL (mật khẩu chung: `PlumoraDemo#2026`):
+Mật khẩu chung cho toàn bộ tài khoản mẫu trong PostgreSQL: `PlumoraDemo#2026`
 
-| Vai trò | Cổng Đăng nhập | Tên đăng nhập (`username`) | Mô tả Trạng thái |
+| Vai trò | Đường dẫn Cổng | Tên đăng nhập | Trạng thái Khởi tạo |
 | :--- | :--- | :--- | :--- |
-| **Học viên** | `/login` | `learner_new` | Học viên mới (`0/12` Backend), phù hợp test *Adaptive Placement* |
-| **Học viên** | `/login` | `learner_foundation` | Đã vững nền tảng (`4/12` Backend), nhận gợi ý `GNN-PPO` & ôn tập |
-| **Học viên** | `/login` | `learner_api_stage` | Học viên nâng cao (`7/12` Backend), mở khóa nhiều bài chuyên sâu |
-| **Chuyên gia** | `/expert/login` | `expert_demo` | Quản trị Knowledge Graph, câu hỏi 5 tầng & Code Challenge |
-| **Quản trị** | `/admin/login` | `admin_demo` | Giám sát Safe Online RL, Safety Gate, Rollback & System Health |
+| **Học viên** | `/login` | `learner_new` | Học viên mới (`0/12` Backend) |
+| **Học viên** | `/login` | `learner_foundation` | Đã hoàn thành nền tảng (`4/12` Backend) |
+| **Học viên** | `/login` | `learner_api_stage` | Học viên nâng cao (`7/12` Backend) |
+| **Chuyên gia** | `/expert/login` | `expert_demo` | Quản trị Knowledge Graph, câu hỏi & Code Challenge |
+| **Quản trị** | `/admin/login` | `admin_demo` | Giám sát Online RL, Safety Gate & System Health |
 
-Hướng dẫn thao tác kiểm thử chi tiết từng màn hình xem tại [MANUAL_SYSTEM_TESTING_SCRIPT.md](docs/verification/MANUAL_SYSTEM_TESTING_SCRIPT.md).
+Xem hướng dẫn thao tác kiểm thử từng màn hình tại [MANUAL_SYSTEM_TESTING_SCRIPT.md](docs/verification/MANUAL_SYSTEM_TESTING_SCRIPT.md).
 
 ---
 
-## 5. Kết quả Thực nghiệm Học tăng cường (`GNN-PPO`)
+## 6. Kết quả Đánh giá Mô hình `GNN-PPO` (Trong Mô phỏng)
 
-Mô hình `GNN-PPO` 3 lớp PyTorch Tensor (`rl/artifacts/gnn_ppo_v2_base.zip`, `SHA-256 = 9977d5f606427d0eb25970b1ce8cf23fa0232e2d7ff0fe392e80d2413d534201`) được huấn luyện trên 3 seeds (`101`, `202`, `303`) và đánh giá trên **500 episodes** (`eval_seed = 2026`):
+Checkpoint `rl/artifacts/gnn_ppo_v2_base.zip` (`SHA-256 = 9977d5f606427d0eb25970b1ce8cf23fa0232e2d7ff0fe392e80d2413d534201`) được huấn luyện trên 3 seeds (`101`, `202`, `303`) và đánh giá trên **500 episodes** (`eval_seed = 2026`):
 
-| Chỉ số Đánh giá | `GNN-PPO` (3 ngành đã biết) | `GNN-PPO` (*Zero-shot Transfer*: `heldout_data_eng_graph`) |
+| Chỉ số | `GNN-PPO` (3 ngành đã biết) | `GNN-PPO` (*Zero-shot*: `heldout_data_eng_graph`) |
 | :--- | :---: | :---: |
-| **Phần thưởng tích lũy (`episodic_reward`)** | **`66.65`** | **`67.36`** |
-| **Tỷ lệ vi phạm tiên quyết (`guardrail_violation_rate`)** | **`0.0%`** | **`0.0%`** |
+| **Phần thưởng tích lũy (`episodic_reward`)** | `66.65` | `67.36` |
+| **Tỷ lệ vi phạm tiên quyết (`guardrail_violation_rate`)** | `0.0%` | `0.0%` |
 
-> **Lưu ý khoa học:** Kết quả trên đo trong môi trường mô phỏng đa ngành (`rl/src/plumora_rl/multidomain_sim.py`), không đồng nhất trực tiếp với hiệu quả học tập trên người thật. Xem chi tiết tại [RL_EXPERIMENTAL_REPORT.md](docs/defense/RL_EXPERIMENTAL_REPORT.md).
+> Kết quả trên được đo trong bộ mô phỏng đa ngành (`rl/src/plumora_rl/multidomain_sim.py`), không đồng nhất với hiệu quả học tập trên người thật. Chi tiết tại [RL_EXPERIMENTAL_REPORT.md](docs/defense/RL_EXPERIMENTAL_REPORT.md).
 
 ---
 
-## 6. Phát triển Cục bộ & Chuỗi Kiểm chứng CI
+## 7. Kiểm tra Chất lượng & Tài liệu Liên quan
 
 ```bash
-# Chạy cơ sở dữ liệu
-docker compose up -d postgres redis
-
-# Chạy toàn bộ chuỗi kiểm tra CI (Ruff, ESLint, Mypy, TSC, Pytest, Vitest, Build, Live E2E, Negative Control)
+# Chạy toàn bộ chuỗi kiểm tra CI cục bộ (Lint, Mypy, TSC, Pytest, Vitest, Build, Live E2E)
 ./scripts/ci_check.sh
 ```
 
----
-
-## 7. Mục lục Tài liệu & Hồ sơ Nghiệm thu
-
-- **Đặc tả & Kiến trúc (`v2.0.0`):** [Intent](docs/intent.md) | [Spec](docs/spec.md) | [Design](docs/design.md) | [UI Design System](docs/ui-design-system.md) | [RL Plan](docs/research/RL_PLAN.md) | [Decisions](docs/decisions.md)
-- **Kiểm định & Phát hành:**
-  - [Biên bản Thẩm định Độc lập Gate 3 Round 2 (APPROVED)](docs/verification/VERIFICATION_GATE3_POST_POLISH.md)
-  - [Hồ sơ Phát hành Gate 4 Phase 3](docs/verification/RELEASE_GATE4_PHASE3.md)
-  - [Báo cáo Đo tải 20 VU & Nhất quán Rubric](docs/verification/P3_SLICE_4_LOAD_AND_CONSISTENCY_REPORT.md)
-- **Vận hành & Bảo vệ:** [Kịch bản Kiểm thử Hệ thống Thực](docs/verification/MANUAL_SYSTEM_TESTING_SCRIPT.md) | [Demo Runbook](docs/defense/DEMO_RUNBOOK.md) | [Báo cáo Thực nghiệm RL](docs/defense/RL_EXPERIMENTAL_REPORT.md)
+- **Đặc tả & Thiết kế:** [Intent](docs/intent.md) | [Spec](docs/spec.md) | [Design](docs/design.md) | [UI Design System](docs/ui-design-system.md) | [Decisions](docs/decisions.md)
+- **Kiểm định & Phát hành:** [Gate 3 Round 2 (APPROVED)](docs/verification/VERIFICATION_GATE3_POST_POLISH.md) | [Gate 4 Release](docs/verification/RELEASE_GATE4_PHASE3.md) | [Load & Consistency Report](docs/verification/P3_SLICE_4_LOAD_AND_CONSISTENCY_REPORT.md)
+- **Hướng dẫn Test & Demo:** [Manual Testing Script](docs/verification/MANUAL_SYSTEM_TESTING_SCRIPT.md) | [Demo Runbook](docs/defense/DEMO_RUNBOOK.md)
