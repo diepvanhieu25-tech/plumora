@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from datetime import UTC, datetime, timedelta
@@ -35,10 +36,15 @@ def test_arch_backend_imports_plumora_rl_without_torch() -> None:
         "assert 'gymnasium' not in sys.modules, 'gymnasium leaked into backend!'; "
         "print('ZERO_TORCH_VERIFIED')"
     )
+    rl_src = str(Path(__file__).resolve().parents[3] / "rl" / "src")
+    env = os.environ.copy()
+    existing_pp = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = f"{rl_src}{os.pathsep}{existing_pp}" if existing_pp else rl_src
     res = subprocess.run(
         [sys.executable, "-c", code],
         capture_output=True,
         text=True,
+        env=env,
         check=True,
     )
     assert "ZERO_TORCH_VERIFIED" in res.stdout
