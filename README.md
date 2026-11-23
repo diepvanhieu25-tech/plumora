@@ -39,46 +39,47 @@ Tên gọi **Plumora** bắt nguồn từ *Plumule* (chồi cây non) — biểu
 
 ```mermaid
 flowchart TD
-    Start([Web Client: /login hoặc /register]) --> Hub[Trung tâm Chuyên ngành /domains]
+    Start(["Web Client: /login hoặc /register"]) --> Hub["Trung tâm Chuyên ngành (/domains)"]
 
-    Hub -->|Đo trình độ đầu vào| Place[Định vị Đầu vào /domains/:domain/placement]
-    Place -->|Thăng cấp tiên quyết -> 75% mở khóa Tầng 2| Roadmap
+    Hub -->|"Đo trình độ đầu vào"| Place["Định vị Đầu vào (/domains/:domain/placement)"]
+    Place -->|"Thăng cấp tiên quyết 75% mở khóa Tầng 2"| Roadmap
 
-    Hub -->|Bắt đầu từ Tầng 1| Roadmap[Bản đồ Lộ trình & Gợi ý AI /domains/:domain/roadmap]
-    Roadmap -->|Chặng 1: Learn_New| Playbook[Playbook 5 Phần /domains/:domain/concepts/:slug/playbook]
-    Playbook -->|Hoàn thành Playbook -> Surface 25% / Applied 50%| DepthProbe
+    Hub -->|"Bắt đầu từ Tầng 1"| Roadmap["Bản đồ Lộ trình và Gợi ý AI (/domains/:domain/roadmap)"]
+    Roadmap -->|"Chặng 1: Learn_New"| Playbook["Playbook 5 Phần (/concepts/:slug/playbook)"]
+    Playbook -->|"Hoàn thành Playbook -> Surface 25% / Applied 50%"| DepthProbe
 
-    Roadmap -->|Chặng 2: Deep_Probe| DepthProbe[Đào sâu 5 Tầng + Socratic AI + Ngăn kéo Playbook]
-    DepthProbe -->|Đạt Tầng 3-4 >= 75%: Mở khóa bài kế tiếp trên DAG| CodeSandbox
+    Roadmap -->|"Chặng 2: Deep_Probe"| DepthProbe["Đào sâu 5 Tầng + Socratic AI + Ngăn kéo Playbook"]
+    DepthProbe -->|"Đạt Tầng 3-4 >= 75%: Mở khóa bài kế tiếp trên DAG"| CodeSandbox
 
-    Roadmap -->|Chặng 3: Code_Practice| CodeSandbox[Thực hành Code Sandbox: Python / JS / SQL]
-    CodeSandbox -->|Deep >= 75% VÀ Code 100% -> Mastery 100%| Roadmap
+    Roadmap -->|"Chặng 3: Code_Practice"| CodeSandbox["Thực hành Code Sandbox (Python / JS / SQL)"]
+    CodeSandbox -->|"Deep >= 75% và Code 100% -> Mastery 100%"| Roadmap
 
-    Roadmap -->|Chặng 4: Đến hạn ôn tập thực tế R < 60%| Review[Trạm Ôn tập Ebbinghaus 1 Bước]
-    Review -->|Khôi phục R = 100% & Tăng độ bền S| Roadmap
+    Roadmap -->|"Chặng 4: Đến hạn ôn tập thực tế R < 60%"| Review["Trạm Ôn tập Ebbinghaus 1 Bước"]
+    Review -->|"Khôi phục R = 100% và Tăng độ bền S"| Roadmap
 ```
 
 ### 2.2. Back-Office Console — Vận hành Học liệu, Đoàn hệ & MLOps
 
 ```mermaid
 flowchart LR
-    Login([Back-Office: /backoffice/login]) --> Studio
+    Login(["Back-Office: /backoffice/login"]) --> Studio
 
-    subgraph Studio [Content Studio — Expert & Admin]
-        S1[Đồ thị DAG & Playbook Editor<br/>/backoffice/studio/domains] -->|Kahn/DFS Live Cycle Check| S2[Master-Detail CRUD Đề 5 Tầng<br/>+ Live Rubric Dry-Run]
-        S2 --> S3[Master-Detail CRUD Code Sandbox<br/>+ Dual Sandbox Verification]
+    subgraph Studio["Content Studio — Expert & Admin"]
+        S1["Đồ thị DAG & Playbook Editor\n/backoffice/studio/domains"] -->|"Kahn/DFS Live Cycle Check"| S2["Master-Detail CRUD Đề 5 Tầng\n+ Live Rubric Dry-Run"]
+        S2 --> S3["Master-Detail CRUD Code Sandbox\n+ Dual Sandbox Verification"]
     end
 
-    subgraph Cohort [Giám sát Học viên — Expert & Admin]
-        C1[Cohort Analytics Heatmap<br/>/backoffice/cohort<br/>Bottleneck Tier & Độ nhớ R]
+    subgraph Cohort["Giám sát Học viên — Expert & Admin"]
+        C1["Cohort Analytics Heatmap\n/backoffice/cohort\nBottleneck Tier & Độ nhớ R(t)"]
     end
 
-    subgraph MLOps [MLOps & Hạ tầng — Admin Only]
-        M1[Online RL Console<br/>Experience Buffer & Policy Inspector<br/>+ What-If Time Clock] --> M2[Model Registry & Safety Gate<br/>Head-to-Head Scorecard<br/>+ Audited Activate / Rollback]
-        M2 --> M3[System Health & Outbox<br/>4-Schema Probe, Relay & DLQ]
+    subgraph MLOps["MLOps & Hạ tầng — Admin Only"]
+        M1["Online RL Console\nExperience Buffer & Policy Inspector\n+ What-If Time Clock"] --> M2["Model Registry & Safety Gate\nHead-to-Head Scorecard\n+ Audited Activate / Rollback"]
+        M2 --> M3["System Health & Outbox\n4-Schema Probe, Relay & DLQ"]
     end
 
-    Login --> Cohort & MLOps
+    Login --> Cohort
+    Login --> MLOps
 ```
 
 ---
@@ -89,33 +90,43 @@ Chi tiết thiết kế xem thêm tại [docs/design.md](docs/design.md). Kiến
 
 ```mermaid
 flowchart TB
-    User([Người dùng: Học viên / Giảng viên / Quản trị]) -->|HTTP :3000| Nginx[Nginx Edge + CSP + Block /api/v2/internal/]
+    User(["Người dùng: Học viên / Giảng viên / Quản trị"]) -->|"HTTP :3000"| Nginx["Nginx Edge + CSP + Chặn /api/v2/internal/"]
 
-    subgraph Frontend_SPA [React 19 + TypeScript + Tailwind v4 @theme]
-        WC[Web Client: LearnerAppShell<br/>/login, /register, /domains/*]
-        BO[Back-Office: BackOfficeAppShell<br/>/backoffice/login, /studio/*, /cohort, /mlops/*, /infra/*]
+    subgraph Frontend_SPA["React 19 + TypeScript + Tailwind v4 @theme"]
+        WC["Web Client: LearnerAppShell\n/login • /register • /domains/*"]
+        BO["Back-Office: BackOfficeAppShell\n/backoffice/login • /studio/* • /cohort • /mlops/* • /infra/*"]
     end
 
-    Nginx -->|Static SPA + Proxy /api| GW[FastAPI Monolith :8000 / API Gateway :8080]
+    Nginx -->|"Static SPA + Proxy /api"| GW["FastAPI Monolith :8000 / API Gateway :8080"]
 
-    subgraph Services_Layer [4 Bounded Contexts — Hexagonal Ports & Adapters]
-        S1[user-auth-service :8001<br/>Argon2id + JWT jti + RBAC]
-        S2[content-kg-service :8002<br/>22 Concepts / 3 Domains + Kahn DAG + Full CRUD]
-        S3[assessment-grader-service :8003<br/>Placement + 5-Depth SM + TaskGraderRegistry + Sandbox]
-        S4[recommendation-ai-service :8004<br/>Shared plumora_rl Kernel + Guardrail + Online RL]
+    subgraph Services_Layer["4 Bounded Contexts — Hexagonal Ports & Adapters"]
+        S1["user-auth-service :8001\nArgon2id + JWT jti + RBAC"]
+        S2["content-kg-service :8002\n22 Concepts / 3 Domains + Kahn DAG + Full CRUD"]
+        S3["assessment-grader-service :8003\nPlacement + 5-Depth SM + TaskGraderRegistry + Sandbox"]
+        S4["recommendation-ai-service :8004\nShared plumora_rl Kernel + Guardrail + Online RL"]
     end
 
-    GW --> S1 & S2 & S3 & S4
+    GW --> S1
+    GW --> S2
+    GW --> S3
+    GW --> S4
 
-    subgraph Data_and_Event_Bus [Persistence, Shared Redis Pool & Event Streams]
-        PG[(PostgreSQL 16 — 4 Isolated Schemas<br/>auth_svc | content_svc + outbox | assess_svc + outbox/consumed | rec_ai_svc + consumed)]
-        RD[(Redis 7<br/>KG & Feature Cache + Active Model Sync + JTI<br/>Streams: competency_events & domain_events)]
-        RLCore[Shared RL Kernel & Checkpoints<br/>rl/src/plumora_rl/domain + gnn_ppo_v2_base.zip]
+    subgraph Data_and_Event_Bus["Persistence, Shared Redis Pool & Event Streams"]
+        PG[("PostgreSQL 16 — 4 Isolated Schemas\nauth_svc • content_svc + outbox\nassess_svc + outbox/consumed • rec_ai_svc + consumed")]
+        RD[("Redis 7\nKG & Feature Cache • Active Model Sync • JTI\nStreams: competency_events & domain_events")]
+        RLCore["Shared RL Kernel & Checkpoints\nrl/src/plumora_rl/domain + gnn_ppo_v2_base.zip"]
     end
 
-    S1 & S2 & S3 & S4 --> PG
-    S1 & S2 & S3 & S4 <--> RD
-    S3 & S4 --> RLCore
+    S1 --> PG
+    S2 --> PG
+    S3 --> PG
+    S4 --> PG
+    S1 <--> RD
+    S2 <--> RD
+    S3 <--> RD
+    S4 <--> RD
+    S3 --> RLCore
+    S4 --> RLCore
 ```
 
 - **PostgreSQL 16 (4 Schema cô lập):** `auth_svc`, `content_svc` (có `outbox_events` riêng), `assess_svc` (có `outbox_events` & `consumed_events` riêng), `rec_ai_svc` (có `consumed_events` riêng); quét Outbox bằng `FOR UPDATE SKIP LOCKED` chống phát trùng đa worker.
