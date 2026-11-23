@@ -39,7 +39,7 @@ trap cleanup EXIT
 
 if ! curl -sf http://127.0.0.1:8000/api/v1/health > /dev/null 2>&1; then
   echo "Backend is not running at 127.0.0.1:8000. Starting backend in background..."
-  (cd backend && uv run uvicorn app.main:app --host 127.0.0.1 --port 8000) &
+  (cd backend && PYTHONPATH=../rl/src uv run uvicorn app.main:app --host 127.0.0.1 --port 8000) &
   BACKEND_PID=$!
   echo "Waiting up to 30s for backend readiness at http://127.0.0.1:8000/api/v1/health..."
   HEALTHY=0
