@@ -1,40 +1,70 @@
 import type {
+  AssessmentAbandonResponse,
   AssessmentStartResponse,
   AssessmentSubmitResponse,
   CodeChallengeOut,
   CodeSandboxSubmitResponse,
+  ConceptPlaybookDetailResponse,
   DomainListItem,
   DomainRoadmapResponse,
   PlacementAnswerResponse,
   PlacementStartResponse,
+  PlaybookCompleteResponse,
   V2RecommendationResponse,
 } from '../types'
 import { requestJson } from './httpClient'
 
-export async function apiGetDomains(): Promise<{ domains: DomainListItem[] }> {
-  return requestJson('/api/v2/domains', {}, 'Không thể tải danh sách lĩnh vực')
+export async function apiGetDomains(signal?: AbortSignal): Promise<{ domains: DomainListItem[] }> {
+  return requestJson('/api/v2/domains', { signal }, 'Không thể tải danh sách chuyên ngành')
 }
 
 export async function apiGetDomainRoadmap(
   domainSlug: string,
-  simulatedTimeOffsetDays: number = 0,
+  signal?: AbortSignal,
 ): Promise<DomainRoadmapResponse> {
-  const query =
-    simulatedTimeOffsetDays > 0
-      ? `?simulated_time_offset_days=${encodeURIComponent(String(simulatedTimeOffsetDays))}`
-      : ''
   return requestJson(
-    `/api/v2/domains/${domainSlug}/roadmap${query}`,
-    {},
-    'Không thể tải bản đồ lĩnh vực',
+    `/api/v2/domains/${encodeURIComponent(domainSlug)}/roadmap`,
+    { signal },
+    'Không thể tải bản đồ lộ trình học tập',
+  )
+}
+
+export async function apiGetConceptPlaybook(
+  domainSlug: string,
+  conceptSlug: string,
+  signal?: AbortSignal,
+): Promise<ConceptPlaybookDetailResponse> {
+  return requestJson(
+    `/api/v2/domains/${encodeURIComponent(domainSlug)}/concepts/${encodeURIComponent(conceptSlug)}`,
+    { signal },
+    'Không thể tải nội dung bài học',
+  )
+}
+
+export async function apiCompletePlaybook(
+  domainSlug: string,
+  conceptSlug: string,
+  submissionId?: string,
+  quickCheckAnswers: Array<Record<string, string>> = [],
+): Promise<PlaybookCompleteResponse> {
+  return requestJson(
+    `/api/v2/domains/${encodeURIComponent(domainSlug)}/concepts/${encodeURIComponent(conceptSlug)}/playbook/complete`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        submission_id: submissionId ?? null,
+        quick_check_answers: quickCheckAnswers,
+      }),
+    },
+    'Không thể xác nhận hoàn thành bài học lý thuyết',
   )
 }
 
 export async function apiStartPlacement(domainSlug: string): Promise<PlacementStartResponse> {
   return requestJson(
-    `/api/v2/domains/${domainSlug}/placement/start`,
+    `/api/v2/domains/${encodeURIComponent(domainSlug)}/placement/start`,
     { method: 'POST' },
-    'Không thể bắt đầu chẩn đoán đầu vào',
+    'Không thể bắt đầu bài đánh giá định vị đầu vào',
   )
 }
 
@@ -46,7 +76,7 @@ export async function apiSubmitPlacementAnswer(
   selectedOption: string,
 ): Promise<PlacementAnswerResponse> {
   return requestJson(
-    `/api/v2/domains/${domainSlug}/placement/${sessionId}/answer`,
+    `/api/v2/domains/${encodeURIComponent(domainSlug)}/placement/${encodeURIComponent(sessionId)}/answer`,
     {
       method: 'POST',
       body: JSON.stringify({
@@ -55,7 +85,7 @@ export async function apiSubmitPlacementAnswer(
         selected_option: selectedOption,
       }),
     },
-    'Lỗi khi nộp câu chẩn đoán',
+    'Lỗi khi nộp câu trả lời định vị',
   )
 }
 
@@ -88,17 +118,32 @@ export async function apiSubmitAssessmentV2(
   },
 ): Promise<AssessmentSubmitResponse> {
   return requestJson(
-    `/api/v2/assessments/${sessionId}/submit`,
+    `/api/v2/assessments/${encodeURIComponent(sessionId)}/submit`,
     { method: 'POST', body: JSON.stringify(payload) },
     'Lỗi khi nộp bước đánh giá',
   )
 }
 
-export async function apiGetCodeChallenge(conceptSlug: string): Promise<CodeChallengeOut> {
+export async function apiAbandonAssessmentV2(
+  sessionId: string,
+): Promise<AssessmentAbandonResponse> {
   return requestJson(
-    `/api/v2/concepts/${conceptSlug}/code-challenge`,
-    {},
-    'Khái niệm chưa có bài tập Code Sandbox',
+    `/api/v2/assessments/${encodeURIComponent(sessionId)}/abandon`,
+    { method: 'POST' },
+    'Không thể dừng phiên đánh giá',
+  )
+}
+
+export async function apiGetCodeChallenge(
+  conceptSlug: string,
+  domainSlug?: string,
+  signal?: AbortSignal,
+): Promise<CodeChallengeOut> {
+  const query = domainSlug ? `?domain_slug=${encodeURIComponent(domainSlug)}` : ''
+  return requestJson(
+    `/api/v2/concepts/${encodeURIComponent(conceptSlug)}/code-challenge${query}`,
+    { signal },
+    'Chủ đề này chưa có bài tập thực hành lập trình',
   )
 }
 
@@ -110,20 +155,23 @@ export async function apiSubmitCodeSandbox(
     language: 'python' | 'sql' | 'javascript'
     source_code: string
   },
+  domainSlug?: string,
 ): Promise<CodeSandboxSubmitResponse> {
+  const query = domainSlug ? `?domain_slug=${encodeURIComponent(domainSlug)}` : ''
   return requestJson(
-    `/api/v2/concepts/${conceptSlug}/code-sandbox/submit`,
+    `/api/v2/concepts/${encodeURIComponent(conceptSlug)}/code-sandbox/submit${query}`,
     { method: 'POST', body: JSON.stringify(payload) },
-    'Lỗi thực thi Sandbox',
+    'Lỗi thực thi bài tập lập trình',
   )
 }
 
 export async function apiGetV2Recommendation(
   domainSlug: string,
+  signal?: AbortSignal,
 ): Promise<V2RecommendationResponse> {
   return requestJson(
     '/api/v2/recommendations',
-    { method: 'POST', body: JSON.stringify({ domain_slug: domainSlug }) },
-    'Không thể lấy khuyến nghị lộ trình',
+    { method: 'POST', body: JSON.stringify({ domain_slug: domainSlug }), signal },
+    'Không thể lấy gợi ý bước học tiếp theo',
   )
 }

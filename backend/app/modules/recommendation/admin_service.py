@@ -1,10 +1,11 @@
-"""Service layer for Safe Micro-batch Online RL, Safety Evaluation Gate & 1-Click Rollback."""
+"""Service layer for Safe Micro-batch Online RL, Safety Evaluation Gate, Policy Inspector & System Ops."""
 
 from __future__ import annotations
 
 import hashlib
 import io
 import json
+import logging
 import math
 import os
 import time
@@ -19,35 +20,53 @@ from typing import Any
 import numpy as np
 import redis
 from fastapi import HTTPException, status
+from plumora_rl.domain import (
+    MODE_NAME_TO_ENUM,
+    MODE_NAMES,
+    EbbinghausMemoryModel,
+    GraphObservationBuilder,
+    LearningMode,
+    MultiObjectiveRewardCalculator,
+    NodeFeatureIdx,
+    PolicyGuardrailStrategy,
+)
+from plumora_rl.inference import ActorTransition, NumpyGnnPredictor
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.config import REPO_ROOT, settings
 from app.db.models import (
-    DomainConceptMapModel,
     ModelRegistryModel,
     OnlineEvalRunModel,
     OutboxEventModel,
     RlExperienceBufferModel,
 )
-from app.modules.assessment.ebbinghaus import is_review_needed
+from app.db.redis_pool import get_redis_client
+from app.modules.contracts.adapters import (
+    get_competency_reader_port,
+    get_content_catalog_port,
+)
 from app.modules.events.internal_client import (
     assessment_service_url,
-    content_service_url,
-    fetch_domain_bundle_internal,
     fetch_outbox_pending_count_internal,
 )
+from app.modules.events.outbox import run_outbox_relay_and_consume_once
 from app.modules.recommendation.admin_schemas import (
     MicroBatchTrainRequest,
     ModelRegistryItemOut,
     OnlineRlStatusResponse,
+    PolicyInspectRequest,
 )
-from app.modules.recommendation.gnn_loader import (
-    VerifiedGnnPpoCheckpoint,
-    load_verified_gnn_checkpoint,
-)
+from app.modules.recommendation.gnn_loader import load_verified_gnn_checkpoint
 from app.modules.recommendation.guardrail import select_guarded_action
+from app.modules.recommendation.service_v2 import (
+    build_domain_graph_observation,
+    invalidate_active_model_cache,
+    publish_active_model_pointer,
+)
+
+logger = logging.getLogger(__name__)
 
 _CFG_CKPT_PATH = Path(settings.rl_checkpoint_path)
 BASE_CKPT_PATH = (
@@ -56,6 +75,8 @@ BASE_CKPT_PATH = (
     else REPO_ROOT / "rl" / "artifacts" / "gnn_ppo_v2_base.zip"
 )
 WORKER_HEARTBEAT_KEY = "plumora:worker:rec_ai_cg"
+COMPETENCY_STREAM_NAME = "plumora:competency_events"
+DOMAIN_STREAM_NAME = "plumora:stream:domain_events"
 
 
 def _ensure_prod_model_seeded(db: Session) -> ModelRegistryModel | None:
@@ -82,6 +103,7 @@ def _ensure_prod_model_seeded(db: Session) -> ModelRegistryModel | None:
             "invalid_action_rate_unmasked": 0.0,
             "masked_violation_rate": 0.0,
             "mean_reward_ratio_vs_prod": 1.0,
+            "block_reasons": [],
         },
         activated_at=datetime.now(UTC),
     )
@@ -100,11 +122,13 @@ def _serialize_model(m: ModelRegistryModel) -> ModelRegistryItemOut:
         gate_verdict=m.gate_verdict,
         is_active=m.is_active,
         created_at=m.created_at.isoformat(),
+        activated_at=m.activated_at.isoformat() if m.activated_at else None,
+        eval_metrics=dict(m.eval_metrics_json or {}),
     )
 
 
 def get_online_rl_status(db: Session, *, limit: int = 50) -> OnlineRlStatusResponse:
-    """Return Experience Buffer count and bounded Model Registry status."""
+    """Return Experience Buffer count and bounded Model Registry status with full eval_metrics."""
     _ensure_prod_model_seeded(db)
     buf_count = int(db.scalar(select(func.count()).select_from(RlExperienceBufferModel)) or 0)
     models = db.scalars(
@@ -135,56 +159,244 @@ def get_online_rl_status(db: Session, *, limit: int = 50) -> OnlineRlStatusRespo
     )
 
 
+def get_online_rl_buffer_summary(
+    db: Session,
+    *,
+    recent_limit: int = 20,
+) -> dict[str, Any]:
+    """Return Experience Buffer distribution by domain/mode/reward + latest verified transitions."""
+    total_count = int(db.scalar(select(func.count()).select_from(RlExperienceBufferModel)) or 0)
+
+    domain_rows = db.execute(
+        select(RlExperienceBufferModel.domain_slug, func.count())
+        .group_by(RlExperienceBufferModel.domain_slug)
+    ).all()
+    by_domain = {str(slug): int(cnt) for slug, cnt in domain_rows}
+
+    mode_rows = db.execute(
+        select(RlExperienceBufferModel.action_mode, func.count())
+        .group_by(RlExperienceBufferModel.action_mode)
+    ).all()
+    by_mode = {str(mode): int(cnt) for mode, cnt in mode_rows}
+
+    rew_stats = db.execute(
+        select(
+            func.avg(RlExperienceBufferModel.reward),
+            func.min(RlExperienceBufferModel.reward),
+            func.max(RlExperienceBufferModel.reward),
+        )
+    ).first()
+    mean_rew = round(float(rew_stats[0]), 4) if (rew_stats and rew_stats[0] is not None) else 0.0
+    min_rew = round(float(rew_stats[1]), 4) if (rew_stats and rew_stats[1] is not None) else 0.0
+    max_rew = round(float(rew_stats[2]), 4) if (rew_stats and rew_stats[2] is not None) else 0.0
+
+    recent_rows = db.scalars(
+        select(RlExperienceBufferModel)
+        .order_by(RlExperienceBufferModel.created_at.desc())
+        .limit(max(1, min(recent_limit, 100)))
+    ).all()
+
+    recent_items: list[dict[str, Any]] = []
+    for r in recent_rows:
+        depth_before: float | None = None
+        depth_after: float | None = None
+        if isinstance(r.obs_before_json, dict) and isinstance(r.obs_after_json, dict):
+            idx = r.obs_before_json.get("action_node_idx")
+            b_nodes = r.obs_before_json.get("nodes")
+            a_nodes = r.obs_after_json.get("nodes")
+            if (
+                isinstance(idx, int)
+                and isinstance(b_nodes, list)
+                and isinstance(a_nodes, list)
+                and 0 <= idx < len(b_nodes)
+                and 0 <= idx < len(a_nodes)
+            ):
+                b_entry = b_nodes[idx]
+                a_entry = a_nodes[idx]
+                if isinstance(b_entry, dict):
+                    depth_before = float(b_entry.get("mastery", 0.0))
+                if isinstance(a_entry, dict):
+                    depth_after = float(a_entry.get("mastery", 0.0))
+
+        recent_items.append(
+            {
+                "id": str(r.id),
+                "event_id": str(r.event_id),
+                "user_id": str(r.user_id),
+                "domain_slug": r.domain_slug,
+                "concept_slug": r.concept_slug,
+                "action_mode": r.action_mode,
+                "reward": round(float(r.reward), 4),
+                "depth_before": depth_before,
+                "depth_after": depth_after,
+                "created_at": r.created_at.isoformat(),
+            }
+        )
+
+    return {
+        "total_transitions": total_count,
+        "by_domain": by_domain,
+        "by_mode": by_mode,
+        "reward_stats": {
+            "mean": mean_rew,
+            "min": min_rew,
+            "max": max_rew,
+        },
+        "recent_transitions": recent_items,
+    }
+
+
+def inspect_policy_for_admin(
+    db: Session,
+    payload: PolicyInspectRequest,
+    *,
+    default_user_id: uuid.UUID,
+) -> dict[str, Any]:
+    """Admin-only Policy Inspector with N x 8 features, raw & guarded action probabilities, and What-If clock."""
+    c_port = get_content_catalog_port(db)
+    u_port = get_competency_reader_port(db)
+
+    topology = c_port.get_domain_topology(payload.domain_slug)
+    if topology is None or not topology.nodes:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error_code": "DOMAIN_NOT_FOUND",
+                "message": f"Domain '{payload.domain_slug}' not found.",
+            },
+        )
+
+    target_user_id = payload.user_id if payload.user_id is not None else default_user_id
+    comp_snap = u_port.get_user_competency_snapshot(target_user_id)
+    comp_map = comp_snap.by_slug()
+    ordered_nodes = sorted(topology.nodes, key=lambda n: n.node_idx)
+
+    obs = build_domain_graph_observation(
+        topology,
+        comp_map,
+        simulated_time_offset_days=payload.simulated_time_offset_days,
+    )
+
+    ckpt: NumpyGnnPredictor | None = None
+    version_tag = "gnn_ppo_v2_base"
+    if payload.checkpoint_model_id is not None:
+        m_row = db.get(ModelRegistryModel, payload.checkpoint_model_id)
+        if m_row is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error_code": "MODEL_NOT_FOUND", "message": "Checkpoint model not found."},
+            )
+        version_tag = m_row.version_tag
+        ckpt = load_verified_gnn_checkpoint(
+            checkpoint_path_override=m_row.checkpoint_path,
+            expected_sha256_override=m_row.checkpoint_sha256,
+        )
+    else:
+        active_row = db.scalars(
+            select(ModelRegistryModel)
+            .where(ModelRegistryModel.is_active.is_(True))
+            .order_by(ModelRegistryModel.activated_at.desc(), ModelRegistryModel.created_at.desc())
+            .limit(1)
+        ).first()
+        if active_row is not None:
+            version_tag = active_row.version_tag
+            ckpt = load_verified_gnn_checkpoint(
+                checkpoint_path_override=active_row.checkpoint_path,
+                expected_sha256_override=active_row.checkpoint_sha256,
+            )
+        if ckpt is None:
+            ckpt = load_verified_gnn_checkpoint()
+
+    if ckpt is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "error_code": "CHECKPOINT_UNAVAILABLE",
+                "message": "Verified GNN-PPO checkpoint not found on disk.",
+            },
+        )
+
+    raw_logits = ckpt.predict_logits(obs.node_features, obs.adj_in, obs.adj_out)
+    raw_probs = ckpt.predict_action_probs(obs.node_features, obs.adj_in, obs.adj_out)
+    valid_mask = PolicyGuardrailStrategy.compute_valid_action_mask(obs)
+    decision = PolicyGuardrailStrategy.select_action(raw_logits, obs)
+
+    masked_logits = np.where(valid_mask, raw_logits, -1e9)
+    flat_m = masked_logits.reshape(-1)
+    m_exp = np.exp(flat_m.astype(np.float64) - float(np.max(flat_m)))
+    guarded_probs = (m_exp / np.sum(m_exp)).reshape(raw_logits.shape)
+
+    rows_out: list[dict[str, Any]] = []
+    for i, node in enumerate(ordered_nodes):
+        rows_out.append(
+            {
+                "node_idx": i,
+                "concept_slug": node.concept_slug,
+                "title": node.title,
+                "tier": node.tier,
+                "has_code_challenge": node.has_code_challenge,
+                "features": [round(float(v), 4) for v in obs.node_features[i].tolist()],
+                "valid_modes": {
+                    MODE_NAMES[m]: bool(valid_mask[i, m]) for m in range(len(MODE_NAMES))
+                },
+                "raw_probs": {
+                    MODE_NAMES[m]: round(float(raw_probs[i, m]), 4) for m in range(len(MODE_NAMES))
+                },
+                "guarded_probs": {
+                    MODE_NAMES[m]: round(float(guarded_probs[i, m]), 4)
+                    for m in range(len(MODE_NAMES))
+                },
+            }
+        )
+
+    sel_node = ordered_nodes[decision.node_idx]
+    return {
+        "domain_slug": payload.domain_slug,
+        "user_id": str(target_user_id),
+        "simulated_time_offset_days": payload.simulated_time_offset_days,
+        "model_version": version_tag,
+        "checkpoint_sha256": ckpt.sha256,
+        "selected_action": {
+            "concept_slug": sel_node.concept_slug,
+            "node_idx": decision.node_idx,
+            "learning_mode": MODE_NAMES[decision.mode],
+            "policy_source": decision.policy_source,
+            "guardrail_applied": decision.guardrail_applied,
+        },
+        "nodes": rows_out,
+    }
+
+
 def _load_domain_topology_for_rl(
     db: Session,
     domain_slug: str,
 ) -> tuple[list[str], np.ndarray, np.ndarray, np.ndarray, list[int], list[list[int]]]:
-    """Load real domain DAG topology (node_order, adj_in, adj_out, edge_index, tiers, prereq_indices)."""
-    node_order: list[str] = []
-    tiers: list[int] = []
-    prereq_slugs: list[list[str]] = []
-
-    if content_service_url():
-        bundle = fetch_domain_bundle_internal(domain_slug)
-        if bundle is None:
-            raise ValueError(f"Domain '{domain_slug}' bundle unavailable")
-        raw_nodes = sorted(bundle.get("nodes", []), key=lambda x: int(x.get("node_idx", 0)))
-        for n in raw_nodes:
-            node_order.append(str(n["concept_slug"]))
-            tiers.append(int(n.get("tier", 1)))
-            prereq_slugs.append(list(n.get("prerequisites_json") or []))
-    else:
-        db_nodes = db.scalars(
-            select(DomainConceptMapModel)
-            .where(DomainConceptMapModel.domain_slug == domain_slug)
-            .order_by(DomainConceptMapModel.node_idx)
-        ).all()
-        for n in db_nodes:
-            node_order.append(str(n.concept_slug))
-            tiers.append(int(n.tier))
-            prereq_slugs.append(list(n.prerequisites_json or []))
-
-    n_nodes = len(node_order)
-    if n_nodes == 0:
+    """Load real domain DAG topology with row-degree normalized (adj_in, adj_out) via GraphObservationBuilder."""
+    c_port = get_content_catalog_port(db)
+    topology = c_port.get_domain_topology(domain_slug)
+    if topology is None or not topology.nodes:
         raise ValueError(f"Domain '{domain_slug}' has no nodes in topology")
 
+    ordered = sorted(topology.nodes, key=lambda n: n.node_idx)
+    node_order = [n.concept_slug for n in ordered]
+    tiers = [int(n.tier) for n in ordered]
+    n_nodes = len(node_order)
     slug_to_idx = {s: i for i, s in enumerate(node_order)}
-    adj_in = np.zeros((n_nodes, n_nodes), dtype=np.float32)
-    adj_out = np.zeros((n_nodes, n_nodes), dtype=np.float32)
+
     src_edges: list[int] = []
     dst_edges: list[int] = []
     prereq_indices: list[list[int]] = [[] for _ in range(n_nodes)]
-
-    for i, p_list in enumerate(prereq_slugs):
-        for p_slug in p_list:
+    for i, node in enumerate(ordered):
+        for p_slug in node.prerequisites:
             p_idx = slug_to_idx.get(p_slug)
             if p_idx is not None:
-                adj_in[i, p_idx] = 1.0
-                adj_out[p_idx, i] = 1.0
                 src_edges.append(p_idx)
                 dst_edges.append(i)
                 prereq_indices[i].append(p_idx)
 
+    adj_in, adj_out = GraphObservationBuilder.build_normalized_adjacencies_from_indices(
+        n_nodes, prereq_indices
+    )
     edge_index = (
         np.array([src_edges, dst_edges], dtype=np.int64)
         if src_edges
@@ -194,13 +406,13 @@ def _load_domain_topology_for_rl(
 
 
 def _rollout_policy_eval_on_topologies(
-    model: VerifiedGnnPpoCheckpoint,
+    model: NumpyGnnPredictor,
     topologies: list[tuple[str, list[str], np.ndarray, np.ndarray, list[int], list[list[int]]]],
     *,
     episodes: int = 200,
     seed: int = 2026,
 ) -> tuple[float, float, float, list[str]]:
-    """Evaluate a checkpoint across real domain DAG topologies with shared Policy Guardrail."""
+    """Evaluate a checkpoint across real domain DAG topologies using Ebbinghaus, Guardrail & Reward SSoT."""
     rng = np.random.default_rng(seed)
     ep_rewards: list[float] = []
     unmasked_invalid = 0
@@ -213,87 +425,131 @@ def _rollout_policy_eval_on_topologies(
         n_nodes = len(node_order)
         depth = np.zeros(n_nodes, dtype=np.float32)
         code_score = np.zeros(n_nodes, dtype=np.float32)
-        retention = np.ones(n_nodes, dtype=np.float32)
+        stability = np.full(n_nodes, EbbinghausMemoryModel.INITIAL_STABILITY_DAYS, dtype=np.float32)
+        dt_days = np.zeros(n_nodes, dtype=np.float32)
         ep_rew = 0.0
-        for step in range(min(12, n_nodes)):
+
+        for step in range(min(20, n_nodes * 2)):
             total_steps += 1
             if step > 0:
-                retention = np.where(depth >= 0.5, np.maximum(0.3, retention - 0.12), retention)
+                for u in range(n_nodes):
+                    if depth[u] >= EbbinghausMemoryModel.MIN_DEPTH_FOR_RETENTION:
+                        dt_days[u] += 1.0
+
+            retention = np.ones(n_nodes, dtype=np.float32)
+            for i in range(n_nodes):
+                if depth[i] >= EbbinghausMemoryModel.MIN_DEPTH_FOR_RETENTION:
+                    retention[i] = float(
+                        EbbinghausMemoryModel.compute_retention(float(dt_days[i]), float(stability[i]))
+                    )
 
             feats = np.zeros((n_nodes, 8), dtype=np.float32)
             eligible = np.zeros(n_nodes, dtype=bool)
             needs_review = np.zeros(n_nodes, dtype=bool)
             for i in range(n_nodes):
                 prereq_ok = all(depth[p] >= 0.75 for p in prereq_indices[i])
-                needs_rev_i = is_review_needed(float(depth[i]), float(retention[i]))
+                needs_rev_i = EbbinghausMemoryModel.is_review_needed(float(depth[i]), float(retention[i]))
                 needs_review[i] = needs_rev_i
-                eligible[i] = prereq_ok and (depth[i] < 1.0 or needs_rev_i)
-                feats[i, 0] = depth[i]
-                feats[i, 1] = 0.85 if depth[i] >= 0.5 else 0.0
-                feats[i, 2] = retention[i]
-                feats[i, 3] = 1.0 if prereq_ok else 0.0
-                feats[i, 4] = 1.0 if needs_rev_i else 0.0
-                feats[i, 5] = float(tiers[i]) / 4.0
-                feats[i, 6] = code_score[i]
-                feats[i, 7] = 1.0
+                eligible[i] = prereq_ok
+                feats[i, NodeFeatureIdx.DEPTH_NORM] = depth[i]
+                feats[i, NodeFeatureIdx.CONFIDENCE] = 0.85 if depth[i] >= 0.5 else 0.0
+                feats[i, NodeFeatureIdx.RETENTION] = retention[i]
+                feats[i, NodeFeatureIdx.IS_ELIGIBLE] = 1.0 if prereq_ok else 0.0
+                feats[i, NodeFeatureIdx.NEEDS_REVIEW] = 1.0 if needs_rev_i else 0.0
+                feats[i, NodeFeatureIdx.TIER_DIFFICULTY] = float(tiers[i]) / 4.0
+                feats[i, NodeFeatureIdx.CODE_SCORE] = code_score[i]
+                feats[i, NodeFeatureIdx.IS_GOAL_PATH] = 1.0
 
             logits = model.predict_logits(feats, adj_in, adj_out)
             raw_v = int(np.argmax(logits.reshape(-1))) // 4
-            if feats[raw_v, 3] < 0.5:
+            if feats[raw_v, NodeFeatureIdx.IS_ELIGIBLE] < 0.5:
                 unmasked_invalid += 1
 
-            if not (np.any(eligible) or np.any(needs_review)):
+            if bool(np.all(depth >= 0.75)) and not bool(np.any(needs_review)):
                 break
+
             sel_v, sel_m, _pol_src, _applied = select_guarded_action(
                 logits,
                 eligible=eligible,
                 needs_review=needs_review,
                 depth=depth,
                 retention=retention,
+                code_score=code_score,
             )
 
-            if feats[sel_v, 3] < 0.5:
+            if feats[sel_v, NodeFeatureIdx.IS_ELIGIBLE] < 0.5:
                 masked_invalid += 1
-                ep_rew -= 1.0
+                ep_rew += MultiObjectiveRewardCalculator.PREREQ_VIOLATION_PENALTY
                 continue
 
-            if sel_m == 0:  # Learn_New
-                if depth[sel_v] < 0.50:
-                    if float(rng.random()) < 0.90:
-                        depth[sel_v] = 0.50
-                        retention[sel_v] = 1.0
-                        ep_rew += 1.0
-                    else:
-                        ep_rew -= 0.1
-                else:
-                    ep_rew -= 0.35
-            elif sel_m == 1:  # Deep_Probe
-                if 0.50 <= depth[sel_v] < 1.0:
-                    if float(rng.random()) < 0.85:
-                        depth[sel_v] = min(1.0, float(depth[sel_v]) + 0.25)
-                        retention[sel_v] = 1.0
-                        ep_rew += 1.5
-                    else:
-                        ep_rew -= 0.15
-                else:
-                    ep_rew -= 0.4
-            elif sel_m == 2:  # Code_Practice
-                if 0.25 <= depth[sel_v] < 1.0 and code_score[sel_v] < 1.0:
-                    if float(rng.random()) < 0.85:
-                        code_score[sel_v] = 1.0
-                        depth[sel_v] = max(float(depth[sel_v]), 0.75)
-                        retention[sel_v] = 1.0
-                        ep_rew += 1.8
-                    else:
-                        ep_rew -= 0.15
-                else:
-                    ep_rew -= 0.3
-            else:  # Spaced_Review (sel_m == 3)
-                if feats[sel_v, 4] > 0.5:
-                    retention[sel_v] = 1.0
-                    ep_rew += 1.5
-                else:
-                    ep_rew -= 0.3
+            depth_old = float(depth[sel_v])
+            code_old = float(code_score[sel_v])
+            ret_old = float(retention[sel_v])
+
+            p_pass = 0.88 if sel_m in (LearningMode.LEARN_NEW, LearningMode.SPACED_REVIEW) else 0.84
+            passed = bool(rng.random() < p_pass)
+            score = 0.90 if passed else 0.45
+
+            if passed:
+                dt_days[sel_v] = 0.0
+                if sel_m == LearningMode.LEARN_NEW:
+                    depth[sel_v] = max(float(depth[sel_v]), 0.50)
+                elif sel_m == LearningMode.DEEP_PROBE:
+                    target = 1.0 if depth[sel_v] >= 0.75 else 0.75
+                    depth[sel_v] = max(float(depth[sel_v]), target)
+                    stability[sel_v] = EbbinghausMemoryModel.update_stability(
+                        float(stability[sel_v]), score, passed=True
+                    )
+                elif sel_m == LearningMode.CODE_PRACTICE:
+                    code_score[sel_v] = 1.0
+                    target = 1.0 if depth[sel_v] >= 0.75 else 0.75
+                    depth[sel_v] = max(float(depth[sel_v]), target)
+                    stability[sel_v] = EbbinghausMemoryModel.update_stability(
+                        float(stability[sel_v]), score, passed=True
+                    )
+                else:  # SPACED_REVIEW
+                    stability[sel_v] = EbbinghausMemoryModel.update_stability(
+                        float(stability[sel_v]), score, passed=True
+                    )
+                ret_after = 1.0
+            else:
+                if depth[sel_v] >= EbbinghausMemoryModel.MIN_DEPTH_FOR_RETENTION:
+                    stability[sel_v] = EbbinghausMemoryModel.update_stability(
+                        float(stability[sel_v]), score, passed=False
+                    )
+                ret_after = ret_old
+
+            goal_mastered = bool(
+                np.all(depth >= 0.75)
+                and all(
+                    not EbbinghausMemoryModel.is_review_needed(
+                        float(depth[u]),
+                        float(
+                            EbbinghausMemoryModel.compute_retention(
+                                float(dt_days[u]), float(stability[u])
+                            )
+                        )
+                        if depth[u] >= EbbinghausMemoryModel.MIN_DEPTH_FOR_RETENTION
+                        else 1.0,
+                    )
+                    for u in range(n_nodes)
+                )
+            )
+            rb = MultiObjectiveRewardCalculator.compute(
+                depth_before=depth_old,
+                depth_after=float(depth[sel_v]),
+                retention_before=ret_old,
+                retention_after=ret_after,
+                code_before=code_old,
+                code_after=float(code_score[sel_v]),
+                mode=sel_m,
+                step_passed=passed,
+                goal_mastered=goal_mastered,
+            )
+            ep_rew += rb.total_reward
+            if goal_mastered:
+                break
+
         ep_rewards.append(ep_rew)
 
     mean_rew = float(np.mean(ep_rewards)) if ep_rewards else 0.0
@@ -302,12 +558,8 @@ def _rollout_policy_eval_on_topologies(
     return mean_rew, unmasked_rate, masked_rate, domains_evaluated
 
 
-def _load_ckpt_weights(ckpt_path: Path) -> VerifiedGnnPpoCheckpoint:
-    with zipfile.ZipFile(ckpt_path, "r") as zf:
-        raw_npz = zf.read("weights.npz")
-    npz = np.load(io.BytesIO(raw_npz))
-    weights = {k: npz[k].astype(np.float32).copy() for k in npz.files}
-    return VerifiedGnnPpoCheckpoint(ckpt_path.name, weights)
+def _load_ckpt_weights(ckpt_path: Path) -> NumpyGnnPredictor:
+    return NumpyGnnPredictor.from_checkpoint_zip(ckpt_path)
 
 
 def _evaluate_candidate_against_active(
@@ -317,6 +569,7 @@ def _evaluate_candidate_against_active(
     active_checkpoint_path: Path,
     eval_episodes: int = 200,
     seed: int = 2026,
+    kl_override: float | None = None,
 ) -> dict[str, Any]:
     """Compare candidate vs active checkpoint over 200 scenarios across real domain DAG topologies."""
     cand_model = _load_ckpt_weights(candidate_checkpoint_path)
@@ -325,7 +578,9 @@ def _evaluate_candidate_against_active(
     topologies: list[tuple[str, list[str], np.ndarray, np.ndarray, list[int], list[list[int]]]] = []
     for dslug in ("backend", "frontend", "devops"):
         try:
-            node_order, adj_in, adj_out, _edge_index, tiers, prereq_indices = _load_domain_topology_for_rl(db, dslug)
+            node_order, adj_in, adj_out, _edge_index, tiers, prereq_indices = (
+                _load_domain_topology_for_rl(db, dslug)
+            )
             topologies.append((dslug, node_order, adj_in, adj_out, tiers, prereq_indices))
         except ValueError:
             continue
@@ -335,36 +590,37 @@ def _evaluate_candidate_against_active(
     active_mean_rew, _, _, domains_evaluated = _rollout_policy_eval_on_topologies(
         active_model, topologies, episodes=eval_episodes, seed=seed
     )
-    cand_mean_rew, unmasked_invalid_rate, masked_violation_rate, _ = _rollout_policy_eval_on_topologies(
-        cand_model, topologies, episodes=eval_episodes, seed=seed
+    cand_mean_rew, unmasked_invalid_rate, masked_violation_rate, _ = (
+        _rollout_policy_eval_on_topologies(
+            cand_model, topologies, episodes=eval_episodes, seed=seed
+        )
     )
 
-    # Measure KL divergence across real domain graph states
-    rng = np.random.default_rng(42)
-    kl_values: list[float] = []
-    for idx in range(40):
-        _dslug, node_order, adj_in, adj_out, tiers, prereq_indices = topologies[idx % len(topologies)]
-        n_nodes = len(node_order)
-        feats = np.zeros((n_nodes, 8), dtype=np.float32)
-        mastered_k = int(rng.integers(0, max(1, n_nodes - 1)))
-        for i in range(n_nodes):
-            prereq_ok = all(p < mastered_k for p in prereq_indices[i])
-            feats[i, 0] = 0.75 if i < mastered_k else 0.0
-            feats[i, 1] = 0.85 if i < mastered_k else 0.0
-            feats[i, 2] = 1.0
-            feats[i, 3] = 1.0 if prereq_ok else 0.0
-            feats[i, 5] = float(tiers[i]) / 4.0
-            feats[i, 7] = 1.0
-        p_logits = active_model.predict_logits(feats, adj_in, adj_out).reshape(-1)
-        q_logits = cand_model.predict_logits(feats, adj_in, adj_out).reshape(-1)
-        p_exp = np.exp(p_logits - np.max(p_logits))
-        q_exp = np.exp(q_logits - np.max(q_logits))
-        p_prob = p_exp / np.sum(p_exp)
-        q_prob = q_exp / np.sum(q_exp)
-        kl = float(np.sum(p_prob * np.log((p_prob + 1e-8) / (q_prob + 1e-8))))
-        kl_values.append(max(0.0, kl))
+    if kl_override is not None:
+        measured_kl = round(float(kl_override), 6)
+    else:
+        rng = np.random.default_rng(42)
+        kl_values: list[float] = []
+        for idx in range(40):
+            _dslug, node_order, adj_in, adj_out, tiers, prereq_indices = topologies[
+                idx % len(topologies)
+            ]
+            n_nodes = len(node_order)
+            feats = np.zeros((n_nodes, 8), dtype=np.float32)
+            mastered_k = int(rng.integers(0, max(1, n_nodes - 1)))
+            for i in range(n_nodes):
+                prereq_ok = all(p < mastered_k for p in prereq_indices[i])
+                feats[i, NodeFeatureIdx.DEPTH_NORM] = 0.75 if i < mastered_k else 0.0
+                feats[i, NodeFeatureIdx.CONFIDENCE] = 0.85 if i < mastered_k else 0.0
+                feats[i, NodeFeatureIdx.RETENTION] = 1.0
+                feats[i, NodeFeatureIdx.IS_ELIGIBLE] = 1.0 if prereq_ok else 0.0
+                feats[i, NodeFeatureIdx.TIER_DIFFICULTY] = float(tiers[i]) / 4.0
+                feats[i, NodeFeatureIdx.IS_GOAL_PATH] = 1.0
+            p_logits = active_model.predict_logits(feats, adj_in, adj_out)
+            q_logits = cand_model.predict_logits(feats, adj_in, adj_out)
+            kl_values.append(NumpyGnnPredictor.compute_kl_divergence(p_logits, q_logits))
+        measured_kl = round(float(np.mean(kl_values)), 6) if kl_values else 0.0
 
-    measured_kl = round(float(np.mean(kl_values)), 6)
     reward_delta = round(cand_mean_rew - active_mean_rew, 4)
     if active_mean_rew > 1e-6:
         reward_ratio = round(cand_mean_rew / active_mean_rew, 4)
@@ -382,47 +638,6 @@ def _evaluate_candidate_against_active(
         "unmasked_invalid_rate": unmasked_invalid_rate,
         "guardrail_violations": masked_violation_rate,
     }
-
-
-def _gelu_grad(x: np.ndarray) -> np.ndarray:
-    """Derivative of tanh-approximated GELU used in VerifiedGnnPpoCheckpoint."""
-    c = float(np.sqrt(2.0 / np.pi))
-    u = c * (x + 0.044715 * (x**3))
-    th = np.tanh(u)
-    du = c * (1.0 + 3.0 * 0.044715 * (x**2))
-    return (0.5 * (1.0 + th) + 0.5 * x * (1.0 - th**2) * du).astype(np.float32)
-
-
-def _forward_with_cache(
-    weights: dict[str, np.ndarray],
-    node_features: np.ndarray,
-    adj_in: np.ndarray,
-    adj_out: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Run VerifiedGnnPpoCheckpoint forward pass returning (logits, actor_in, a1_pre, a1)."""
-    ckpt = VerifiedGnnPpoCheckpoint("train", weights)
-    h = ckpt._linear(node_features.astype(np.float32), "input_proj")
-    h = 0.5 * h * (1.0 + np.tanh(np.sqrt(2.0 / np.pi) * (h + 0.044715 * (h**3))))
-    for idx in range(3):
-        p = f"layers__{idx}"
-        msg = (
-            ckpt._linear(h, f"{p}__w_self", has_bias=True)
-            + ckpt._linear(adj_in @ h, f"{p}__w_prereq", has_bias=False)
-            + ckpt._linear(adj_out @ h, f"{p}__w_dep", has_bias=False)
-        )
-        gelu_msg = 0.5 * msg * (1.0 + np.tanh(np.sqrt(2.0 / np.pi) * (msg + 0.044715 * (msg**3))))
-        x_in = h + gelu_msg
-        mean = x_in.mean(axis=-1, keepdims=True)
-        var = x_in.var(axis=-1, keepdims=True)
-        h = ((x_in - mean) / np.sqrt(var + 1e-5)) * weights[f"{p}__norm__weight"] + weights[f"{p}__norm__bias"]
-
-    g = h.mean(axis=0, keepdims=True)
-    g_exp = np.repeat(g, h.shape[0], axis=0)
-    actor_in = np.concatenate([h, g_exp], axis=-1)
-    a1_pre = actor_in @ weights["actor_head__0__weight"].T + weights["actor_head__0__bias"]
-    a1 = (0.5 * a1_pre * (1.0 + np.tanh(np.sqrt(2.0 / np.pi) * (a1_pre + 0.044715 * (a1_pre**3))))).astype(np.float32)
-    logits = a1 @ weights["actor_head__2__weight"].T + weights["actor_head__2__bias"]
-    return logits.astype(np.float32), actor_in.astype(np.float32), a1_pre.astype(np.float32), a1
 
 
 def _extract_feature_matrix(obs_raw: Any, expected_node_order: list[str]) -> np.ndarray | None:
@@ -468,15 +683,18 @@ def _build_transition_tensors(
     domain_slug: str | None = None,
 ) -> dict[str, Any]:
     """Validate real transitions (order, index/concept match, known mode, finite values) and build tensors."""
-    mode_to_idx = {"Learn_New": 0, "Deep_Probe": 1, "Code_Practice": 2, "Spaced_Review": 3}
-    topo_cache: dict[str, tuple[list[str], np.ndarray, np.ndarray, np.ndarray, list[int], list[list[int]]]] = {}
-    transitions: list[tuple[np.ndarray, np.ndarray, np.ndarray, int, float]] = []
+    topo_cache: dict[
+        str, tuple[list[str], np.ndarray, np.ndarray, np.ndarray, list[int], list[list[int]]]
+    ] = {}
+    transitions: list[ActorTransition] = []
     last_edge_index = np.zeros((2, 0), dtype=np.int64)
     last_node_order: list[str] = []
 
     for s in samples:
         is_dict = isinstance(s, dict)
-        s_domain = str(s.get("domain_slug") if is_dict else getattr(s, "domain_slug", "") or domain_slug or "")
+        s_domain = str(
+            s.get("domain_slug") if is_dict else getattr(s, "domain_slug", "") or domain_slug or ""
+        )
         if not s_domain:
             continue
         if s_domain not in topo_cache:
@@ -485,8 +703,12 @@ def _build_transition_tensors(
         last_edge_index = edge_index
         last_node_order = node_order
 
-        obs_before_raw = s.get("obs_before_json") if is_dict else getattr(s, "obs_before_json", None)
-        obs_after_raw = s.get("obs_after_json") if is_dict else getattr(s, "obs_after_json", None)
+        obs_before_raw = (
+            s.get("obs_before_json") if is_dict else getattr(s, "obs_before_json", None)
+        )
+        obs_after_raw = (
+            s.get("obs_after_json") if is_dict else getattr(s, "obs_after_json", None)
+        )
         feats_before = _extract_feature_matrix(obs_before_raw, node_order)
         feats_after = _extract_feature_matrix(obs_after_raw, node_order)
         if feats_before is None or feats_after is None:
@@ -500,21 +722,31 @@ def _build_transition_tensors(
         raw_node_idx = (
             s.get("action_node_idx")
             if is_dict and "action_node_idx" in s
-            else (obs_before_raw.get("action_node_idx") if isinstance(obs_before_raw, dict) else None)
+            else (
+                obs_before_raw.get("action_node_idx") if isinstance(obs_before_raw, dict) else None
+            )
         )
         if raw_node_idx is not None and int(raw_node_idx) != expected_idx:
             continue
         node_idx = expected_idx
 
         action_mode = str(s.get("action_mode") if is_dict else getattr(s, "action_mode", ""))
-        if action_mode not in mode_to_idx:
+        if action_mode not in MODE_NAME_TO_ENUM:
             continue
-        mode_idx = mode_to_idx[action_mode]
+        mode_idx = int(MODE_NAME_TO_ENUM[action_mode])
 
         reward = float(s.get("reward") if is_dict else getattr(s, "reward", float("nan")))
         if not math.isfinite(reward):
             continue
-        transitions.append((feats_before, adj_in, adj_out, node_idx * 4 + mode_idx, reward))
+        transitions.append(
+            ActorTransition(
+                node_features=feats_before,
+                adj_in=adj_in,
+                adj_out=adj_out,
+                action_idx=node_idx * 4 + mode_idx,
+                reward=reward,
+            )
+        )
 
     if not transitions:
         raise ValueError(
@@ -534,72 +766,31 @@ def _derive_candidate_checkpoint(
     mean_buf_reward: float,
     samples: list[RlExperienceBufferModel] | None = None,
 ) -> tuple[str, str, dict[str, Any]]:
-    """Derive a candidate checkpoint via PPO clipped objective on valid transitions and 200-scenario eval."""
+    """Derive a candidate checkpoint via KL-regularized NumpyGnnPredictor.micro_batch_ppo_update & 200-scenario eval."""
     env_cand_dir = os.environ.get("PLUMORA_CANDIDATES_DIR", "").strip()
     candidates_dir = Path(env_cand_dir) if env_cand_dir else (base_ckpt_path.parent / "candidates")
     candidates_dir.mkdir(parents=True, exist_ok=True)
     cand_file = candidates_dir / f"{version_tag}.zip"
 
-    with zipfile.ZipFile(base_ckpt_path, "r") as zf:
-        raw_npz = zf.read("weights.npz")
-    npz = np.load(io.BytesIO(raw_npz))
-    base_weights: dict[str, np.ndarray] = {k: npz[k].copy() for k in npz.files}
-    cand_weights: dict[str, np.ndarray] = {k: v.astype(np.float32).copy() for k, v in base_weights.items()}
-
-    base_model = VerifiedGnnPpoCheckpoint("base", base_weights)
+    base_model = NumpyGnnPredictor.from_checkpoint_zip(base_ckpt_path)
+    cand_weights = {k: v.copy() for k, v in base_model.w.items()}
 
     valid_transition_count = 0
+    measured_buffer_kl: float | None = None
     if samples:
         built = _build_transition_tensors(db, list(samples))
-        raw_transitions: list[tuple[np.ndarray, np.ndarray, np.ndarray, int, float]] = built["transitions"]
-        valid_transition_count = len(raw_transitions)
-        rewards = np.array([t[4] for t in raw_transitions], dtype=np.float32)
-        advs = (rewards - float(np.mean(rewards))) / (float(np.std(rewards)) + 1e-6)
-        advs = np.clip(advs, -2.0, 2.0)
-
-        transitions: list[tuple[np.ndarray, np.ndarray, np.ndarray, int, float, float]] = []
-        for (feats, a_in, a_out, act_idx, _rew), adv in zip(raw_transitions, advs, strict=True):
-            old_logits = base_model.predict_logits(feats, a_in, a_out).reshape(-1)
-            old_exp = np.exp(old_logits - np.max(old_logits))
-            old_probs = old_exp / np.sum(old_exp)
-            transitions.append((feats, a_in, a_out, act_idx, float(old_probs[act_idx]), float(adv)))
-
-        clip_eps = 0.2
-        lr = 0.005
-        for _epoch in range(4):
-            g_w2 = np.zeros_like(cand_weights["actor_head__2__weight"])
-            g_b2 = np.zeros_like(cand_weights["actor_head__2__bias"])
-            g_w0 = np.zeros_like(cand_weights["actor_head__0__weight"])
-            g_b0 = np.zeros_like(cand_weights["actor_head__0__bias"])
-
-            for feats, a_in, a_out, act_idx, old_p, adv in transitions:
-                logits, actor_in, a1_pre, a1 = _forward_with_cache(cand_weights, feats, a_in, a_out)
-                flat_logits = logits.reshape(-1)
-                exp_l = np.exp(flat_logits - np.max(flat_logits))
-                probs = exp_l / np.sum(exp_l)
-                new_p = float(probs[act_idx])
-                ratio = new_p / (old_p + 1e-8)
-
-                if (adv >= 0.0 and ratio > 1.0 + clip_eps) or (adv < 0.0 and ratio < 1.0 - clip_eps):
-                    continue
-
-                one_hot = np.zeros_like(probs)
-                one_hot[act_idx] = 1.0
-                d_flat = (ratio * adv) * (one_hot - probs)
-                d_logits = d_flat.reshape(logits.shape)
-
-                g_w2 += d_logits.T @ a1
-                g_b2 += d_logits.sum(axis=0)
-                d_a1 = d_logits @ cand_weights["actor_head__2__weight"]
-                d_a1_pre = d_a1 * _gelu_grad(a1_pre)
-                g_w0 += d_a1_pre.T @ actor_in
-                g_b0 += d_a1_pre.sum(axis=0)
-
-            scale = lr / max(1, len(transitions))
-            cand_weights["actor_head__2__weight"] += np.clip(scale * g_w2, -0.02, 0.02)
-            cand_weights["actor_head__2__bias"] += np.clip(scale * g_b2, -0.02, 0.02)
-            cand_weights["actor_head__0__weight"] += np.clip(scale * g_w0, -0.02, 0.02)
-            cand_weights["actor_head__0__bias"] += np.clip(scale * g_b0, -0.02, 0.02)
+        transitions: list[ActorTransition] = built["transitions"]
+        valid_transition_count = len(transitions)
+        update_res = base_model.micro_batch_ppo_update(
+            transitions,
+            epochs=4,
+            lr=0.005,
+            clip_eps=0.2,
+            beta_kl=0.5,
+            max_param_step=0.02,
+        )
+        cand_weights = update_res.updated_weights
+        measured_buffer_kl = update_res.mean_kl_divergence
 
     buf = io.BytesIO()
     np.savez(buf, **cand_weights)  # type: ignore[arg-type]
@@ -610,6 +801,7 @@ def _derive_candidate_checkpoint(
         "buffer_samples": valid_transition_count,
         "ppo_epochs": 4,
         "clip_eps": 0.2,
+        "beta_kl": 0.5,
         "created_at": datetime.now(UTC).isoformat(),
     }
     with zipfile.ZipFile(cand_file, "w", compression=zipfile.ZIP_DEFLATED) as zout:
@@ -623,6 +815,7 @@ def _derive_candidate_checkpoint(
         active_checkpoint_path=base_ckpt_path,
         eval_episodes=200,
         seed=2026,
+        kl_override=measured_buffer_kl,
     )
 
     rel_path = (
@@ -703,13 +896,31 @@ def run_micro_batch_online_rl(
     masked_violation = float(eval_report["guardrail_violations"])
     reward_ratio = float(eval_report["reward_ratio"])
 
-    passed_gate = (
-        kl_div <= payload.kl_target_max
-        and invalid_unmasked < 0.05
-        and masked_violation == 0.0
-        and reward_ratio >= 0.98
-    )
+    block_reasons: list[str] = []
+    if kl_div > payload.kl_target_max:
+        block_reasons.append(f"KL_EXCEEDED_TARGET ({kl_div:.4f} > {payload.kl_target_max:.4f})")
+    if invalid_unmasked >= 0.05:
+        block_reasons.append(f"UNMASKED_INVALID_RATE_HIGH ({invalid_unmasked:.4f} >= 0.05)")
+    if masked_violation > 0.0:
+        block_reasons.append(f"GUARDRAIL_VIOLATION_NONZERO ({masked_violation:.4f})")
+    if reward_ratio < 0.98:
+        block_reasons.append(f"REWARD_REGRESSION_BELOW_98_PCT ({reward_ratio:.4f} < 0.98)")
+
+    passed_gate = len(block_reasons) == 0
     verdict = "PASSED" if passed_gate else "BLOCKED"
+
+    eval_metrics_payload = {
+        "eval_episodes": eval_report["eval_episodes"],
+        "domains_evaluated": eval_report["domains_evaluated"],
+        "candidate_mean_reward": eval_report["candidate_mean_reward"],
+        "active_mean_reward": eval_report["active_mean_reward"],
+        "reward_delta": eval_report["reward_delta"],
+        "invalid_action_rate_unmasked": invalid_unmasked,
+        "masked_violation_rate": masked_violation,
+        "mean_reward_ratio_vs_prod": reward_ratio,
+        "block_reasons": block_reasons,
+        "eval_source": "checkpoint_disk_eval_200",
+    }
 
     cand = ModelRegistryModel(
         id=cand_id,
@@ -719,17 +930,7 @@ def run_micro_batch_online_rl(
         kl_divergence=kl_div,
         gate_verdict=verdict,
         is_active=False,
-        eval_metrics_json={
-            "eval_episodes": eval_report["eval_episodes"],
-            "domains_evaluated": eval_report["domains_evaluated"],
-            "candidate_mean_reward": eval_report["candidate_mean_reward"],
-            "active_mean_reward": eval_report["active_mean_reward"],
-            "reward_delta": eval_report["reward_delta"],
-            "invalid_action_rate_unmasked": invalid_unmasked,
-            "masked_violation_rate": masked_violation,
-            "mean_reward_ratio_vs_prod": reward_ratio,
-            "eval_source": "checkpoint_disk_eval_200",
-        },
+        eval_metrics_json=eval_metrics_payload,
     )
     db.add(cand)
     db.flush()
@@ -756,6 +957,10 @@ def run_micro_batch_online_rl(
             "invalid_action_rate_unmasked": invalid_unmasked,
             "masked_violation_rate": masked_violation,
             "mean_reward_ratio_vs_prod": reward_ratio,
+            "candidate_mean_reward": eval_report["candidate_mean_reward"],
+            "active_mean_reward": eval_report["active_mean_reward"],
+            "reward_delta": eval_report["reward_delta"],
+            "block_reasons": block_reasons,
         },
     }
 
@@ -796,8 +1001,13 @@ def _verify_checkpoint_artifact(checkpoint_path_str: str, expected_sha256: str) 
     return resolved
 
 
-def activate_candidate_model(db: Session, model_id: uuid.UUID) -> dict[str, Any]:
-    """Activate a PASSED candidate model after verifying its checkpoint artifact & SHA-256."""
+def activate_candidate_model(
+    db: Session,
+    model_id: uuid.UUID,
+    *,
+    reason: str = "Admin activation",
+) -> dict[str, Any]:
+    """Activate a PASSED candidate model, verify SHA-256, and sync Redis active pointer."""
     t0 = time.monotonic()
     cand = db.get(ModelRegistryModel, model_id)
     if cand is None:
@@ -825,15 +1035,13 @@ def activate_candidate_model(db: Session, model_id: uuid.UUID) -> dict[str, Any]
 
     cand.is_active = True
     cand.activated_at = datetime.now(UTC)
-    if prev_id:
-        cand.eval_metrics_json = {
-            **dict(cand.eval_metrics_json or {}),
-            "previous_active_model_id": prev_id,
-        }
+    cand.eval_metrics_json = {
+        **dict(cand.eval_metrics_json or {}),
+        **({"previous_active_model_id": prev_id} if prev_id else {}),
+        "last_activation_reason": reason,
+    }
     db.commit()
-    from app.modules.recommendation.service_v2 import invalidate_active_model_cache
-
-    invalidate_active_model_cache()
+    publish_active_model_pointer(str(cand.checkpoint_path), str(cand.checkpoint_sha256))
 
     latency_ms = max(1, int((time.monotonic() - t0) * 1000))
     return {
@@ -842,10 +1050,15 @@ def activate_candidate_model(db: Session, model_id: uuid.UUID) -> dict[str, Any]
         "active_checkpoint_sha256": cand.checkpoint_sha256,
         "switched_at": cand.activated_at.isoformat(),
         "switch_latency_ms": latency_ms,
+        "reason": reason,
     }
 
 
-def rollback_active_model(db: Session) -> dict[str, Any]:
+def rollback_active_model(
+    db: Session,
+    *,
+    reason: str = "1-Click Rollback",
+) -> dict[str, Any]:
     """1-Click Rollback (< 2000ms) to the actual previously active PASSED checkpoint."""
     t0 = time.monotonic()
     _ensure_prod_model_seeded(db)
@@ -859,13 +1072,16 @@ def rollback_active_model(db: Session) -> dict[str, Any]:
         if prev_ptr:
             try:
                 candidate_prev = db.get(ModelRegistryModel, uuid.UUID(str(prev_ptr)))
-                if candidate_prev is not None and candidate_prev.gate_verdict == "PASSED" and candidate_prev.id != curr.id:
+                if (
+                    candidate_prev is not None
+                    and candidate_prev.gate_verdict == "PASSED"
+                    and candidate_prev.id != curr.id
+                ):
                     target = candidate_prev
             except ValueError:
                 target = None
 
     if target is None:
-        # Fallback: most recently activated PASSED model excluding current (never pick unactivated candidates)
         stmt = (
             select(ModelRegistryModel)
             .where(
@@ -882,7 +1098,10 @@ def rollback_active_model(db: Session) -> dict[str, Any]:
     if target is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error_code": "NO_ROLLBACK_TARGET", "message": "No previously active safe rollback target found."},
+            detail={
+                "error_code": "NO_ROLLBACK_TARGET",
+                "message": "No previously active safe rollback target found.",
+            },
         )
     _verify_checkpoint_artifact(target.checkpoint_path, target.checkpoint_sha256)
 
@@ -892,10 +1111,13 @@ def rollback_active_model(db: Session) -> dict[str, Any]:
         db.flush()
     target.is_active = True
     target.activated_at = datetime.now(UTC)
+    target.eval_metrics_json = {
+        **dict(target.eval_metrics_json or {}),
+        "last_rollback_reason": reason,
+    }
     db.commit()
-    from app.modules.recommendation.service_v2 import invalidate_active_model_cache
-
     invalidate_active_model_cache()
+    publish_active_model_pointer(str(target.checkpoint_path), str(target.checkpoint_sha256))
 
     latency_ms = max(1, int((time.monotonic() - t0) * 1000))
     return {
@@ -904,6 +1126,47 @@ def rollback_active_model(db: Session) -> dict[str, Any]:
         "active_checkpoint_sha256": target.checkpoint_sha256,
         "switched_at": target.activated_at.isoformat(),
         "switch_latency_ms": latency_ms,
+        "reason": reason,
+    }
+
+
+def trigger_manual_outbox_relay(db: Session) -> dict[str, Any]:
+    """Admin-triggered immediate outbox relay + Redis Streams consume."""
+    stats = run_outbox_relay_and_consume_once(db)
+    return {
+        "status": "ok",
+        **stats,
+    }
+
+
+def get_streams_dlq_entries(*, limit: int = 50) -> dict[str, Any]:
+    """Read Dead-Letter Queue entries from Redis Streams."""
+    dlq_streams = [f"{COMPETENCY_STREAM_NAME}:dlq", f"{DOMAIN_STREAM_NAME}:dlq"]
+    entries: list[dict[str, Any]] = []
+    try:
+        client = get_redis_client(decode_responses=True, socket_timeout=0.5)
+        for s_name in dlq_streams:
+            try:
+                raw_msgs = client.xrevrange(s_name, max="+", min="-", count=limit)
+                if isinstance(raw_msgs, list):
+                    for msg_id, fields in raw_msgs:
+                        entries.append(
+                            {
+                                "stream": s_name,
+                                "msg_id": str(msg_id),
+                                "fields": dict(fields) if isinstance(fields, dict) else {},
+                            }
+                        )
+            except redis.ResponseError:
+                continue
+    except (redis.RedisError, OSError) as exc:
+        logger.warning("Failed to read DLQ streams from Redis: %s", exc)
+        return {"redis_connected": False, "dlq_count": 0, "entries": []}
+
+    return {
+        "redis_connected": True,
+        "dlq_count": len(entries),
+        "entries": entries[:limit],
     }
 
 
@@ -916,7 +1179,7 @@ def _probe_http_health(url: str) -> str:
 
 
 def get_system_health_status(db: Session) -> dict[str, Any]:
-    """Return real probed status of PostgreSQL, Redis, RL Checkpoint, and 4 services."""
+    """Return honest probed status of PostgreSQL/SQLite, Redis, RL Checkpoint, Outbox, DLQ & 4 services."""
     pg_ok = True
     try:
         db.execute(text("SELECT 1"))
@@ -924,6 +1187,10 @@ def get_system_health_status(db: Session) -> dict[str, Any]:
         pg_ok = False
 
     pending_outbox = -1
+    outbox_by_event_type: dict[str, int] = {
+        "CompetencyUpdatedEvent": 0,
+        "DomainGraphUpdatedEvent": 0,
+    }
     if assessment_service_url():
         ext_pending = fetch_outbox_pending_count_internal()
         pending_outbox = ext_pending if ext_pending is not None else -1
@@ -937,14 +1204,22 @@ def get_system_health_status(db: Session) -> dict[str, Any]:
                 )
                 or 0
             )
+            ev_rows = db.execute(
+                select(OutboxEventModel.event_type, func.count())
+                .where(OutboxEventModel.published_at.is_(None))
+                .group_by(OutboxEventModel.event_type)
+            ).all()
+            for ev_type, cnt in ev_rows:
+                outbox_by_event_type[str(ev_type)] = int(cnt)
         except SQLAlchemyError:
             db.rollback()
             ext_pending = fetch_outbox_pending_count_internal()
             pending_outbox = ext_pending if ext_pending is not None else -1
 
-    schemas_isolated = False
     bind = db.get_bind()
-    if bind is not None and bind.dialect.name == "postgresql":
+    db_dialect = str(bind.dialect.name) if bind is not None else "unknown"
+    schemas_isolated = False
+    if db_dialect == "postgresql":
         rows = db.execute(
             text(
                 "SELECT schema_name FROM information_schema.schemata "
@@ -975,8 +1250,6 @@ def get_system_health_status(db: Session) -> dict[str, Any]:
             and int(svc_roles or 0) == 4
             and bool(priv_ok)
         )
-    elif bind is not None and bind.dialect.name == "sqlite":
-        schemas_isolated = True
 
     redis_ok = False
     cache_hit_rate = 0.0
@@ -987,13 +1260,13 @@ def get_system_health_status(db: Session) -> dict[str, Any]:
     c2c_p95_ms: float | None = None
     c2c_samples = 0
     pending_age_ms: float | None = None
+    dlq_count = 0
+    stream_lengths: dict[str, int] = {
+        "CompetencyUpdatedEvent": 0,
+        "DomainGraphUpdatedEvent": 0,
+    }
     try:
-        client: redis.Redis = redis.Redis.from_url(
-            settings.redis_url,
-            socket_connect_timeout=0.5,
-            socket_timeout=0.5,
-            decode_responses=True,
-        )
+        client = get_redis_client(decode_responses=True, socket_timeout=0.5)
         redis_ok = bool(client.ping())
         if redis_ok:
             hits = int(client.get("plumora:metrics:kg_cache_hits") or 0)
@@ -1010,8 +1283,23 @@ def get_system_health_status(db: Session) -> dict[str, Any]:
                 c2c_samples = len(vals)
                 p95_idx = min(c2c_samples - 1, max(0, int(0.95 * (c2c_samples - 1))))
                 c2c_p95_ms = round(vals[p95_idx], 2)
+
             try:
-                groups = client.xinfo_groups("plumora:competency_events")
+                stream_lengths["CompetencyUpdatedEvent"] = int(client.xlen(COMPETENCY_STREAM_NAME))
+            except redis.ResponseError:
+                stream_lengths["CompetencyUpdatedEvent"] = 0
+            try:
+                stream_lengths["DomainGraphUpdatedEvent"] = int(client.xlen(DOMAIN_STREAM_NAME))
+            except redis.ResponseError:
+                stream_lengths["DomainGraphUpdatedEvent"] = 0
+            for dlq_s in (f"{COMPETENCY_STREAM_NAME}:dlq", f"{DOMAIN_STREAM_NAME}:dlq"):
+                try:
+                    dlq_count += int(client.xlen(dlq_s))
+                except redis.ResponseError:
+                    continue
+
+            try:
+                groups = client.xinfo_groups(COMPETENCY_STREAM_NAME)
                 worker_alive = bool(client.exists(WORKER_HEARTBEAT_KEY))
                 if groups and worker_alive:
                     consumer_group_active = True
@@ -1019,7 +1307,7 @@ def get_system_health_status(db: Session) -> dict[str, Any]:
                         int(g.get("pending", 0) or 0) + int(g.get("lag", 0) or 0)
                         for g in groups
                     )
-                    pending_summary = client.xpending("plumora:competency_events", "rec_ai_cg")
+                    pending_summary = client.xpending(COMPETENCY_STREAM_NAME, "rec_ai_cg")
                     oldest_id = (
                         pending_summary.get("min")
                         if isinstance(pending_summary, dict)
@@ -1036,8 +1324,7 @@ def get_system_health_status(db: Session) -> dict[str, Any]:
             except redis.ResponseError:
                 consumer_group_active = False
                 redis_stream_pending = -1
-        client.close()
-    except redis.RedisError:
+    except (redis.RedisError, OSError):
         redis_ok = False
         redis_stream_pending = -1
         redis_lag_ms = -1.0
@@ -1077,11 +1364,15 @@ def get_system_health_status(db: Session) -> dict[str, Any]:
 
     return {
         "mode": deployment_mode,
+        "db_dialect": db_dialect,
         "services": services_status,
         "postgres_connected": pg_ok,
         "rl_checkpoint_verified": ckpt_ok,
         "schemas_isolated": schemas_isolated,
         "outbox_pending_count": pending_outbox,
+        "outbox_pending_by_event_type": outbox_by_event_type,
+        "stream_lengths_by_event_type": stream_lengths,
+        "dlq_count": dlq_count,
         "redis_connected": redis_ok,
         "redis_stream_lag_ms": redis_lag_ms,
         "redis_stream_pending_age_ms": pending_age_ms,

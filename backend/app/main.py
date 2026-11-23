@@ -46,7 +46,7 @@ async def _outbox_background_worker() -> None:
             with SessionLocal() as db:
                 run_outbox_relay_and_consume_once(db)
         except Exception as exc:  # noqa: BLE001
-            log.debug("Outbox worker iteration skipped: %s", exc)
+            log.warning("Outbox worker iteration failed: %s", exc)
         await asyncio.sleep(2.0)
 
 
@@ -74,7 +74,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.frontend_origin, "http://localhost:5173"],
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-CSRF-Token", "Idempotency-Key"],
 )
 
@@ -90,8 +90,7 @@ async def security_headers_middleware(
     request: Request,
     call_next: Callable[[Request], Awaitable[Response]],
 ) -> Response:
-    """Ensure DB is seeded and attach mandatory security headers to every HTTP response."""
-    ensure_db_initialized()
+    """Attach mandatory security headers to every HTTP response."""
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"

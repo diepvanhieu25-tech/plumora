@@ -77,11 +77,27 @@ def fetch_concept_bundle_internal(concept_slug: str) -> dict[str, Any] | None:
     return data
 
 
-def fetch_user_competencies_internal(user_id: uuid.UUID) -> list[dict[str, Any]] | None:
+def invalidate_bundle_cache(domain_slug: str | None = None) -> None:
+    """Invalidate in-memory bundle cache for a specific domain or all entries."""
+    if domain_slug is None:
+        _BUNDLE_CACHE.clear()
+        return
+    _BUNDLE_CACHE.pop(f"domain:{domain_slug}", None)
+    # Also evict concept caches since shared concepts may have changed
+    for key in [k for k in _BUNDLE_CACHE if k.startswith("concept:")]:
+        _BUNDLE_CACHE.pop(key, None)
+
+
+def fetch_user_competencies_payload_internal(user_id: uuid.UUID) -> dict[str, Any] | None:
+    """Fetch full internal competencies payload including state_version & completed_placement_domains."""
     base = assessment_service_url()
     if not base:
         return None
-    data = _get_json(f"{base}/api/v2/internal/users/{user_id}/competencies")
+    return _get_json(f"{base}/api/v2/internal/users/{user_id}/competencies")
+
+
+def fetch_user_competencies_internal(user_id: uuid.UUID) -> list[dict[str, Any]] | None:
+    data = fetch_user_competencies_payload_internal(user_id)
     if data is not None:
         return list(data.get("competencies", []))
     return None

@@ -41,13 +41,53 @@
       "memory_limit_mb": 128
     },
     {
+      "id": "b1f2c3d4-1001-5a00-8b01-000000000001",
+      "concept_slug": "os-basics",
+      "title": "Kiểm tra Giới hạn File Descriptors & Tránh Rò rỉ Socket (ulimit)",
+      "language": "python",
+      "prompt": "Hàm `allocate_fds(events: list[tuple[str, str]], max_fds: int) -> dict` mô phỏng mở (`'open'`) và đóng (`'close'`) File Descriptor theo tên socket. Hãy sửa lỗi để trả về `{'active': sorted_open_fds, 'rejected': rejected_count}` sao cho không vượt quá `max_fds` và đóng đúng FD đã mở (bỏ qua lệnh close với FD không tồn tại).",
+      "buggy_starter_code": "def allocate_fds(events: list[tuple[str, str]], max_fds: int) -> dict:\n    active = []\n    rejected = 0\n    for op, name in events:\n        if op == 'open':\n            active.append(name)\n        elif op == 'close' and name in active:\n            active.remove(name)\n    return {'active': active, 'rejected': rejected}\n",
+      "solution_code": "def allocate_fds(events: list[tuple[str, str]], max_fds: int) -> dict:\n    active = set()\n    rejected = 0\n    for op, name in events:\n        if op == 'open':\n            if name in active:\n                continue\n            if len(active) >= max_fds:\n                rejected += 1\n            else:\n                active.add(name)\n        elif op == 'close':\n            active.discard(name)\n    return {'active': sorted(active), 'rejected': rejected}\n",
+      "test_cases": [
+        {
+          "name": "Reject open when FD limit reached",
+          "call": "allocate_fds([('open', 's1'), ('open', 's2'), ('open', 's3')], 2)",
+          "expected": {
+            "active": ["s1", "s2"],
+            "rejected": 1
+          },
+          "is_hidden": false
+        },
+        {
+          "name": "Closing FD frees slot for next socket",
+          "call": "allocate_fds([('open', 's1'), ('open', 's2'), ('close', 's1'), ('open', 's3')], 2)",
+          "expected": {
+            "active": ["s2", "s3"],
+            "rejected": 0
+          },
+          "is_hidden": false
+        },
+        {
+          "name": "Ignore unknown close and duplicate open",
+          "call": "allocate_fds([('close', 'ghost'), ('open', 'b'), ('open', 'b'), ('open', 'a'), ('open', 'c')], 2)",
+          "expected": {
+            "active": ["a", "b"],
+            "rejected": 1
+          },
+          "is_hidden": true
+        }
+      ],
+      "timeout_ms": 3000,
+      "memory_limit_mb": 128
+    },
+    {
       "id": "2457f84e-c2e8-5440-9bb2-040baff132cd",
       "concept_slug": "web-http",
       "title": "Chuẩn hóa Kiểm tra CORS Origin Cho phép",
       "language": "python",
-      "prompt": "Sửa hàm `is_allowed_origin(origin: str, allowlist: list[str]) -> bool` để không bị qua mặt bởi tiền tố giả mạo (ví dụ `https://plumora.dev.evil.com`).",
+      "prompt": "Sửa hàm `is_allowed_origin(origin: str, allowlist: list[str]) -> bool` để không bị qua mặt bởi tiền tố giả mạo (ví dụ `https://plumora.dev.evil.com`) và bỏ qua dấu `/` thừa ở cuối.",
       "buggy_starter_code": "def is_allowed_origin(origin: str, allowlist: list[str]) -> bool:\n    return any(origin.startswith(item) for item in allowlist)\n",
-      "solution_code": "def is_allowed_origin(origin: str, allowlist: list[str]) -> bool:\n    normalized = origin.rstrip('/')\n    return normalized in {item.rstrip('/') for item in allowlist}\n",
+      "solution_code": "def is_allowed_origin(origin: str, allowlist: list[str]) -> bool:\n    normalized = origin.strip().rstrip('/').lower()\n    return normalized in {item.strip().rstrip('/').lower() for item in allowlist}\n",
       "test_cases": [
         {
           "name": "Exact origin match",
@@ -65,6 +105,126 @@
           "name": "Reject http downgrade",
           "call": "is_allowed_origin('http://plumora.dev', ['https://plumora.dev'])",
           "expected": false,
+          "is_hidden": true
+        }
+      ],
+      "timeout_ms": 3000,
+      "memory_limit_mb": 128
+    },
+    {
+      "id": "31596ee6-df8c-5f18-9bb0-c9c1cd48ee7d",
+      "concept_slug": "db-relational",
+      "title": "Truy vấn Top Khái niệm Cần Ôn tập Theo Độ bền Trí nhớ",
+      "language": "sql",
+      "prompt": "Viết câu lệnh SQL chọn `concept_slug, stability_s` từ bảng `competencies` cho các dòng có `depth_level_norm >= 0.5` và sắp xếp theo `stability_s ASC, concept_slug ASC`.",
+      "buggy_starter_code": "SELECT concept_slug FROM competencies;\n",
+      "solution_code": "SELECT concept_slug, stability_s FROM competencies WHERE depth_level_norm >= 0.5 ORDER BY stability_s ASC, concept_slug ASC;\n",
+      "test_cases": [
+        {
+          "name": "Filter depth >= 0.5 and order by stability_s ASC",
+          "call": "SQL_QUERY",
+          "setup_sql": "CREATE TABLE competencies (concept_slug TEXT, depth_level_norm REAL, stability_s REAL); INSERT INTO competencies VALUES ('net-internet', 0.75, 3.0), ('web-http', 0.50, 1.8), ('os-basics', 0.25, 3.0);",
+          "expected": [
+            ["web-http", 1.8],
+            ["net-internet", 3.0]
+          ],
+          "is_hidden": false
+        },
+        {
+          "name": "Tie-break equal stability_s by concept_slug ASC",
+          "call": "SQL_QUERY",
+          "setup_sql": "CREATE TABLE competencies (concept_slug TEXT, depth_level_norm REAL, stability_s REAL); INSERT INTO competencies VALUES ('sec-api', 1.0, 4.5), ('api-rest', 0.75, 4.5), ('db-nosql', 0.49, 1.5);",
+          "expected": [
+            ["api-rest", 4.5],
+            ["sec-api", 4.5]
+          ],
+          "is_hidden": false
+        },
+        {
+          "name": "Hidden dataset with all below 0.5 returns empty",
+          "call": "SQL_QUERY",
+          "setup_sql": "CREATE TABLE competencies (concept_slug TEXT, depth_level_norm REAL, stability_s REAL); INSERT INTO competencies VALUES ('docker-containers', 0.25, 3.0), ('k8s-orchestration', 0.0, 3.0);",
+          "expected": [],
+          "is_hidden": true
+        }
+      ],
+      "timeout_ms": 3000,
+      "memory_limit_mb": 128
+    },
+    {
+      "id": "b1f2c3d4-1002-5a00-8b02-000000000002",
+      "concept_slug": "db-transactions",
+      "title": "Truy vấn Tổng hợp Giao dịch Đã COMMIT Theo Tài khoản (ACID)",
+      "language": "sql",
+      "prompt": "Viết câu lệnh SQL trên bảng `ledger_tx(account_id TEXT, status TEXT, amount INT)` để tính tổng `amount` của các giao dịch có `status = 'COMMITTED'` theo từng `account_id`, chỉ giữ các tài khoản có tổng `>= 100`, sắp xếp theo `account_id ASC`.",
+      "buggy_starter_code": "SELECT account_id, SUM(amount) FROM ledger_tx GROUP BY account_id;\n",
+      "solution_code": "SELECT account_id, SUM(amount) FROM ledger_tx WHERE status = 'COMMITTED' GROUP BY account_id HAVING SUM(amount) >= 100 ORDER BY account_id ASC;\n",
+      "test_cases": [
+        {
+          "name": "Exclude ROLLED_BACK rows and apply HAVING >= 100",
+          "call": "SQL_QUERY",
+          "setup_sql": "CREATE TABLE ledger_tx (account_id TEXT, status TEXT, amount INT); INSERT INTO ledger_tx VALUES ('acc_a', 'COMMITTED', 60), ('acc_a', 'COMMITTED', 50), ('acc_a', 'ROLLED_BACK', 500), ('acc_b', 'COMMITTED', 90), ('acc_c', 'COMMITTED', 200);",
+          "expected": [
+            ["acc_a", 110],
+            ["acc_c", 200]
+          ],
+          "is_hidden": false
+        },
+        {
+          "name": "Boundary exact sum == 100 included",
+          "call": "SQL_QUERY",
+          "setup_sql": "CREATE TABLE ledger_tx (account_id TEXT, status TEXT, amount INT); INSERT INTO ledger_tx VALUES ('acc_x', 'COMMITTED', 100), ('acc_y', 'PENDING', 300);",
+          "expected": [
+            ["acc_x", 100]
+          ],
+          "is_hidden": false
+        },
+        {
+          "name": "Hidden negative refund transaction reduces net sum below 100",
+          "call": "SQL_QUERY",
+          "setup_sql": "CREATE TABLE ledger_tx (account_id TEXT, status TEXT, amount INT); INSERT INTO ledger_tx VALUES ('acc_1', 'COMMITTED', 150), ('acc_1', 'COMMITTED', -80), ('acc_2', 'COMMITTED', 120);",
+          "expected": [
+            ["acc_2", 120]
+          ],
+          "is_hidden": true
+        }
+      ],
+      "timeout_ms": 3000,
+      "memory_limit_mb": 128
+    },
+    {
+      "id": "b1f2c3d4-1003-5a00-8b03-000000000003",
+      "concept_slug": "db-nosql",
+      "title": "Định tuyến Phân mảnh Dữ liệu (Consistent Partition Routing)",
+      "language": "python",
+      "prompt": "Hàm `route_partition(keys: list[str], num_shards: int) -> dict[str, list[str]]` phân bổ danh sách khóa vào `num_shards` phân mảnh theo công thức `idx = sum(byte) % num_shards` với khóa shard là `f'shard-{idx}'` (danh sách khóa trong mỗi shard được sắp xếp tăng dần). Hãy sửa lỗi để trả về đầy đủ các shard có phần tử mà không ghi đè khóa cùng shard.",
+      "buggy_starter_code": "def route_partition(keys: list[str], num_shards: int) -> dict[str, list[str]]:\n    shards = {}\n    for k in keys:\n        idx = len(k) % num_shards\n        shards[f'shard-{idx}'] = [k]\n    return shards\n",
+      "solution_code": "def route_partition(keys: list[str], num_shards: int) -> dict[str, list[str]]:\n    shards: dict[str, list[str]] = {}\n    for k in keys:\n        total = sum(k.encode('utf-8'))\n        shard_name = f'shard-{total % num_shards}'\n        shards.setdefault(shard_name, []).append(k)\n    return {name: sorted(vals) for name, vals in shards.items()}\n",
+      "test_cases": [
+        {
+          "name": "Group keys by byte sum modulo num_shards",
+          "call": "route_partition(['a', 'd', 'b'], 3)",
+          "expected": {
+            "shard-1": ["a", "d"],
+            "shard-2": ["b"]
+          },
+          "is_hidden": false
+        },
+        {
+          "name": "Single shard collects and sorts all keys",
+          "call": "route_partition(['u3', 'u1', 'u2'], 1)",
+          "expected": {
+            "shard-0": ["u1", "u2", "u3"]
+          },
+          "is_hidden": false
+        },
+        {
+          "name": "Hidden multi-char keys partition cleanly",
+          "call": "route_partition(['ab', 'ba', 'ac'], 2)",
+          "expected": {
+            "shard-1": ["ab", "ba"],
+            "shard-0": ["ac"]
+          },
           "is_hidden": true
         }
       ],
@@ -103,28 +263,74 @@
       "memory_limit_mb": 128
     },
     {
-      "id": "2b6e6fb6-0d7f-5b0e-aff6-41e009cebe0c",
-      "concept_slug": "fe-dom-events",
-      "title": "Gom Nhóm Cập nhật DOM Tránh Layout Thrashing",
-      "language": "javascript",
-      "prompt": "Sửa hàm `batchResize(widths, factor)` để trả về mảng chiều rộng mới đã làm tròn nguyên, không đột biến mảng đầu vào.",
-      "buggy_starter_code": "function batchResize(widths, factor) {\n  for (let i = 0; i < widths.length; i++) {\n    widths[i] = widths[i] * factor;\n  }\n  return widths;\n}\n",
-      "solution_code": "function batchResize(widths, factor) {\n  return widths.map((w) => Math.round(w * factor));\n}\n",
+      "id": "b1f2c3d4-1004-5a00-8b04-000000000004",
+      "concept_slug": "api-validation",
+      "title": "Lọc Trường Cho phép (Allowlist) Chống Mass Assignment",
+      "language": "python",
+      "prompt": "Hàm `sanitize_profile_update(payload: dict, allowed_fields: list[str]) -> dict` phải chỉ giữ lại các trường nằm trong `allowed_fields`, bỏ qua mọi trường nhạy cảm (như `role`, `is_admin`), đồng thời cắt khoảng trắng đầu cuối đối với giá trị chuỗi (`str`) và bỏ qua chuỗi rỗng sau khi cắt.",
+      "buggy_starter_code": "def sanitize_profile_update(payload: dict, allowed_fields: list[str]) -> dict:\n    return dict(payload)\n",
+      "solution_code": "def sanitize_profile_update(payload: dict, allowed_fields: list[str]) -> dict:\n    allowed = set(allowed_fields)\n    cleaned = {}\n    for key, val in payload.items():\n        if key not in allowed:\n            continue\n        if val == '' or val is None:\n            continue\n        if str(val) == val:\n            trimmed = val.strip()\n            if not trimmed:\n                continue\n            cleaned[key] = trimmed\n        else:\n            cleaned[key] = val\n    return cleaned\n",
       "test_cases": [
         {
-          "name": "Scale widths immutably",
-          "call": "batchResize([100, 200], 1.5)",
+          "name": "Strip forbidden role escalation field",
+          "call": "sanitize_profile_update({'display_name': '  Minh  ', 'role': 'admin'}, ['display_name', 'bio'])",
+          "expected": {
+            "display_name": "Minh"
+          },
+          "is_hidden": false
+        },
+        {
+          "name": "Drop whitespace-only strings",
+          "call": "sanitize_profile_update({'display_name': '   ', 'bio': 'Backend Dev'}, ['display_name', 'bio'])",
+          "expected": {
+            "bio": "Backend Dev"
+          },
+          "is_hidden": false
+        },
+        {
+          "name": "Hidden preserve non-string allowed values and drop None",
+          "call": "sanitize_profile_update({'age': 21, 'bio': None, 'is_superuser': True}, ['age', 'bio'])",
+          "expected": {
+            "age": 21
+          },
+          "is_hidden": true
+        }
+      ],
+      "timeout_ms": 3000,
+      "memory_limit_mb": 128
+    },
+    {
+      "id": "b1f2c3d4-1005-5a00-8b05-000000000005",
+      "concept_slug": "api-data",
+      "title": "Gom Nhóm Dữ liệu Batch Chống N+1 Query",
+      "language": "python",
+      "prompt": "Thay vì truy vấn lẻ từng phần tử (N+1), hàm `attach_scores_batch(concepts: list[str], rows: list[tuple[str, float]]) -> list[dict]` nhận danh sách `concepts` và kết quả truy vấn 1 lần `rows` gồm `(slug, score)` (có thể có nhiều lượt nộp trên 1 slug). Hãy trả về danh sách `{'slug': s, 'best_score': max_score}` (mặc định `0.0` nếu chưa có) giữ đúng thứ tự `concepts`.",
+      "buggy_starter_code": "def attach_scores_batch(concepts: list[str], rows: list[tuple[str, float]]) -> list[dict]:\n    score_map = {slug: score for slug, score in rows}\n    return [{'slug': s, 'best_score': score_map.get(s, 0.0)} for s in concepts]\n",
+      "solution_code": "def attach_scores_batch(concepts: list[str], rows: list[tuple[str, float]]) -> list[dict]:\n    best_map: dict[str, float] = {}\n    for slug, score in rows:\n        if slug not in best_map or score > best_map[slug]:\n            best_map[slug] = float(score)\n    return [{'slug': s, 'best_score': best_map.get(s, 0.0)} for s in concepts]\n",
+      "test_cases": [
+        {
+          "name": "Keep highest score across multiple attempts",
+          "call": "attach_scores_batch(['net-internet', 'web-http'], [('net-internet', 0.75), ('net-internet', 0.25)])",
           "expected": [
-            150,
-            300
+            {"slug": "net-internet", "best_score": 0.75},
+            {"slug": "web-http", "best_score": 0.0}
           ],
           "is_hidden": false
         },
         {
-          "name": "Round fractional pixels",
-          "call": "batchResize([33], 1.5)",
+          "name": "Preserve concept order with missing scores",
+          "call": "attach_scores_batch(['api-rest', 'os-basics'], [('os-basics', 1.0)])",
           "expected": [
-            50
+            {"slug": "api-rest", "best_score": 0.0},
+            {"slug": "os-basics", "best_score": 1.0}
+          ],
+          "is_hidden": false
+        },
+        {
+          "name": "Hidden ignore rows not in concept list",
+          "call": "attach_scores_batch(['db-relational'], [('db-relational', 0.5), ('db-relational', 1.0), ('other', 0.9)])",
+          "expected": [
+            {"slug": "db-relational", "best_score": 1.0}
           ],
           "is_hidden": true
         }
@@ -133,28 +339,403 @@
       "memory_limit_mb": 128
     },
     {
-      "id": "31596ee6-df8c-5f18-9bb0-c9c1cd48ee7d",
-      "concept_slug": "db-relational",
-      "title": "Truy vấn Top Khái niệm Cần Ôn tập Theo Độ bền Trí nhớ",
-      "language": "sql",
-      "prompt": "Viết câu lệnh SQL chọn `concept_slug, stability_s` từ bảng `competencies` cho các dòng có `depth_level_norm >= 0.5` và sắp xếp theo `stability_s ASC`.",
-      "buggy_starter_code": "SELECT concept_slug FROM competencies;\n",
-      "solution_code": "SELECT concept_slug, stability_s FROM competencies WHERE depth_level_norm >= 0.5 ORDER BY stability_s ASC;\n",
+      "id": "b1f2c3d4-1006-5a00-8b06-000000000006",
+      "concept_slug": "cache-redis",
+      "title": "Xác thực Phiên bản & TTL của State Cache (Cache-Aside + Fallback)",
+      "language": "python",
+      "prompt": "Hàm `resolve_state_cache(cache_entry: dict | None, db_version: int, now_ts: int, db_value: str) -> tuple[str, str]` kiểm tra `cache_entry` (`{'version': int, 'expires_at': int, 'value': str}` hoặc `None`). Nếu cache tồn tại, chưa hết hạn (`expires_at > now_ts`) và `version == db_version` thì trả về `(cache_entry['value'], 'redis_cache')`; ngược lại trả về `(db_value, 'postgres_cache_warm')`.",
+      "buggy_starter_code": "def resolve_state_cache(cache_entry: dict | None, db_version: int, now_ts: int, db_value: str) -> tuple[str, str]:\n    if cache_entry is not None:\n        return cache_entry['value'], 'redis_cache'\n    return db_value, 'postgres_cache_warm'\n",
+      "solution_code": "def resolve_state_cache(cache_entry: dict | None, db_version: int, now_ts: int, db_value: str) -> tuple[str, str]:\n    if (\n        cache_entry is not None\n        and cache_entry.get('expires_at', 0) > now_ts\n        and cache_entry.get('version') == db_version\n    ):\n        return str(cache_entry['value']), 'redis_cache'\n    return db_value, 'postgres_cache_warm'\n",
       "test_cases": [
         {
-          "name": "Filter depth >= 0.5 and order by stability_s ASC",
-          "call": "SQL_QUERY",
-          "expected": [
-            [
-              "web-http",
-              1.8
-            ],
-            [
-              "net-internet",
-              3.0
-            ]
-          ],
+          "name": "Fresh matching version hits redis_cache",
+          "call": "resolve_state_cache({'version': 3, 'expires_at': 1000, 'value': 'v3'}, 3, 900, 'db_v3')",
+          "expected": ["v3", "redis_cache"],
           "is_hidden": false
+        },
+        {
+          "name": "Stale version triggers postgres_cache_warm",
+          "call": "resolve_state_cache({'version': 2, 'expires_at': 1000, 'value': 'v2'}, 3, 900, 'db_v3')",
+          "expected": ["db_v3", "postgres_cache_warm"],
+          "is_hidden": false
+        },
+        {
+          "name": "Hidden expired TTL at exact boundary triggers fallback",
+          "call": "resolve_state_cache({'version': 3, 'expires_at': 900, 'value': 'v3'}, 3, 900, 'db_v3')",
+          "expected": ["db_v3", "postgres_cache_warm"],
+          "is_hidden": true
+        }
+      ],
+      "timeout_ms": 3000,
+      "memory_limit_mb": 128
+    },
+    {
+      "id": "b1f2c3d4-1007-5a00-8b07-000000000007",
+      "concept_slug": "sec-authn",
+      "title": "Kiểm tra Hiệu lực Token JWT (Thời hạn, Blocklist JTI & Vai trò RBAC)",
+      "language": "python",
+      "prompt": "Hàm `authorize_token(claims: dict, required_roles: list[str], revoked_jtis: list[str], now_ts: int) -> str` trả về `'OK'` nếu token chưa hết hạn (`exp > now_ts`), `jti` không nằm trong `revoked_jtis`, và `role` nằm trong `required_roles`. Nếu hết hạn hoặc bị thu hồi trả `'401_UNAUTHORIZED'`; nếu hợp lệ nhưng sai vai trò trả `'403_FORBIDDEN'`.",
+      "buggy_starter_code": "def authorize_token(claims: dict, required_roles: list[str], revoked_jtis: list[str], now_ts: int) -> str:\n    if claims.get('role') in required_roles:\n        return 'OK'\n    return '403_FORBIDDEN'\n",
+      "solution_code": "def authorize_token(claims: dict, required_roles: list[str], revoked_jtis: list[str], now_ts: int) -> str:\n    exp = claims.get('exp', 0)\n    jti = claims.get('jti', '')\n    if exp <= now_ts or jti in set(revoked_jtis):\n        return '401_UNAUTHORIZED'\n    if claims.get('role') not in set(required_roles):\n        return '403_FORBIDDEN'\n    return 'OK'\n",
+      "test_cases": [
+        {
+          "name": "Reject revoked JTI with 401",
+          "call": "authorize_token({'jti': 'tok-1', 'exp': 2000, 'role': 'admin'}, ['admin'], ['tok-1'], 1000)",
+          "expected": "401_UNAUTHORIZED",
+          "is_hidden": false
+        },
+        {
+          "name": "Reject learner accessing admin route with 403",
+          "call": "authorize_token({'jti': 'tok-2', 'exp': 2000, 'role': 'learner'}, ['admin'], [], 1000)",
+          "expected": "403_FORBIDDEN",
+          "is_hidden": false
+        },
+        {
+          "name": "Hidden expired token returns 401 even if role mismatches",
+          "call": "authorize_token({'jti': 'tok-3', 'exp': 1000, 'role': 'learner'}, ['admin'], [], 1000)",
+          "expected": "401_UNAUTHORIZED",
+          "is_hidden": true
+        }
+      ],
+      "timeout_ms": 3000,
+      "memory_limit_mb": 128
+    },
+    {
+      "id": "b1f2c3d4-1008-5a00-8b08-000000000008",
+      "concept_slug": "sec-api",
+      "title": "Bộ Giới hạn Tần suất Cửa sổ Trượt (Sliding Window Rate Limiter)",
+      "language": "python",
+      "prompt": "Hàm `evaluate_rate_limit(timestamps: list[int], window_sec: int, max_requests: int) -> list[bool]` nhận danh sách mốc thời gian gửi request (tăng dần theo giây). Một request tại thời điểm `t` được cho phép (`True`) nếu số request ĐÃ ĐƯỢC CHẤP NHẬN trong khoảng `(t - window_sec, t]` nhỏ hơn `max_requests`; ngược lại bị từ chối (`False`) và không ghi vào cửa sổ.",
+      "buggy_starter_code": "def evaluate_rate_limit(timestamps: list[int], window_sec: int, max_requests: int) -> list[bool]:\n    return [i < max_requests for i in range(len(timestamps))]\n",
+      "solution_code": "def evaluate_rate_limit(timestamps: list[int], window_sec: int, max_requests: int) -> list[bool]:\n    accepted: list[int] = []\n    decisions: list[bool] = []\n    for t in timestamps:\n        cutoff = t - window_sec\n        accepted = [ts for ts in accepted if ts > cutoff]\n        if len(accepted) < max_requests:\n            accepted.append(t)\n            decisions.append(True)\n        else:\n            decisions.append(False)\n    return decisions\n",
+      "test_cases": [
+        {
+          "name": "Block burst exceeding limit within window",
+          "call": "evaluate_rate_limit([1, 2, 3, 4], 10, 2)",
+          "expected": [true, true, false, false],
+          "is_hidden": false
+        },
+        {
+          "name": "Allow new request after window expires",
+          "call": "evaluate_rate_limit([1, 2, 5, 11, 12], 10, 2)",
+          "expected": [true, true, false, true, true],
+          "is_hidden": false
+        },
+        {
+          "name": "Hidden rejected requests do not consume quota",
+          "call": "evaluate_rate_limit([0, 1, 2, 3, 10], 10, 2)",
+          "expected": [true, true, false, false, true],
+          "is_hidden": true
+        }
+      ],
+      "timeout_ms": 3000,
+      "memory_limit_mb": 128
+    },
+    {
+      "id": "2b6e6fb6-0d7f-5b0e-aff6-41e009cebe0c",
+      "concept_slug": "fe-dom-events",
+      "title": "Ủy quyền Sự kiện DOM theo Bubbling (Event Delegation)",
+      "language": "javascript",
+      "prompt": "Hàm `resolveDelegatedAction(bubblingPath)` nhận mảng các node DOM theo thứ tự nổi bọt từ phần tử bị click lên tới container (`[{ tag, action, disabled }]`). Hãy trả về `action` của phần tử ĐẦU TIÊN có `action` không rỗng và `disabled !== true`; nếu gặp node có `stopPropagation === true` thì dừng nổi bọt ngay sau khi kiểm tra node đó. Nếu không khớp trả về `null`.",
+      "buggy_starter_code": "function resolveDelegatedAction(bubblingPath) {\n  for (let i = 0; i < bubblingPath.length; i++) {\n    if (bubblingPath[i].action) {\n      return bubblingPath[i].action;\n    }\n  }\n  return null;\n}\n",
+      "solution_code": "function resolveDelegatedAction(bubblingPath) {\n  for (let i = 0; i < bubblingPath.length; i++) {\n    const node = bubblingPath[i];\n    if (node.action && !node.disabled) {\n      return node.action;\n    }\n    if (node.stopPropagation) {\n      break;\n    }\n  }\n  return null;\n}\n",
+      "test_cases": [
+        {
+          "name": "Bubble from icon child to parent button action",
+          "call": "resolveDelegatedAction([{ tag: 'svg', action: null, disabled: false }, { tag: 'button', action: 'delete', disabled: false }])",
+          "expected": "delete",
+          "is_hidden": false
+        },
+        {
+          "name": "Skip disabled button and respect stopPropagation",
+          "call": "resolveDelegatedAction([{ tag: 'button', action: 'delete', disabled: true, stopPropagation: true }, { tag: 'li', action: 'select', disabled: false }])",
+          "expected": null,
+          "is_hidden": false
+        },
+        {
+          "name": "Hidden bubble past disabled child when propagation not stopped",
+          "call": "resolveDelegatedAction([{ tag: 'button', action: 'delete', disabled: true }, { tag: 'div', action: 'open-card', disabled: false }])",
+          "expected": "open-card",
+          "is_hidden": true
+        }
+      ],
+      "timeout_ms": 3000,
+      "memory_limit_mb": 128
+    },
+    {
+      "id": "b1f2c3d4-1009-5a00-8b09-000000000009",
+      "concept_slug": "fe-js-async",
+      "title": "Mô phỏng Thứ tự Hàng đợi Event Loop (Sync -> Microtask -> Macrotask)",
+      "language": "javascript",
+      "prompt": "Hàm `scheduleEventLoop(tasks)` nhận mảng tác vụ `{ id, queue }` với `queue` thuộc `'sync' | 'microtask' | 'macrotask'`. Hãy trả về mảng `id` theo đúng thứ tự thực thi của JavaScript Event Loop: toàn bộ `'sync'` trước, sau đó rút sạch `'microtask'`, cuối cùng mới tới `'macrotask'` (giữ nguyên thứ tự FIFO trong cùng hàng đợi).",
+      "buggy_starter_code": "function scheduleEventLoop(tasks) {\n  return tasks.map((t) => t.id);\n}\n",
+      "solution_code": "function scheduleEventLoop(tasks) {\n  const sync = [];\n  const micro = [];\n  const macro = [];\n  for (const t of tasks) {\n    if (t.queue === 'sync') sync.push(t.id);\n    else if (t.queue === 'microtask') micro.push(t.id);\n    else if (t.queue === 'macrotask') macro.push(t.id);\n  }\n  return [...sync, ...micro, ...macro];\n}\n",
+      "test_cases": [
+        {
+          "name": "Microtasks run before setTimeout macrotasks",
+          "call": "scheduleEventLoop([{ id: 't1', queue: 'macrotask' }, { id: 'p1', queue: 'microtask' }, { id: 's1', queue: 'sync' }])",
+          "expected": ["s1", "p1", "t1"],
+          "is_hidden": false
+        },
+        {
+          "name": "Preserve FIFO order inside each queue",
+          "call": "scheduleEventLoop([{ id: 'm1', queue: 'microtask' }, { id: 's1', queue: 'sync' }, { id: 'm2', queue: 'microtask' }, { id: 's2', queue: 'sync' }])",
+          "expected": ["s1", "s2", "m1", "m2"],
+          "is_hidden": false
+        },
+        {
+          "name": "Hidden mixed three queues",
+          "call": "scheduleEventLoop([{ id: 'a', queue: 'macrotask' }, { id: 'b', queue: 'macrotask' }, { id: 'c', queue: 'microtask' }, { id: 'd', queue: 'sync' }])",
+          "expected": ["d", "c", "a", "b"],
+          "is_hidden": true
+        }
+      ],
+      "timeout_ms": 3000,
+      "memory_limit_mb": 128
+    },
+    {
+      "id": "b1f2c3d4-1010-5a00-8b10-000000000010",
+      "concept_slug": "fe-component-state",
+      "title": "Cập nhật Bất biến State Reducer theo Quy tắc High-Water Mark",
+      "language": "javascript",
+      "prompt": "Sửa hàm `applyScoreReducer(state, action)` nhận `state` (mảng `{ slug, score }`) và `action = { slug, score }`. Hàm phải trả về một mảng MỚI (không đột biến mảng/đối tượng cũ) cập nhật `score = Math.max(oldScore, action.score)` nếu `slug` đã tồn tại, hoặc thêm mới `{ slug, score }` nếu chưa có.",
+      "buggy_starter_code": "function applyScoreReducer(state, action) {\n  for (let i = 0; i < state.length; i++) {\n    if (state[i].slug === action.slug) {\n      state[i].score = action.score;\n      return state;\n    }\n  }\n  state.push(action);\n  return state;\n}\n",
+      "solution_code": "function applyScoreReducer(state, action) {\n  let found = false;\n  const next = state.map((item) => {\n    if (item.slug === action.slug) {\n      found = true;\n      return { ...item, score: Math.max(item.score, action.score) };\n    }\n    return item;\n  });\n  return found ? next : [...next, { slug: action.slug, score: action.score }];\n}\n",
+      "test_cases": [
+        {
+          "name": "Preserve high-water mark without downgrading score",
+          "call": "applyScoreReducer([{ slug: 'web-http', score: 0.75 }], { slug: 'web-http', score: 0.25 })",
+          "expected": [{"slug": "web-http", "score": 0.75}],
+          "is_hidden": false
+        },
+        {
+          "name": "Upgrade score and keep input array immutable",
+          "call": "(() => { const orig = [{ slug: 'web-http', score: 0.5 }]; const res = applyScoreReducer(orig, { slug: 'web-http', score: 1.0 }); return [orig[0].score, res[0].score]; })()",
+          "expected": [0.5, 1.0],
+          "is_hidden": false
+        },
+        {
+          "name": "Hidden append new slug immutably",
+          "call": "(() => { const orig = [{ slug: 'a', score: 0.5 }]; const res = applyScoreReducer(orig, { slug: 'b', score: 0.75 }); return [orig.length, res.length, res[1].score]; })()",
+          "expected": [1, 2, 0.75],
+          "is_hidden": true
+        }
+      ],
+      "timeout_ms": 3000,
+      "memory_limit_mb": 128
+    },
+    {
+      "id": "b1f2c3d4-1011-5a00-8b11-000000000011",
+      "concept_slug": "fe-data-fetching",
+      "title": "Quyết định Chiến lược Cache Stale-While-Revalidate (SWR)",
+      "language": "javascript",
+      "prompt": "Hàm `decideSwrAction(entry, nowMs, staleTimeMs)` nhận `entry = { data, updatedAt }` (hoặc `null`). Trả về `'fetch_blocking'` nếu `entry` là `null`; trả về `'use_fresh'` nếu `nowMs - entry.updatedAt < staleTimeMs`; ngược lại trả về `'serve_stale_and_revalidate'`.",
+      "buggy_starter_code": "function decideSwrAction(entry, nowMs, staleTimeMs) {\n  if (!entry) return 'fetch_blocking';\n  return 'use_fresh';\n}\n",
+      "solution_code": "function decideSwrAction(entry, nowMs, staleTimeMs) {\n  if (!entry) return 'fetch_blocking';\n  if (nowMs - entry.updatedAt < staleTimeMs) return 'use_fresh';\n  return 'serve_stale_and_revalidate';\n}\n",
+      "test_cases": [
+        {
+          "name": "Missing cache entry requires blocking fetch",
+          "call": "decideSwrAction(null, 5000, 3000)",
+          "expected": "fetch_blocking",
+          "is_hidden": false
+        },
+        {
+          "name": "Fresh entry skips network",
+          "call": "decideSwrAction({ data: [1], updatedAt: 4000 }, 5000, 3000)",
+          "expected": "use_fresh",
+          "is_hidden": false
+        },
+        {
+          "name": "Hidden stale entry at exact boundary serves stale and revalidates",
+          "call": "decideSwrAction({ data: [1], updatedAt: 2000 }, 5000, 3000)",
+          "expected": "serve_stale_and_revalidate",
+          "is_hidden": true
+        }
+      ],
+      "timeout_ms": 3000,
+      "memory_limit_mb": 128
+    },
+    {
+      "id": "b1f2c3d4-1012-5a00-8b12-000000000012",
+      "concept_slug": "fe-xss-csrf",
+      "title": "Kiểm thực Giao thức URL An toàn Chống DOM-XSS",
+      "language": "javascript",
+      "prompt": "Sửa hàm `sanitizeHref(rawUrl)` để chỉ cho phép các đường dẫn tương đối bắt đầu bằng `'/'` (không phải `'//'`) hoặc URL có giao thức `'http://'` / `'https://'` (không phân biệt chữ hoa/thường sau khi `trim()`). Mọi giá trị nguy hiểm (như `javascript:`, `data:`, `vbscript:`) phải trả về `'#'`.",
+      "buggy_starter_code": "function sanitizeHref(rawUrl) {\n  if (!rawUrl) return '#';\n  return rawUrl.trim();\n}\n",
+      "solution_code": "function sanitizeHref(rawUrl) {\n  if (!rawUrl || typeof rawUrl !== 'string') return '#';\n  const trimmed = rawUrl.trim();\n  const lower = trimmed.toLowerCase();\n  if (lower.startsWith('http://') || lower.startsWith('https://')) {\n    return trimmed;\n  }\n  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {\n    return trimmed;\n  }\n  return '#';\n}\n",
+      "test_cases": [
+        {
+          "name": "Allow valid HTTPS URL",
+          "call": "sanitizeHref('  https://plumora.dev/docs  ')",
+          "expected": "https://plumora.dev/docs",
+          "is_hidden": false
+        },
+        {
+          "name": "Block javascript URI XSS payload",
+          "call": "sanitizeHref('JaVaScRiPt:alert(1)')",
+          "expected": "#",
+          "is_hidden": false
+        },
+        {
+          "name": "Hidden block protocol-relative //evil.com and allow /roadmap",
+          "call": "[sanitizeHref('//evil.com/phish'), sanitizeHref('/domains/frontend')]",
+          "expected": ["#", "/domains/frontend"],
+          "is_hidden": true
+        }
+      ],
+      "timeout_ms": 3000,
+      "memory_limit_mb": 128
+    },
+    {
+      "id": "b1f2c3d4-1013-5a00-8b13-000000000013",
+      "concept_slug": "fe-perf-caching",
+      "title": "Tính Cửa sổ Hiển thị cho List Virtualization (Tối ưu INP)",
+      "language": "javascript",
+      "prompt": "Hàm `computeVirtualRange(scrollTop, viewportHeight, itemHeight, totalItems, overscan)` trả về `[startIndex, endIndex]` (endIndex không bao gồm, bị chặn trong `[0, totalItems]`) để chỉ render các phần tử trong khung nhìn cộng thêm `overscan` phần tử trên và dưới.",
+      "buggy_starter_code": "function computeVirtualRange(scrollTop, viewportHeight, itemHeight, totalItems, overscan) {\n  return [0, totalItems];\n}\n",
+      "solution_code": "function computeVirtualRange(scrollTop, viewportHeight, itemHeight, totalItems, overscan) {\n  const firstVisible = Math.floor(scrollTop / itemHeight);\n  const visibleCount = Math.ceil(viewportHeight / itemHeight);\n  const start = Math.max(0, firstVisible - overscan);\n  const end = Math.min(totalItems, firstVisible + visibleCount + overscan);\n  return [start, end];\n}\n",
+      "test_cases": [
+        {
+          "name": "Top of list clamps start to 0",
+          "call": "computeVirtualRange(0, 400, 40, 1000, 2)",
+          "expected": [0, 12],
+          "is_hidden": false
+        },
+        {
+          "name": "Middle scroll applies overscan on both sides",
+          "call": "computeVirtualRange(400, 200, 40, 1000, 2)",
+          "expected": [8, 17],
+          "is_hidden": false
+        },
+        {
+          "name": "Hidden bottom scroll clamps end to totalItems",
+          "call": "computeVirtualRange(3800, 400, 40, 100, 3)",
+          "expected": [92, 100],
+          "is_hidden": true
+        }
+      ],
+      "timeout_ms": 3000,
+      "memory_limit_mb": 128
+    },
+    {
+      "id": "b1f2c3d4-1014-5a00-8b14-000000000014",
+      "concept_slug": "docker-containers",
+      "title": "Kiểm toán Bảo mật Dockerfile (Non-root, Tag Bất biến & Secrets)",
+      "language": "python",
+      "prompt": "Hàm `audit_dockerfile(lines: list[str]) -> list[str]` kiểm tra danh sách dòng `Dockerfile` và trả về danh sách cảnh báo đã sắp xếp: thêm `'LATEST_TAG'` nếu dòng `FROM ` dùng `:latest` hoặc không có `:`; thêm `'ROOT_USER'` nếu không có dòng nào đặt `USER ` khác `root` (và `0`); thêm `'HARDCODED_SECRET'` nếu dòng `ENV ` chứa `PASSWORD` hoặc `SECRET`.",
+      "buggy_starter_code": "def audit_dockerfile(lines: list[str]) -> list[str]:\n    return []\n",
+      "solution_code": "def audit_dockerfile(lines: list[str]) -> list[str]:\n    findings = set()\n    has_non_root = False\n    for raw in lines:\n        line = raw.strip()\n        upper = line.upper()\n        if upper.startswith('FROM '):\n            image = line.split()[1]\n            if ':' not in image or image.endswith(':latest'):\n                findings.add('LATEST_TAG')\n        elif upper.startswith('USER '):\n            usr = line.split()[1].lower()\n            if usr not in ('root', '0'):\n                has_non_root = True\n        elif upper.startswith('ENV '):\n            if 'PASSWORD' in upper or 'SECRET' in upper:\n                findings.add('HARDCODED_SECRET')\n    if not has_non_root:\n        findings.add('ROOT_USER')\n    return sorted(findings)\n",
+      "test_cases": [
+        {
+          "name": "Detect latest tag, root user, and hardcoded secret",
+          "call": "audit_dockerfile(['FROM python:latest', 'ENV JWT_SECRET=abc123', 'CMD [\"python\", \"app.py\"]'])",
+          "expected": ["HARDCODED_SECRET", "LATEST_TAG", "ROOT_USER"],
+          "is_hidden": false
+        },
+        {
+          "name": "Hardened Dockerfile returns empty findings",
+          "call": "audit_dockerfile(['FROM python:3.12-slim', 'USER appuser', 'CMD [\"uvicorn\", \"app.main:app\"]'])",
+          "expected": [],
+          "is_hidden": false
+        },
+        {
+          "name": "Hidden explicit USER root still flagged as ROOT_USER",
+          "call": "audit_dockerfile(['FROM node:20-alpine', 'USER root'])",
+          "expected": ["ROOT_USER"],
+          "is_hidden": true
+        }
+      ],
+      "timeout_ms": 3000,
+      "memory_limit_mb": 128
+    },
+    {
+      "id": "b1f2c3d4-1015-5a00-8b15-000000000015",
+      "concept_slug": "reverse-proxy-caching",
+      "title": "Chọn Upstream Theo Least Connections & Passive Health Check",
+      "language": "python",
+      "prompt": "Hàm `select_upstream(nodes: list[dict], max_fails: int) -> str | None` nhận danh sách upstream `{'name': str, 'active_conns': int, 'fails': int}`. Loại bỏ mọi node có `fails >= max_fails`, sau đó chọn node có `active_conns` nhỏ nhất (nếu bằng nhau thì chọn theo `name` theo thứ tự từ điển). Trả về `None` nếu không còn node khỏe mạnh.",
+      "buggy_starter_code": "def select_upstream(nodes: list[dict], max_fails: int) -> str | None:\n    if not nodes:\n        return None\n    return nodes[0]['name']\n",
+      "solution_code": "def select_upstream(nodes: list[dict], max_fails: int) -> str | None:\n    healthy = [n for n in nodes if n['fails'] < max_fails]\n    if not healthy:\n        return None\n    best = min(healthy, key=lambda n: (n['active_conns'], n['name']))\n    return str(best['name'])\n",
+      "test_cases": [
+        {
+          "name": "Skip unhealthy node and pick least connections",
+          "call": "select_upstream([{'name': 'b1', 'active_conns': 1, 'fails': 3}, {'name': 'b2', 'active_conns': 5, 'fails': 0}, {'name': 'b3', 'active_conns': 2, 'fails': 1}], 3)",
+          "expected": "b3",
+          "is_hidden": false
+        },
+        {
+          "name": "Return None when all upstreams failed",
+          "call": "select_upstream([{'name': 'b1', 'active_conns': 0, 'fails': 3}], 3)",
+          "expected": null,
+          "is_hidden": false
+        },
+        {
+          "name": "Hidden tie-break equal active_conns alphabetically",
+          "call": "select_upstream([{'name': 'api-b', 'active_conns': 4, 'fails': 0}, {'name': 'api-a', 'active_conns': 4, 'fails': 2}], 3)",
+          "expected": "api-a",
+          "is_hidden": true
+        }
+      ],
+      "timeout_ms": 3000,
+      "memory_limit_mb": 128
+    },
+    {
+      "id": "b1f2c3d4-1016-5a00-8b16-000000000016",
+      "concept_slug": "ci-cd-pipelines",
+      "title": "Cổng Phê duyệt Canary Release & Tự động Rollback",
+      "language": "python",
+      "prompt": "Hàm `evaluate_canary_gate(error_rate_pct: float, p95_ms: int, max_error_pct: float = 1.0, max_p95_ms: int = 300) -> str` trả về `'ROLLBACK'` nếu `error_rate_pct > max_error_pct` HOẶC `p95_ms > max_p95_ms`; trả về `'HOLD'` nếu lỗi nằm trong vùng cảnh báo (`error_rate_pct > max_error_pct * 0.5` hoặc `p95_ms > max_p95_ms * 0.85`); ngược lại trả về `'PROMOTE'`.",
+      "buggy_starter_code": "def evaluate_canary_gate(error_rate_pct: float, p95_ms: int, max_error_pct: float = 1.0, max_p95_ms: int = 300) -> str:\n    if error_rate_pct > max_error_pct:\n        return 'ROLLBACK'\n    return 'PROMOTE'\n",
+      "solution_code": "def evaluate_canary_gate(error_rate_pct: float, p95_ms: int, max_error_pct: float = 1.0, max_p95_ms: int = 300) -> str:\n    if error_rate_pct > max_error_pct or p95_ms > max_p95_ms:\n        return 'ROLLBACK'\n    if error_rate_pct > max_error_pct * 0.5 or p95_ms > max_p95_ms * 0.85:\n        return 'HOLD'\n    return 'PROMOTE'\n",
+      "test_cases": [
+        {
+          "name": "Healthy canary promotes",
+          "call": "evaluate_canary_gate(0.2, 180)",
+          "expected": "PROMOTE",
+          "is_hidden": false
+        },
+        {
+          "name": "High p95 latency triggers automatic ROLLBACK",
+          "call": "evaluate_canary_gate(0.1, 350)",
+          "expected": "ROLLBACK",
+          "is_hidden": false
+        },
+        {
+          "name": "Hidden warning zone holds rollout for observation",
+          "call": "evaluate_canary_gate(0.7, 210)",
+          "expected": "HOLD",
+          "is_hidden": true
+        }
+      ],
+      "timeout_ms": 3000,
+      "memory_limit_mb": 128
+    },
+    {
+      "id": "b1f2c3d4-1017-5a00-8b17-000000000017",
+      "concept_slug": "k8s-orchestration",
+      "title": "Tính Số lượng Replica cho Kubernetes HPA",
+      "language": "python",
+      "prompt": "Hàm `compute_hpa_replicas(current_replicas: int, current_cpu_pct: float, target_cpu_pct: float, min_replicas: int, max_replicas: int) -> int` áp dụng công thức HPA `ceil(current_replicas * (current_cpu_pct / target_cpu_pct))` (với vùng dung sai 10%: nếu `0.9 <= ratio <= 1.1` thì giữ nguyên `current_replicas`), cuối cùng kẹp kết quả trong `[min_replicas, max_replicas]`.",
+      "buggy_starter_code": "def compute_hpa_replicas(current_replicas: int, current_cpu_pct: float, target_cpu_pct: float, min_replicas: int, max_replicas: int) -> int:\n    return int(current_replicas * (current_cpu_pct / target_cpu_pct))\n",
+      "solution_code": "def compute_hpa_replicas(current_replicas: int, current_cpu_pct: float, target_cpu_pct: float, min_replicas: int, max_replicas: int) -> int:\n    ratio = current_cpu_pct / target_cpu_pct\n    if 0.9 <= ratio <= 1.1:\n        desired = current_replicas\n    else:\n        raw = current_replicas * ratio\n        desired = int(raw) if raw == int(raw) else int(raw) + 1\n    return max(min_replicas, min(max_replicas, desired))\n",
+      "test_cases": [
+        {
+          "name": "Scale up with ceiling when CPU spikes",
+          "call": "compute_hpa_replicas(2, 140.0, 70.0, 2, 10)",
+          "expected": 4,
+          "is_hidden": false
+        },
+        {
+          "name": "Tolerance band keeps replicas stable",
+          "call": "compute_hpa_replicas(3, 74.0, 70.0, 2, 10)",
+          "expected": 3,
+          "is_hidden": false
+        },
+        {
+          "name": "Hidden clamp desired replicas to max_replicas",
+          "call": "compute_hpa_replicas(4, 280.0, 70.0, 2, 8)",
+          "expected": 8,
+          "is_hidden": true
         }
       ],
       "timeout_ms": 3000,

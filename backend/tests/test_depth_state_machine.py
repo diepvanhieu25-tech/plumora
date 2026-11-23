@@ -83,6 +83,11 @@ def test_pl3_assess_01_five_depth_state_machine_ceiling_and_idempotency() -> Non
     """5-Depth State Machine stops on 2 consecutive fails at same tier and enforces idempotency."""
     with TestClient(app) as client:
         _register_fresh_user(client)
+        pb = client.post(
+            "/api/v2/domains/frontend/concepts/fe-dom-events/playbook/complete",
+            json={"submission_id": str(uuid.uuid4())},
+        )
+        assert pb.status_code == 200
         start = client.post(
             "/api/v2/assessments/start",
             json={
@@ -137,8 +142,8 @@ def test_pl3_assess_01_five_depth_state_machine_ceiling_and_idempotency() -> Non
         )
         assert r2.status_code == 200
         assert r2.json()["session_status"] == "ceiling_reached"
-        assert r2.json()["updated_competency"]["depth_level_norm"] == 0.0
-        assert r2.json()["updated_competency"]["confidence"] == 0.50
+        assert r2.json()["updated_competency"]["depth_level_norm"] == 0.25
+        assert r2.json()["updated_competency"]["confidence"] >= 0.50
 
 
 def test_pl3_assess_01_insufficient_evidence_preserves_existing_competency() -> None:

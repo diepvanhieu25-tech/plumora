@@ -14,13 +14,18 @@ import torch
 from stable_baselines3 import DQN, PPO
 
 from plumora_rl.config import EVAL_EPISODES, EVAL_SEED, TRAIN_SEEDS, VAL_SEED
+from plumora_rl.domain import (
+    NUM_MODES,
+    LearningMode,
+    NodeFeatureIdx,
+    PolicyGuardrailStrategy,
+)
 from plumora_rl.gnn_ppo import (
     GnnActorCritic,
     export_gnn_ppo_checkpoint,
     train_gnn_ppo_on_seed,
 )
 from plumora_rl.multidomain_sim import (
-    NUM_MODES,
     TRAIN_DOMAINS,
     MultiDomainStudentSimulatorEnv,
     PaddedFlatEnvWrapper,
@@ -34,14 +39,28 @@ def _heuristic_b1_tier_action(obs: dict[str, np.ndarray]) -> tuple[int, int]:
     feats = obs["node_features"]
     n = feats.shape[0]
     for i in range(n):
-        if feats[i, 4] > 0.5:
-            return (i, 3)  # Spaced_Review
-    eligible = [i for i in range(n) if feats[i, 3] > 0.5 and feats[i, 0] < 0.75]
+        if feats[i, NodeFeatureIdx.NEEDS_REVIEW] > 0.5:
+            return (i, int(LearningMode.SPACED_REVIEW))
+    eligible = [
+        i
+        for i in range(n)
+        if feats[i, NodeFeatureIdx.IS_ELIGIBLE] > 0.5 and feats[i, NodeFeatureIdx.DEPTH_NORM] < 0.75
+    ]
     if eligible:
-        best = min(eligible, key=lambda idx: (feats[idx, 5], feats[idx, 0]))
-        mode = 1 if feats[best, 0] >= 0.50 else 0
+        best = min(
+            eligible,
+            key=lambda idx: (
+                feats[idx, NodeFeatureIdx.TIER_DIFFICULTY],
+                feats[idx, NodeFeatureIdx.DEPTH_NORM],
+            ),
+        )
+        mode = (
+            int(LearningMode.DEEP_PROBE)
+            if feats[best, NodeFeatureIdx.DEPTH_NORM] >= 0.50
+            else int(LearningMode.LEARN_NEW)
+        )
         return (best, mode)
-    return (0, 1)
+    return (0, int(LearningMode.DEEP_PROBE))
 
 
 def _heuristic_b2_random_action(
@@ -51,12 +70,12 @@ def _heuristic_b2_random_action(
     """B2: Random eligible node and mode (with Spaced_Review if needed)."""
     feats = obs["node_features"]
     n = feats.shape[0]
-    eligible = [i for i in range(n) if feats[i, 3] > 0.5]
+    eligible = [i for i in range(n) if feats[i, NodeFeatureIdx.IS_ELIGIBLE] > 0.5]
     if not eligible:
-        return (0, 0)
+        return (0, int(LearningMode.LEARN_NEW))
     v = int(rng.choice(eligible))
-    if feats[v, 4] > 0.5:
-        return (v, 3)
+    if feats[v, NodeFeatureIdx.NEEDS_REVIEW] > 0.5:
+        return (v, int(LearningMode.SPACED_REVIEW))
     m = int(rng.integers(0, 3))
     return (v, m)
 
@@ -66,18 +85,30 @@ def _heuristic_b3_greedy_action(obs: dict[str, np.ndarray]) -> tuple[int, int]:
     feats = obs["node_features"]
     n = feats.shape[0]
     for i in range(n):
-        if feats[i, 4] > 0.5:
-            return (i, 3)
-    eligible_incomplete = [i for i in range(n) if feats[i, 3] > 0.5 and feats[i, 0] < 0.75]
+        if feats[i, NodeFeatureIdx.NEEDS_REVIEW] > 0.5:
+            return (i, int(LearningMode.SPACED_REVIEW))
+    eligible_incomplete = [
+        i
+        for i in range(n)
+        if feats[i, NodeFeatureIdx.IS_ELIGIBLE] > 0.5 and feats[i, NodeFeatureIdx.DEPTH_NORM] < 0.75
+    ]
     if eligible_incomplete:
-        best = max(eligible_incomplete, key=lambda idx: (feats[idx, 0], -feats[idx, 5]))
-        if feats[best, 0] >= 0.50:
-            return (best, 2)  # Code_Practice
-        return (best, 0)
-    return (0, 3)
+        best = max(
+            eligible_incomplete,
+            key=lambda idx: (
+                feats[idx, NodeFeatureIdx.DEPTH_NORM],
+                -feats[idx, NodeFeatureIdx.TIER_DIFFICULTY],
+            ),
+        )
+        if feats[best, NodeFeatureIdx.DEPTH_NORM] >= 0.50:
+            return (best, int(LearningMode.CODE_PRACTICE))
+        return (best, int(LearningMode.LEARN_NEW))
+    return (0, int(LearningMode.SPACED_REVIEW))
 
 
-def _summarize_episodes(rewards: list[float], invalid_steps: int, total_steps: int, completed: int) -> dict[str, Any]:
+def _summarize_episodes(
+    rewards: list[float], invalid_steps: int, total_steps: int, completed: int
+) -> dict[str, Any]:
     arr = np.array(rewards, dtype=np.float64)
     q75, q25 = np.percentile(arr, [75, 25])
     return {
@@ -98,27 +129,9 @@ def apply_policy_guardrail(
     raw_logits: np.ndarray,
 ) -> tuple[int, int]:
     """Shared Policy Guardrail used identically across DQN-MLP, PPO-MLP, and GNN-PPO masked branches."""
-    feats = obs["node_features"]
-    n_nodes = feats.shape[0]
-    review_nodes = [i for i in range(n_nodes) if feats[i, 4] > 0.5]
-    if review_nodes:
-        return (review_nodes[0], 3)
-
-    mask = env.get_action_mask()
-    for i in range(n_nodes):
-        if feats[i, 0] >= 0.50:
-            mask[i, 0] = False
-        if feats[i, 0] >= 1.0 and feats[i, 2] >= 0.85:
-            mask[i, 1] = False
-        if feats[i, 6] >= 1.0 and feats[i, 0] >= 1.0:
-            mask[i, 2] = False
-        if feats[i, 2] >= 0.85:
-            mask[i, 3] = False
-    if not np.any(mask):
-        mask = env.get_action_mask()
-    masked_logits = np.where(mask, raw_logits, -1e9)
-    act_idx = int(np.argmax(masked_logits.reshape(-1)))
-    return (act_idx // NUM_MODES, act_idx % NUM_MODES)
+    _ = env
+    decision = PolicyGuardrailStrategy.select_action(raw_logits, obs["node_features"])
+    return (decision.node_idx, int(decision.mode))
 
 
 def evaluate_policy(

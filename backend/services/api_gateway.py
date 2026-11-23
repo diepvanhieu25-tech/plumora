@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 
 import httpx
@@ -24,12 +25,48 @@ def _resolve_upstream(path: str) -> str:
     if path.startswith("/api/v1/auth"):
         return AUTH_URL
     if path.startswith(("/api/v1/roadmap", "/api/v1/concepts", "/api/v2/expert")) or (
-        path.startswith("/api/v2/domains") and "/placement" not in path
+        path.startswith("/api/v2/domains")
+        and "/placement" not in path
+        and "/playbook/complete" not in path
     ):
         return CONTENT_URL
     if path.startswith(("/api/v1/recommendations", "/api/v2/recommendations", "/api/v2/admin")):
         return REC_URL
     return ASSESS_URL
+
+
+async def _probe_service(url: str) -> str:
+    try:
+        resp = await _GATEWAY_CLIENT.get(f"{url.rstrip('/')}/health", timeout=2.0)
+        return "up" if 200 <= resp.status_code < 300 else "degraded"
+    except httpx.HTTPError:
+        return "down"
+
+
+@app.get("/api/v1/health")
+async def aggregated_health() -> JSONResponse:
+    """Aggregate downstream microservice health probes at the API Gateway edge."""
+    probes = await asyncio.gather(
+        _probe_service(AUTH_URL),
+        _probe_service(CONTENT_URL),
+        _probe_service(ASSESS_URL),
+        _probe_service(REC_URL),
+    )
+    services_status = {
+        "auth": probes[0],
+        "content_kg": probes[1],
+        "assessment_grader": probes[2],
+        "recommendation_ai": probes[3],
+    }
+    overall = "ok" if all(v == "up" for v in services_status.values()) else "degraded"
+    return JSONResponse(
+        status_code=200 if overall == "ok" else 503,
+        content={
+            "status": overall,
+            "mode": "microservices",
+            "services": services_status,
+        },
+    )
 
 
 @app.api_route("/api/{rest:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])

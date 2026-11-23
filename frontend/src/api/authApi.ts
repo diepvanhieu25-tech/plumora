@@ -1,21 +1,19 @@
 import type { LearnerUser, PortalKind } from '../types'
-import { buildHeaders, setAuthToken } from './httpClient'
+import { buildHeaders, requestJson, setAuthToken } from './httpClient'
 
 export async function apiLogin(
   username: string,
   password: string,
   portal: PortalKind = 'learner',
 ): Promise<{ user: LearnerUser; access_token: string }> {
-  const res = await fetch('/api/v1/auth/login', {
-    method: 'POST',
-    headers: buildHeaders(),
-    credentials: 'include',
-    body: JSON.stringify({ username, password, portal }),
-  })
-  const data = await res.json()
-  if (!res.ok) {
-    throw new Error(data.message || 'Đăng nhập thất bại')
-  }
+  const data = await requestJson<{ user: LearnerUser; access_token: string }>(
+    '/api/v1/auth/login',
+    {
+      method: 'POST',
+      body: JSON.stringify({ username, password, portal }),
+    },
+    'Đăng nhập thất bại. Vui lòng kiểm tra lại tên đăng nhập và mật khẩu.',
+  )
   if (data.access_token) {
     setAuthToken(data.access_token)
   }
@@ -27,16 +25,14 @@ export async function apiRegister(
   displayName: string,
   password: string,
 ): Promise<{ user: LearnerUser; access_token: string }> {
-  const res = await fetch('/api/v1/auth/register', {
-    method: 'POST',
-    headers: buildHeaders(),
-    credentials: 'include',
-    body: JSON.stringify({ username, display_name: displayName, password }),
-  })
-  const data = await res.json()
-  if (!res.ok) {
-    throw new Error(data.message || 'Đăng ký thất bại')
-  }
+  const data = await requestJson<{ user: LearnerUser; access_token: string }>(
+    '/api/v1/auth/register',
+    {
+      method: 'POST',
+      body: JSON.stringify({ username, display_name: displayName, password }),
+    },
+    'Đăng ký thất bại. Vui lòng thử tên đăng nhập khác.',
+  )
   if (data.access_token) {
     setAuthToken(data.access_token)
   }
@@ -44,12 +40,15 @@ export async function apiRegister(
 }
 
 export async function apiLogout(): Promise<void> {
-  await fetch('/api/v1/auth/logout', {
-    method: 'POST',
-    headers: buildHeaders(),
-    credentials: 'include',
-  })
-  setAuthToken(null)
+  try {
+    await fetch('/api/v1/auth/logout', {
+      method: 'POST',
+      headers: buildHeaders(),
+      credentials: 'include',
+    })
+  } finally {
+    setAuthToken(null)
+  }
 }
 
 export async function apiGetMe(): Promise<LearnerUser | null> {

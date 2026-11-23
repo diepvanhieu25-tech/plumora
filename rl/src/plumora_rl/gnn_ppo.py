@@ -15,9 +15,12 @@ import torch.nn.functional as F
 from torch import nn
 from torch.distributions import Categorical
 
-from plumora_rl.multidomain_sim import (
+from plumora_rl.domain import (
     NODE_FEAT_DIM,
     NUM_MODES,
+    PolicyGuardrailStrategy,
+)
+from plumora_rl.multidomain_sim import (
     TRAIN_DOMAINS,
     MultiDomainStudentSimulatorEnv,
 )
@@ -116,20 +119,9 @@ def export_gnn_ppo_checkpoint(
 
 
 def _build_valid_mask(obs: dict[str, np.ndarray]) -> torch.Tensor:
-    """Build non-redundant eligible mask for rollout exploration."""
+    """Build non-redundant eligible mask for rollout exploration via shared PolicyGuardrailStrategy."""
     feats = obs["node_features"]
-    n = feats.shape[0]
-    mask = np.zeros((n, NUM_MODES), dtype=bool)
-    for i in range(n):
-        if feats[i, 3] > 0.5:  # is_eligible
-            if feats[i, 0] < 0.50:
-                mask[i, 0] = True
-            if feats[i, 0] < 1.0 or feats[i, 2] < 0.85:
-                mask[i, 1] = True
-            if feats[i, 6] < 1.0 or feats[i, 0] < 1.0:
-                mask[i, 2] = True
-            if feats[i, 2] < 0.85 and feats[i, 0] >= 0.50:
-                mask[i, 3] = True
+    mask = PolicyGuardrailStrategy.compute_valid_action_mask(feats)
     if not np.any(mask):
         mask[:, 1] = True
     return torch.from_numpy(mask)

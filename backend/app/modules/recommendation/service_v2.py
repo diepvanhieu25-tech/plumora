@@ -1,153 +1,101 @@
-"""GNN-PPO Serving + Policy Guardrail Decorator + Fallback Service (PL3-GUARD-01)."""
+"""GNN-PPO Serving + Policy Guardrail + Time-Aware Feature Store Service (PL3-GUARD-01)."""
 
 from __future__ import annotations
 
-import time
+import json
+import logging
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import Any
 
 import numpy as np
+import redis
+from plumora_rl.domain import (
+    MODE_NAMES,
+    EbbinghausMemoryModel,
+    GraphObservation,
+    GraphObservationBuilder,
+    LearningMode,
+    NodeCompetencyInput,
+    NodeFeatureIdx,
+)
+from plumora_rl.inference import NumpyGnnPredictor
 from sqlalchemy import select
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.db.models import ModelRegistryModel, UserModel
-from app.db.redis_store import get_or_cache_graph_snapshot
-from app.modules.assessment.ebbinghaus import (
-    INITIAL_STABILITY_DAYS,
-    compute_elapsed_days,
-    compute_retention,
-    is_review_needed,
-)
+from app.config import settings
+from app.db.models import ModelRegistryModel
+from app.db.redis_pool import get_redis_client
 from app.modules.assessment.schemas_v2 import (
     V2RecommendationResponse,
     V2RecommendedAction,
 )
-from app.modules.assessment.service_v2 import recommend_v2_next_step
-from app.modules.content.kg_service import get_domain_roadmap_for_user
-from app.modules.content.schemas_v2 import DomainRoadmapNode
-from app.modules.events.internal_client import (
-    assessment_service_url,
-    content_service_url,
-    fetch_domain_bundle_internal,
-    fetch_user_competencies_internal,
+from app.modules.contracts.adapters import (
+    get_competency_reader_port,
+    get_content_catalog_port,
 )
-from app.modules.recommendation.gnn_loader import (
-    VerifiedGnnPpoCheckpoint,
-    load_verified_gnn_checkpoint,
+from app.modules.contracts.dtos import (
+    ConceptNodeDTO,
+    DomainTopologyDTO,
+    UserCompetencySnapshotDTO,
+    UserNodeCompetencyDTO,
 )
-from app.modules.recommendation.guardrail import select_guarded_action
+from app.modules.contracts.ports import CompetencyReaderPort, ContentCatalogPort
+from app.modules.recommendation.gnn_loader import load_verified_gnn_checkpoint
+from app.modules.recommendation.guardrail import select_guarded_action_from_obs
+from app.modules.recommendation.rationale_builder import PedagogicalRationaleBuilder
 
-MODE_NAMES: tuple[str, str, str, str] = (
-    "Learn_New",
-    "Deep_Probe",
-    "Code_Practice",
-    "Spaced_Review",
-)
+logger = logging.getLogger(__name__)
 
-MODE_REASONS_VI: dict[str, str] = {
-    "Learn_New": "GNN-PPO đề xuất học nền tảng khái niệm đã mở khóa trên đồ thị DAG.",
-    "Deep_Probe": "GNN-PPO đề xuất đào sâu 5 tầng để nâng mức hiểu lên Hiểu bản chất / Làm chủ.",
-    "Code_Practice": "GNN-PPO đề xuất thực hành Code Sandbox để củng cố kỹ năng áp dụng.",
-    "Spaced_Review": "Cảnh báo trí nhớ Ebbinghaus < 60%: Policy Guardrail ưu tiên ôn tập ngay.",
-}
+ACTIVE_MODEL_REDIS_KEY = "plumora:model_registry:active"
+ACTIVE_MODEL_REDIS_TTL_SECONDS = 300
 
 
-def _build_graph_tensors(
-    nodes: list[DomainRoadmapNode],
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    n = len(nodes)
-    slug_to_idx = {node.slug: idx for idx, node in enumerate(nodes)}
-    feats = np.zeros((n, 8), dtype=np.float32)
-    a_in = np.zeros((n, n), dtype=np.float32)
-    a_out = np.zeros((n, n), dtype=np.float32)
-
-    for idx, node in enumerate(nodes):
-        feats[idx, 0] = float(node.depth_level_norm)
-        feats[idx, 1] = float(node.confidence)
-        feats[idx, 2] = float(node.retention_ebbinghaus)
-        feats[idx, 3] = 1.0 if node.is_eligible else 0.0
-        feats[idx, 4] = 1.0 if node.needs_review else 0.0
-        feats[idx, 5] = float(node.tier) / 4.0
-        feats[idx, 6] = float(node.code_practice_score)
-        feats[idx, 7] = 1.0
-        for p_slug in node.prerequisites:
-            if p_slug in slug_to_idx:
-                p_idx = slug_to_idx[p_slug]
-                a_in[idx, p_idx] = 1.0
-                a_out[p_idx, idx] = 1.0
-
-    deg_in = np.where(a_in.sum(axis=1, keepdims=True) > 0, a_in.sum(axis=1, keepdims=True), 1.0)
-    deg_out = np.where(a_out.sum(axis=1, keepdims=True) > 0, a_out.sum(axis=1, keepdims=True), 1.0)
-    return feats, (a_in / deg_in).astype(np.float32), (a_out / deg_out).astype(np.float32)
-
-
-def _build_nodes_via_internal_services(
-    user_id: uuid.UUID,
-    domain_slug: str,
-) -> list[DomainRoadmapNode] | None:
-    bundle = fetch_domain_bundle_internal(domain_slug)
-    comp_items = fetch_user_competencies_internal(user_id)
-    if bundle is None or comp_items is None:
-        return None
-    comp_map = {str(c["concept_slug"]): c for c in comp_items}
-    out: list[DomainRoadmapNode] = []
-    for n in bundle.get("nodes", []):
-        slug = str(n["concept_slug"])
-        prereqs = [str(p) for p in n.get("prerequisites_json", [])]
-        c = comp_map.get(slug)
-        depth_norm = float(c["depth_level_norm"]) if c else 0.0
-        conf = float(c["confidence"]) if c else 0.0
-        stab = float(c["stability_s"]) if c else INITIAL_STABILITY_DAYS
-        code_score = float(c.get("code_practice_score", 0.0)) if c else 0.0
-        lp_raw = c.get("last_practiced_at") if c else None
-        lp_dt = datetime.fromisoformat(str(lp_raw)) if lp_raw else None
-        if depth_norm >= 0.50 and lp_dt is not None:
-            dt = compute_elapsed_days(lp_dt, 0.0)
-            ret = compute_retention(dt, stab)
-            needs_rev = is_review_needed(depth_norm, ret)
-        else:
-            ret = 1.0
-            needs_rev = False
-        eligible = all(
-            (comp_map.get(p) is not None and float(comp_map[p]["depth_level_norm"]) >= 0.75)
-            for p in prereqs
-        )
-        out.append(
-            DomainRoadmapNode(
-                slug=slug,
-                node_idx=int(n["node_idx"]),
-                title=str(n["title"]),
-                tier=int(n["tier"]),
-                is_shared=bool(n["is_shared"]),
-                prerequisites=prereqs,
-                depth_level_norm=round(depth_norm, 4),
-                depth_label=str(c["depth_label"]) if c else "Untested / Below Surface",
-                confidence=round(conf, 4),
-                stability_s=round(stab, 4),
-                retention_ebbinghaus=round(ret, 4),
-                needs_review=needs_rev,
-                is_eligible=eligible,
-                code_practice_score=round(code_score, 4),
-                lesson_markdown="",
-            )
-        )
-    return out
-
-
-_ACTIVE_MODEL_CACHE: tuple[float, str, str] | None = None
+def _raw_comp_redis_key(user_id: uuid.UUID, domain_slug: str) -> str:
+    return f"plumora:raw_comp_state:{user_id}:{domain_slug}"
 
 
 def invalidate_active_model_cache() -> None:
-    global _ACTIVE_MODEL_CACHE
-    _ACTIVE_MODEL_CACHE = None
+    """Invalidate distributed Redis active model pointer across all workers."""
+    try:
+        client = get_redis_client(decode_responses=True, socket_timeout=0.3)
+        client.delete(ACTIVE_MODEL_REDIS_KEY)
+    except (redis.RedisError, OSError) as exc:
+        logger.warning("Failed to invalidate Redis active model key: %s", exc)
 
 
-def _get_cached_active_model_meta(db: Session) -> tuple[str, str] | None:
-    global _ACTIVE_MODEL_CACHE
-    now = time.monotonic()
-    if _ACTIVE_MODEL_CACHE is not None and (now - _ACTIVE_MODEL_CACHE[0]) < 2.0:
-        return _ACTIVE_MODEL_CACHE[1], _ACTIVE_MODEL_CACHE[2]
+def publish_active_model_pointer(checkpoint_path: str, checkpoint_sha256: str) -> None:
+    """Write active model pointer to Redis for instant cross-worker synchronization."""
+    try:
+        client = get_redis_client(decode_responses=True, socket_timeout=0.3)
+        client.set(
+            ACTIVE_MODEL_REDIS_KEY,
+            json.dumps(
+                {
+                    "checkpoint_path": checkpoint_path,
+                    "checkpoint_sha256": checkpoint_sha256,
+                }
+            ),
+            ex=ACTIVE_MODEL_REDIS_TTL_SECONDS,
+        )
+    except (redis.RedisError, OSError) as exc:
+        logger.warning("Failed to publish active model pointer to Redis: %s", exc)
+
+
+def _get_active_model_meta(db: Session) -> tuple[str, str] | None:
+    """Resolve active model (checkpoint_path, checkpoint_sha256) from Redis -> fallback PostgreSQL."""
+    try:
+        client = get_redis_client(decode_responses=True, socket_timeout=0.3)
+        raw = client.get(ACTIVE_MODEL_REDIS_KEY)
+        if isinstance(raw, str):
+            data = json.loads(raw)
+            c_path = str(data.get("checkpoint_path", "")).strip()
+            c_sha = str(data.get("checkpoint_sha256", "")).strip()
+            if c_path and c_sha:
+                return c_path, c_sha
+    except (redis.RedisError, OSError, ValueError, KeyError) as exc:
+        logger.warning("Redis active model read failed, falling back to PostgreSQL: %s", exc)
+
     active_model = db.scalars(
         select(ModelRegistryModel)
         .where(ModelRegistryModel.is_active.is_(True))
@@ -156,8 +104,246 @@ def _get_cached_active_model_meta(db: Session) -> tuple[str, str] | None:
     ).first()
     if active_model is None:
         return None
-    _ACTIVE_MODEL_CACHE = (now, str(active_model.checkpoint_path), str(active_model.checkpoint_sha256))
-    return _ACTIVE_MODEL_CACHE[1], _ACTIVE_MODEL_CACHE[2]
+    publish_active_model_pointer(
+        str(active_model.checkpoint_path), str(active_model.checkpoint_sha256)
+    )
+    return str(active_model.checkpoint_path), str(active_model.checkpoint_sha256)
+
+
+def _serialize_comp_map_for_cache(
+    comp_map: dict[str, UserNodeCompetencyDTO],
+    node_slugs: list[str],
+) -> dict[str, dict[str, Any]]:
+    payload: dict[str, dict[str, Any]] = {}
+    for slug in node_slugs:
+        c = comp_map.get(slug)
+        if c is None:
+            continue
+        payload[slug] = {
+            "concept_slug": c.concept_slug,
+            "depth_level_norm": c.depth_level_norm,
+            "peak_depth_level_norm": c.peak_depth_level_norm,
+            "depth_label": c.depth_label,
+            "confidence": c.confidence,
+            "stability_s": c.stability_s,
+            "last_practiced_at": c.last_practiced_at.isoformat() if c.last_practiced_at else None,
+            "playbook_completed_at": (
+                c.playbook_completed_at.isoformat() if c.playbook_completed_at else None
+            ),
+            "code_practice_score": c.code_practice_score,
+        }
+    return payload
+
+
+def _deserialize_comp_map_from_cache(
+    raw_map: dict[str, Any],
+) -> dict[str, UserNodeCompetencyDTO]:
+    out: dict[str, UserNodeCompetencyDTO] = {}
+    for slug, it in raw_map.items():
+        lp_raw = it.get("last_practiced_at")
+        pb_raw = it.get("playbook_completed_at")
+        out[str(slug)] = UserNodeCompetencyDTO(
+            concept_slug=str(it["concept_slug"]),
+            depth_level_norm=float(it["depth_level_norm"]),
+            peak_depth_level_norm=float(it["peak_depth_level_norm"]),
+            depth_label=str(it["depth_label"]),
+            confidence=float(it["confidence"]),
+            stability_s=float(it["stability_s"]),
+            last_practiced_at=datetime.fromisoformat(str(lp_raw)) if lp_raw else None,
+            playbook_completed_at=datetime.fromisoformat(str(pb_raw)) if pb_raw else None,
+            code_practice_score=float(it.get("code_practice_score", 0.0)),
+        )
+    return out
+
+
+def _read_through_raw_competencies(
+    user_id: uuid.UUID,
+    domain_slug: str,
+    topology: DomainTopologyDTO,
+    competency_port: CompetencyReaderPort,
+) -> tuple[dict[str, UserNodeCompetencyDTO], str]:
+    """Time-Aware Read-Through Feature Store: cache raw competency + timestamps by state_version.
+
+    Real-time Ebbinghaus retention & needs_review are ALWAYS projected fresh at request time
+    using EbbinghausMemoryModel so cache hits never serve stale retention values.
+    """
+    snapshot: UserCompetencySnapshotDTO = competency_port.get_user_competency_snapshot(user_id)
+    state_version = snapshot.state_version
+    node_slugs = [n.concept_slug for n in topology.nodes]
+    key = _raw_comp_redis_key(user_id, domain_slug)
+
+    try:
+        client = get_redis_client(decode_responses=True, socket_timeout=0.25)
+        raw = client.get(key)
+        if isinstance(raw, str):
+            data = json.loads(raw)
+            if (
+                int(data.get("state_version", -1)) == state_version
+                and int(data.get("graph_version", -1)) == topology.graph_version
+                and isinstance(data.get("competencies"), dict)
+            ):
+                client.incr("plumora:metrics:kg_cache_hits")
+                return _deserialize_comp_map_from_cache(data["competencies"]), "redis_cache"
+
+        comp_map = snapshot.by_slug()
+        client.incr("plumora:metrics:kg_cache_misses")
+        client.set(
+            key,
+            json.dumps(
+                {
+                    "state_version": state_version,
+                    "graph_version": topology.graph_version,
+                    "competencies": _serialize_comp_map_for_cache(comp_map, node_slugs),
+                }
+            ),
+            ex=settings.redis_state_ttl_seconds,
+        )
+        return comp_map, "postgres_cache_warm"
+    except (redis.RedisError, OSError, ValueError, KeyError) as exc:
+        logger.warning(
+            "Redis raw competency cache unavailable for user %s/%s: %s",
+            user_id,
+            domain_slug,
+            exc,
+        )
+        return snapshot.by_slug(), "postgres_fallback"
+
+
+def build_domain_graph_observation(
+    topology: DomainTopologyDTO,
+    comp_map: dict[str, UserNodeCompetencyDTO],
+    *,
+    now: datetime | None = None,
+    simulated_time_offset_days: float = 0.0,
+) -> GraphObservation:
+    """Build canonical (N, 8) GraphObservation + normalized adjacencies via GraphObservationBuilder."""
+    eval_now = now if now is not None else datetime.now(UTC)
+    inputs: list[NodeCompetencyInput] = []
+    for n in topology.nodes:
+        c = comp_map.get(n.concept_slug)
+        inputs.append(
+            NodeCompetencyInput(
+                concept_slug=n.concept_slug,
+                node_idx=n.node_idx,
+                tier=n.tier,
+                prerequisites=n.prerequisites,
+                depth_level_norm=c.depth_level_norm if c else 0.0,
+                confidence=c.confidence if c else 0.0,
+                stability_s=c.stability_s if c else EbbinghausMemoryModel.INITIAL_STABILITY_DAYS,
+                last_practiced_at=c.last_practiced_at if c else None,
+                code_practice_score=c.code_practice_score if c else 0.0,
+                has_code_challenge=n.has_code_challenge,
+                is_shared=n.is_shared,
+            )
+        )
+    return GraphObservationBuilder.build(
+        inputs,
+        now=eval_now,
+        simulated_time_offset_days=simulated_time_offset_days,
+    )
+
+
+def _fallback_recommendation(
+    domain_slug: str,
+    ordered_nodes: list[ConceptNodeDTO],
+    obs: GraphObservation,
+    comp_map: dict[str, UserNodeCompetencyDTO],
+    state_source: str,
+    snapshot: list[list[float]],
+) -> V2RecommendationResponse:
+    """Deterministic pedagogical fallback when checkpoint is missing/corrupt (never labeled gnn_ppo)."""
+    feats = obs.node_features
+    needs_review_mask = feats[:, NodeFeatureIdx.NEEDS_REVIEW] > 0.5
+    retention_vec = feats[:, NodeFeatureIdx.RETENTION]
+
+    if bool(np.any(needs_review_mask)):
+        masked_ret = np.where(needs_review_mask, retention_vec, np.inf)
+        idx = int(np.argmin(masked_ret))
+        target = ordered_nodes[idx]
+        reason = PedagogicalRationaleBuilder.build_reason(
+            target_node=target,
+            mode=LearningMode.SPACED_REVIEW,
+            all_nodes=ordered_nodes,
+            comp_map=comp_map,
+            retention=float(retention_vec[idx]),
+        )
+        return V2RecommendationResponse(
+            domain_slug=domain_slug,
+            status="active",
+            recommended_action=V2RecommendedAction(
+                concept_slug=target.concept_slug,
+                title=target.title,
+                tier=target.tier,
+                learning_mode=MODE_NAMES[LearningMode.SPACED_REVIEW],
+                reason_vi=reason,
+            ),
+            policy_source="fallback_rule",
+            state_source=state_source,
+            guardrail_applied=True,
+            retention_alert=True,
+            checkpoint_sha256="",
+            node_features_snapshot=snapshot,
+        )
+
+    eligible_incomplete = [
+        (i, n)
+        for i, n in enumerate(ordered_nodes)
+        if feats[i, NodeFeatureIdx.IS_ELIGIBLE] > 0.5 and feats[i, NodeFeatureIdx.DEPTH_NORM] < 1.0
+    ]
+    if not eligible_incomplete:
+        return V2RecommendationResponse(
+            domain_slug=domain_slug,
+            status="completed",
+            recommended_action=None,
+            policy_source="fallback_rule",
+            state_source=state_source,
+            guardrail_applied=True,
+            retention_alert=False,
+            checkpoint_sha256="",
+            node_features_snapshot=snapshot,
+        )
+
+    idx, target = min(
+        eligible_incomplete,
+        key=lambda pair: (
+            pair[1].tier,
+            float(feats[pair[0], NodeFeatureIdx.DEPTH_NORM]),
+            pair[1].node_idx,
+        ),
+    )
+    depth = float(feats[idx, NodeFeatureIdx.DEPTH_NORM])
+    code_sc = float(feats[idx, NodeFeatureIdx.CODE_SCORE])
+    if depth >= 0.75 and target.has_code_challenge and code_sc < 1.0:
+        mode = LearningMode.CODE_PRACTICE
+    elif depth >= 0.25:
+        mode = LearningMode.DEEP_PROBE
+    else:
+        mode = LearningMode.LEARN_NEW
+
+    reason = PedagogicalRationaleBuilder.build_reason(
+        target_node=target,
+        mode=mode,
+        all_nodes=ordered_nodes,
+        comp_map=comp_map,
+        retention=float(retention_vec[idx]),
+    )
+    return V2RecommendationResponse(
+        domain_slug=domain_slug,
+        status="active",
+        recommended_action=V2RecommendedAction(
+            concept_slug=target.concept_slug,
+            title=target.title,
+            tier=target.tier,
+            learning_mode=MODE_NAMES[mode],
+            reason_vi=reason,
+        ),
+        policy_source="fallback_rule",
+        state_source=state_source,
+        guardrail_applied=True,
+        retention_alert=False,
+        checkpoint_sha256="",
+        node_features_snapshot=snapshot,
+    )
 
 
 def recommend_gnn_ppo_v2(
@@ -167,15 +353,15 @@ def recommend_gnn_ppo_v2(
     *,
     checkpoint_path_override: str | None = None,
     manifest_path_override: str | None = None,
+    content_port: ContentCatalogPort | None = None,
+    competency_port: CompetencyReaderPort | None = None,
 ) -> V2RecommendationResponse:
-    """Serve GNN-PPO with Policy Guardrail (0% masked DAG violation + Ebbinghaus review priority)."""
-    nodes: list[DomainRoadmapNode] | None = None
-    if content_service_url() and assessment_service_url():
-        nodes = _build_nodes_via_internal_services(user_id, domain_slug)
-    if nodes is None:
-        roadmap = get_domain_roadmap_for_user(db, user_id, domain_slug, 0.0)
-        nodes = roadmap.nodes
-    if not nodes:
+    """Serve GNN-PPO with shared PolicyGuardrailStrategy, Hexagonal Ports & Time-Aware Feature Store."""
+    c_port = content_port if content_port is not None else get_content_catalog_port(db)
+    u_port = competency_port if competency_port is not None else get_competency_reader_port(db)
+
+    topology = c_port.get_domain_topology(domain_slug)
+    if topology is None or not topology.nodes:
         return V2RecommendationResponse(
             domain_slug=domain_slug,
             status="completed",
@@ -188,26 +374,18 @@ def recommend_gnn_ppo_v2(
             node_features_snapshot=[],
         )
 
-    feats, adj_in, adj_out = _build_graph_tensors(nodes)
-    computed_snapshot = [[round(float(val), 4) for val in row] for row in feats.tolist()]
-    if content_service_url() and assessment_service_url():
-        user_row = None
-    else:
-        try:
-            user_row = db.get(UserModel, user_id)
-        except SQLAlchemyError:
-            db.rollback()
-            user_row = None
-    state_version = user_row.state_version if user_row is not None else 1
-    snapshot, state_source = get_or_cache_graph_snapshot(
-        user_id=user_id,
-        domain_slug=domain_slug,
-        state_version=state_version,
-        computed_snapshot=computed_snapshot,
+    ordered_nodes = sorted(topology.nodes, key=lambda n: n.node_idx)
+    comp_map, state_source = _read_through_raw_competencies(
+        user_id, domain_slug, topology, u_port
     )
 
-    # Completed check
-    if all(n.depth_level_norm >= 0.75 and not n.needs_review for n in nodes):
+    obs = build_domain_graph_observation(topology, comp_map)
+    snapshot = [[round(float(val), 4) for val in row] for row in obs.node_features.tolist()]
+
+    # Completed check: all nodes depth >= 0.75 and no node needs_review
+    depths = obs.node_features[:, NodeFeatureIdx.DEPTH_NORM]
+    needs_rev = obs.node_features[:, NodeFeatureIdx.NEEDS_REVIEW] > 0.5
+    if bool(np.all(depths >= 0.75)) and not bool(np.any(needs_rev)):
         return V2RecommendationResponse(
             domain_slug=domain_slug,
             status="completed",
@@ -220,14 +398,14 @@ def recommend_gnn_ppo_v2(
             node_features_snapshot=snapshot,
         )
 
-    ckpt: VerifiedGnnPpoCheckpoint | None = None
+    ckpt: NumpyGnnPredictor | None = None
     if checkpoint_path_override is not None or manifest_path_override is not None:
         ckpt = load_verified_gnn_checkpoint(
             checkpoint_path_override=checkpoint_path_override,
             manifest_path_override=manifest_path_override,
         )
     else:
-        active_meta = _get_cached_active_model_meta(db)
+        active_meta = _get_active_model_meta(db)
         if active_meta is not None:
             ckpt = load_verified_gnn_checkpoint(
                 checkpoint_path_override=active_meta[0],
@@ -237,66 +415,38 @@ def recommend_gnn_ppo_v2(
             ckpt = load_verified_gnn_checkpoint()
 
     if ckpt is None:
-        if content_service_url() and assessment_service_url():
-            eligible_nodes = [n for n in nodes if n.is_eligible and n.depth_level_norm < 1.0]
-            target_n = eligible_nodes[0] if eligible_nodes else nodes[0]
-            return V2RecommendationResponse(
-                domain_slug=domain_slug,
-                status="active",
-                recommended_action=V2RecommendedAction(
-                    concept_slug=target_n.slug,
-                    title=target_n.title,
-                    tier=target_n.tier,
-                    learning_mode="Learn_New",
-                    reason_vi=MODE_REASONS_VI["Learn_New"],
-                ),
-                policy_source="fallback_rule",
-                state_source=state_source,
-                guardrail_applied=True,
-                retention_alert=False,
-                checkpoint_sha256="",
-                node_features_snapshot=snapshot,
-            )
-        fallback_user = user_row or UserModel(
-            id=user_id,
-            username="learner",
-            display_name="Learner",
-            password_hash="",
-            role="learner",
-            state_version=1,
+        return _fallback_recommendation(
+            domain_slug=domain_slug,
+            ordered_nodes=ordered_nodes,
+            obs=obs,
+            comp_map=comp_map,
+            state_source=state_source,
+            snapshot=snapshot,
         )
-        fallback = recommend_v2_next_step(db, fallback_user, domain_slug)
-        fallback.state_source = state_source
-        fallback.node_features_snapshot = snapshot
-        return fallback
 
-    # 1 & 2. Shared Policy Guardrail + GNN-PPO Forward Pass (C03)
-    logits = ckpt.predict_logits(feats, adj_in, adj_out)  # (N, 4)
-    eligible_arr = np.array([n.is_eligible for n in nodes], dtype=bool)
-    needs_review_arr = np.array([n.needs_review for n in nodes], dtype=bool)
-    depth_arr = np.array([n.depth_level_norm for n in nodes], dtype=np.float32)
-    ret_arr = np.array([n.retention_ebbinghaus for n in nodes], dtype=np.float32)
+    logits = ckpt.predict_logits(obs.node_features, obs.adj_in, obs.adj_out)
+    sel_v, sel_m_int, policy_source, guardrail_applied = select_guarded_action_from_obs(logits, obs)
+    sel_mode = LearningMode(sel_m_int)
+    selected_node = ordered_nodes[sel_v]
+    retention_alert = bool(np.any(needs_rev))
 
-    sel_v, sel_m, policy_source, guardrail_applied = select_guarded_action(
-        logits,
-        eligible=eligible_arr,
-        needs_review=needs_review_arr,
-        depth=depth_arr,
-        retention=ret_arr,
+    reason_vi = PedagogicalRationaleBuilder.build_reason(
+        target_node=selected_node,
+        mode=sel_mode,
+        all_nodes=ordered_nodes,
+        comp_map=comp_map,
+        retention=float(obs.node_features[sel_v, NodeFeatureIdx.RETENTION]),
     )
-    selected_node = nodes[sel_v]
-    selected_mode = MODE_NAMES[sel_m]
-    retention_alert = bool(np.any(needs_review_arr))
 
     return V2RecommendationResponse(
         domain_slug=domain_slug,
         status="active",
         recommended_action=V2RecommendedAction(
-            concept_slug=selected_node.slug,
+            concept_slug=selected_node.concept_slug,
             title=selected_node.title,
             tier=selected_node.tier,
-            learning_mode=selected_mode,
-            reason_vi=MODE_REASONS_VI[selected_mode],
+            learning_mode=MODE_NAMES[sel_mode],
+            reason_vi=reason_vi,
         ),
         policy_source=policy_source,
         state_source=state_source,

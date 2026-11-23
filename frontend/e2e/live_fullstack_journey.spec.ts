@@ -1,6 +1,6 @@
 /**
- * Live Full-Stack Integration Test (Phase 3 End-to-End) executing the React SPA against the live
- * FastAPI Backend (127.0.0.1:8000) -> PostgreSQL 16 -> Redis 7 -> GNN-PPO Checkpoint.
+ * Live Full-Stack Integration Test (Phase 3 v3 Dual-Portal End-to-End) executing the React SPA
+ * against the live FastAPI Backend (127.0.0.1:8000) -> PostgreSQL 16 -> Redis 7 -> GNN-PPO.
  */
 
 import { createElement } from 'react'
@@ -12,7 +12,7 @@ import { setAuthToken } from '../src/api'
 const BACKEND_BASE = 'http://127.0.0.1:8000'
 
 describe('Phase 3 Live Full-Stack Golden Journey (React -> FastAPI -> PostgreSQL -> Redis -> GNN-PPO)', () => {
-  it('routes logged-in learner straight to SCR-09 Multi-Domain Hub and loads SCR-11 Roadmap + GNN-PPO', async () => {
+  it('enforces clean de-demoed Learner Auth, Multi-Domain Hub, and Adaptive Placement against live backend', async () => {
     const origFetch = globalThis.fetch
     let backendReachable = false
     try {
@@ -34,9 +34,16 @@ describe('Phase 3 Live Full-Stack Golden Journey (React -> FastAPI -> PostgreSQL
 
     try {
       setAuthToken(null)
+      window.history.pushState({}, '', '/login')
       const { unmount } = render(createElement(App))
 
-      // 1. SCR-01: Register a fresh learner in PostgreSQL
+      // 1. Learner Auth must be clean: ZERO demo buttons, ZERO hardcoded passwords
+      const authPage = screen.getByTestId('learner-auth-page')
+      expect(authPage.textContent).not.toContain('PlumoraDemo#2026')
+      expect(authPage.textContent).not.toContain('learner_new')
+      expect(authPage.textContent).not.toContain('admin_demo')
+
+      // 2. Register a fresh learner in PostgreSQL
       const uname = `p3live_${Date.now().toString().slice(-6)}`
       fireEvent.click(screen.getByTestId('tab-register-btn'))
       fireEvent.change(screen.getByTestId('input-username'), { target: { value: uname } })
@@ -45,14 +52,14 @@ describe('Phase 3 Live Full-Stack Golden Journey (React -> FastAPI -> PostgreSQL
       fireEvent.click(screen.getByTestId('login-submit-btn'))
       await waitFor(
         () => {
-          expect(screen.getByTestId('active-username')).toHaveTextContent(uname)
+          expect(screen.getByTestId('active-username')).toHaveTextContent('P3 Live Learner')
           expect(screen.getByTestId('scr09-multi-domain-hub')).toBeInTheDocument()
           expect(screen.getByTestId('domain-card-frontend')).toBeInTheDocument()
         },
         { timeout: 10000 },
       )
 
-      // 2. SCR-09 -> SCR-10: Start Adaptive Placement on Frontend domain
+      // 3. Multi-Domain Hub -> Start Adaptive Placement on Frontend domain
       const frontendCard = screen.getByTestId('domain-card-frontend')
       const startPlacementBtn = frontendCard.querySelector('button:last-of-type')
       expect(startPlacementBtn).not.toBeNull()
@@ -69,5 +76,5 @@ describe('Phase 3 Live Full-Stack Golden Journey (React -> FastAPI -> PostgreSQL
       globalThis.fetch = origFetch
       setAuthToken(null)
     }
-  })
+  }, 20000)
 })

@@ -2,75 +2,139 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
   ArrowRight,
+  BookOpen,
   CheckCircle2,
   Code2,
+  Eye,
   FileQuestion,
   GitBranch,
   GitMerge,
-  Info,
   Layers,
   Network,
   Plus,
   RefreshCw,
-  ShieldCheck,
+  RotateCcw,
   Trash2,
   X,
 } from 'lucide-react'
 import {
   apiExpertCreateDomain,
+  apiExpertGetDomainGraph,
   apiExpertUpdateGraph,
-  apiGetDomainRoadmap,
   apiGetDomains,
 } from '../api'
-import type { ActiveView, DomainListItem } from '../types'
+import { useDagTopologyEditor } from '../hooks/useDagTopologyEditor'
+import { useOptionalBackOfficeStudio } from '../shells/BackOfficeStudioContext'
+import type { BackOfficeView } from '../types/expert'
+import type { DomainListItem } from '../types/learnerV2'
 
-interface ExpertDomainsPageProps {
-  onNavigate: (view: ActiveView) => void
+export interface ExpertDomainsPageProps {
+  onNavigate: (view: BackOfficeView, params?: { domainSlug?: string; conceptSlug?: string }) => void
 }
 
-interface EditableNode {
-  slug: string
-  title: string
-  tier: number
-  is_shared: boolean
-  lesson_markdown?: string
-  prerequisites: string[]
+const TIER_HEADER_META: Record<number, { title: string; dotColor: string }> = {
+  1: { title: 'Tầng 1: Nền tảng & Khái niệm Gốc', dotColor: 'bg-[#0D9488]' },
+  2: { title: 'Tầng 2: Cơ chế Cốt lõi & Giao thức', dotColor: 'bg-[#15803D]' },
+  3: { title: 'Tầng 3: Kiến trúc Ứng dụng & Tích hợp', dotColor: 'bg-[#D97706]' },
+  4: { title: 'Tầng 4: Chuyên sâu, Bảo mật & Vận hành', dotColor: 'bg-[#9F1239]' },
 }
 
-const TIER_HEADER_META: Record<
-  number,
-  { title: string; dotColor: string; degreeNote: string }
-> = {
-  1: {
-    title: 'Tầng 1: Nền tảng Hệ thống & Giao thức (Foundations)',
-    dotColor: 'bg-secondary',
-    degreeNote: 'In-degree: 0 (Gốc không phụ thuộc)',
-  },
-  2: {
-    title: 'Tầng 2: Cơ chế Cốt lõi & Điều phối (Core Mechanics)',
-    dotColor: 'bg-primary',
-    degreeNote: 'In-degree: 1 - 2',
-  },
-  3: {
-    title: 'Tầng 3: Kiến trúc Ứng dụng & Trạng thái Phân tán (Applied Architecture)',
-    dotColor: 'bg-tertiary',
-    degreeNote: 'Trọng số Bloom L3 - L4',
-  },
-  4: {
-    title: 'Tầng 4: Hệ thống Phân tán & Chuyên sâu (Capstone)',
-    dotColor: 'bg-error-dim',
-    degreeNote: 'Đỉnh lá (Bloom L4 - L5)',
-  },
+function SimpleMarkdownPreview({ markdown }: { markdown: string }) {
+  const lines = markdown.replace(/\r\n/g, '\n').split('\n')
+  const blocks: React.ReactNode[] = []
+  let i = 0
+
+  while (i < lines.length) {
+    const line = lines[i]
+    if (line.trim().startsWith('```')) {
+      const lang = line.trim().slice(3).trim()
+      const codeLines: string[] = []
+      i++
+      while (i < lines.length && !lines[i].trim().startsWith('```')) {
+        codeLines.push(lines[i])
+        i++
+      }
+      blocks.push(
+        <div key={`code-${i}`} className="my-2 rounded-lg overflow-hidden bg-[#14241B] text-[#E9FFE7]">
+          <div className="px-3 py-1 bg-[#0C1711] text-[10px] font-mono text-[#98FBA9]">
+            {lang || 'code'}
+          </div>
+          <pre className="p-3 text-xs font-mono overflow-x-auto leading-relaxed">
+            <code>{codeLines.join('\n')}</code>
+          </pre>
+        </div>,
+      )
+      i++
+      continue
+    }
+    if (line.startsWith('## ')) {
+      blocks.push(
+        <h2
+          key={`h2-${i}`}
+          className="text-sm font-extrabold text-[#14241B] mt-3 mb-1.5 pl-2.5 border-l-3 border-[#15803D]"
+        >
+          {line.slice(3)}
+        </h2>,
+      )
+      i++
+      continue
+    }
+    if (line.startsWith('### ')) {
+      blocks.push(
+        <h3 key={`h3-${i}`} className="text-xs font-bold text-[#15803D] mt-2.5 mb-1">
+          {line.slice(4)}
+        </h3>,
+      )
+      i++
+      continue
+    }
+    if (line.trim().startsWith('- ') || line.trim().startsWith('* ')) {
+      const items: string[] = []
+      while (
+        i < lines.length &&
+        (lines[i].trim().startsWith('- ') || lines[i].trim().startsWith('* '))
+      ) {
+        items.push(lines[i].trim().slice(2))
+        i++
+      }
+      blocks.push(
+        <ul key={`ul-${i}`} className="my-1.5 space-y-1 pl-4 list-disc text-xs text-[#3F5247]">
+          {items.map((it, idx) => (
+            <li key={idx}>{it}</li>
+          ))}
+        </ul>,
+      )
+      continue
+    }
+    if (line.trim() === '') {
+      i++
+      continue
+    }
+    blocks.push(
+      <p key={`p-${i}`} className="text-xs text-[#3F5247] leading-relaxed my-1.5">
+        {line}
+      </p>,
+    )
+    i++
+  }
+
+  return <div className="space-y-1">{blocks}</div>
 }
 
 export function ExpertDomainsPage({ onNavigate }: ExpertDomainsPageProps) {
-  const [domains, setDomains] = useState<DomainListItem[]>([])
-  const [selectedDomain, setSelectedDomain] = useState<string>('backend')
-  const [nodes, setNodes] = useState<EditableNode[]>([])
-  const [selectedNodeSlug, setSelectedNodeSlug] = useState<string | null>(null)
+  const studio = useOptionalBackOfficeStudio()
+  const [localDomains, setLocalDomains] = useState<DomainListItem[]>([])
+  const [localSelectedDomain, setLocalSelectedDomain] = useState('backend')
+
+  const domains = studio ? studio.domains : localDomains
+  const selectedDomain = studio ? studio.selectedDomainSlug : localSelectedDomain
+  const setSelectedDomain = studio ? studio.setSelectedDomainSlug : setLocalSelectedDomain
+
+  const [graphVersion, setGraphVersion] = useState<number>(1)
   const [canvasFilter, setCanvasFilter] = useState<'all' | 'shared'>('all')
-  const [loadingDomains, setLoadingDomains] = useState(true)
   const [loadingGraph, setLoadingGraph] = useState(false)
+  const [inspectorTab, setInspectorTab] = useState<'meta' | 'lesson'>('meta')
+  const [lessonPreview, setLessonPreview] = useState(false)
 
   // New domain form
   const [showNewDomainForm, setShowNewDomainForm] = useState(false)
@@ -79,69 +143,107 @@ export function ExpertDomainsPage({ onNavigate }: ExpertDomainsPageProps) {
   const [newDesc, setNewDesc] = useState('')
   const [creatingDomain, setCreatingDomain] = useState(false)
 
-  // New node form
+  // New node strip
   const [nodeSlug, setNodeSlug] = useState('')
   const [nodeTitle, setNodeTitle] = useState('')
   const [nodeTier, setNodeTier] = useState(1)
   const [nodeShared, setNodeShared] = useState(false)
 
+  // Confirmation modal for destructive node removal
+  const [confirmRemoveSlug, setConfirmRemoveSlug] = useState<string | null>(null)
+
   const [statusMsg, setStatusMsg] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  const loadDomainGraph = useCallback(async (slug: string) => {
-    setLoadingGraph(true)
-    setErrorMsg(null)
-    try {
-      const rm = await apiGetDomainRoadmap(slug, 0)
-      // Gate 3 invariant: DO NOT overwrite lesson_markdown for existing nodes with `## ${n.title}`
-      const mapped: EditableNode[] = rm.nodes.map((n) => ({
-        slug: n.slug,
-        title: n.title,
-        tier: n.tier,
-        is_shared: n.is_shared,
-        prerequisites: [...n.prerequisites],
-      }))
-      setNodes(mapped)
-      setSelectedNodeSlug(mapped.length > 0 ? mapped[0].slug : null)
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Không thể tải đồ thị lĩnh vực')
-      setNodes([])
-      setSelectedNodeSlug(null)
-    } finally {
-      setLoadingGraph(false)
-    }
-  }, [])
+  const editor = useDagTopologyEditor()
+  const {
+    nodes,
+    selectedNode,
+    allEdges,
+    outDegreeMap,
+    cycleAnalysis,
+    isDirty,
+    loadFromServer,
+    selectNode,
+    addNode,
+    removeNode,
+    updateNode,
+    togglePrereq,
+    discardChanges,
+    commitSnapshot,
+  } = editor
 
-  const loadDomains = useCallback(async () => {
-    setLoadingDomains(true)
-    setErrorMsg(null)
-    try {
-      const data = await apiGetDomains()
-      setDomains(data.domains)
-      if (data.domains.length > 0) {
-        const target = data.domains.some((d) => d.slug === selectedDomain)
-          ? selectedDomain
-          : data.domains[0].slug
+  useEffect(() => {
+    studio?.setIsDirty(isDirty)
+    return () => studio?.setIsDirty(false)
+  }, [isDirty, studio])
+
+  useEffect(() => {
+    if (selectedNode && studio) {
+      studio.setSelectedConceptSlug(selectedNode.slug)
+    }
+  }, [selectedNode, studio])
+
+  const loadDomainGraph = useCallback(
+    async (slug: string, preferredConcept?: string | null) => {
+      setLoadingGraph(true)
+      setErrorMsg(null)
+      try {
+        const graph = await apiExpertGetDomainGraph(slug)
+        setGraphVersion(graph.graph_version)
+        loadFromServer(graph.nodes, preferredConcept ?? studio?.selectedConceptSlug)
+      } catch (err) {
+        setErrorMsg(err instanceof Error ? err.message : 'Không thể tải đồ thị lĩnh vực')
+        loadFromServer([])
+      } finally {
+        setLoadingGraph(false)
+      }
+    },
+    [loadFromServer, studio?.selectedConceptSlug],
+  )
+
+  const loadDomainsList = useCallback(async () => {
+    if (studio) {
+      const list = await studio.refreshDomains()
+      if (list.length > 0) {
+        const target = list.some((d) => d.slug === selectedDomain) ? selectedDomain : list[0].slug
         setSelectedDomain(target)
+        await loadDomainGraph(target)
+      }
+      return
+    }
+    try {
+      const res = await apiGetDomains()
+      setLocalDomains(res.domains)
+      if (res.domains.length > 0) {
+        const target = res.domains.some((d) => d.slug === selectedDomain)
+          ? selectedDomain
+          : res.domains[0].slug
+        setLocalSelectedDomain(target)
         await loadDomainGraph(target)
       }
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Không thể tải danh sách lĩnh vực')
-    } finally {
-      setLoadingDomains(false)
     }
-  }, [loadDomainGraph, selectedDomain])
+  }, [studio, selectedDomain, setSelectedDomain, loadDomainGraph])
 
   useEffect(() => {
-    void loadDomains()
+    void loadDomainsList()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function handleSelectDomain(slug: string) {
-    setSelectedDomain(slug)
-    setStatusMsg(null)
-    await loadDomainGraph(slug)
+  function handleSelectDomain(slug: string) {
+    const proceed = () => {
+      setSelectedDomain(slug)
+      setStatusMsg(null)
+      void loadDomainGraph(slug, null)
+    }
+    if (studio) {
+      studio.requestGuardedAction(proceed)
+    } else {
+      proceed()
+    }
   }
 
   async function handleCreateDomain(e: React.FormEvent) {
@@ -161,11 +263,15 @@ export function ExpertDomainsPage({ onNavigate }: ExpertDomainsPageProps) {
       setNewDesc('')
       setShowNewDomainForm(false)
       setStatusMsg(`Đã tạo lĩnh vực mới '${created.title}' (${created.slug}).`)
-      const data = await apiGetDomains()
-      setDomains(data.domains)
+      if (studio) {
+        await studio.refreshDomains()
+      } else {
+        const res = await apiGetDomains()
+        setLocalDomains(res.domains)
+      }
       setSelectedDomain(created.slug)
-      setNodes([])
-      setSelectedNodeSlug(null)
+      setGraphVersion(created.graph_version)
+      loadFromServer([])
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Không thể tạo lĩnh vực mới')
     } finally {
@@ -177,72 +283,29 @@ export function ExpertDomainsPage({ onNavigate }: ExpertDomainsPageProps) {
     const cleanSlug = nodeSlug.trim()
     if (!cleanSlug || !nodeTitle.trim()) return
     if (nodes.some((n) => n.slug === cleanSlug)) {
-      setErrorMsg(`Node '${cleanSlug}' đã tồn tại trong đồ thị.`)
+      setErrorMsg(`Khái niệm '${cleanSlug}' đã tồn tại trong đồ thị.`)
       return
     }
     setErrorMsg(null)
-    const newNode: EditableNode = {
+    addNode({
       slug: cleanSlug,
       title: nodeTitle.trim(),
       tier: nodeTier,
       is_shared: nodeShared,
-      lesson_markdown: `## ${nodeTitle.trim()}`,
+      lesson_markdown: `## ${nodeTitle.trim()}\n\n### 1. Bản chất & Mục tiêu\nNhập nội dung bài giảng tại đây.\n`,
       prerequisites: [],
-    }
-    setNodes((prev) => [...prev, newNode])
-    setSelectedNodeSlug(cleanSlug)
+      question_counts_by_tier: { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 },
+      has_code_challenge: false,
+    })
     setNodeSlug('')
     setNodeTitle('')
     setNodeTier(1)
     setNodeShared(false)
-  }
-
-  function handleRemoveNode(slug: string) {
-    setNodes((prev) => {
-      const next = prev
-        .filter((n) => n.slug !== slug)
-        .map((n) => ({
-          ...n,
-          prerequisites: n.prerequisites.filter((p) => p !== slug),
-        }))
-      if (selectedNodeSlug === slug) {
-        setSelectedNodeSlug(next.length > 0 ? next[0].slug : null)
-      }
-      return next
-    })
-  }
-
-  function handleToggleShared(slug: string) {
-    setNodes((prev) =>
-      prev.map((n) => (n.slug === slug ? { ...n, is_shared: !n.is_shared } : n)),
-    )
-  }
-
-  function handleUpdateNodeTitle(slug: string, title: string) {
-    setNodes((prev) => prev.map((n) => (n.slug === slug ? { ...n, title } : n)))
-  }
-
-  function handleUpdateNodeTier(slug: string, tier: number) {
-    setNodes((prev) => prev.map((n) => (n.slug === slug ? { ...n, tier } : n)))
-  }
-
-  function handleTogglePrereq(nodeSlugTarget: string, prereqSlug: string) {
-    setNodes((prev) =>
-      prev.map((n) => {
-        if (n.slug !== nodeSlugTarget) return n
-        const exists = n.prerequisites.includes(prereqSlug)
-        return {
-          ...n,
-          prerequisites: exists
-            ? n.prerequisites.filter((p) => p !== prereqSlug)
-            : [...n.prerequisites, prereqSlug],
-        }
-      }),
-    )
+    setInspectorTab('lesson')
   }
 
   async function handlePublish() {
-    if (!selectedDomain) return
+    if (!selectedDomain || cycleAnalysis.hasCycle) return
     setSubmitting(true)
     setErrorMsg(null)
     setStatusMsg(null)
@@ -260,68 +323,41 @@ export function ExpertDomainsPage({ onNavigate }: ExpertDomainsPageProps) {
         })),
         edges,
       })
+      setGraphVersion(res.graph_version)
+      commitSnapshot()
       setStatusMsg(
-        `DAG Valid — Đã xuất bản đồ thị '${res.domain_slug}' phiên bản v${res.graph_version} (${nodes.length} nodes, ${edges.length} cạnh).`,
+        `Đã xuất bản đồ thị '${res.domain_slug}' phiên bản v${res.graph_version} (${res.total_nodes} khái niệm, ${edges.length} cạnh tiên quyết).`,
       )
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Lỗi kiểm tra chu trình DAG')
+      setErrorMsg(err instanceof Error ? err.message : 'Lỗi kiểm tra đồ thị DAG')
     } finally {
       setSubmitting(false)
     }
   }
 
-  const allEdges = useMemo(
-    () =>
-      nodes.flatMap((n) =>
-        n.prerequisites.map((p) => ({ source: p, target: n.slug })),
-      ),
-    [nodes],
-  )
-
-  const sharedNodesCount = useMemo(
-    () => nodes.filter((n) => n.is_shared).length,
-    [nodes],
-  )
-
-  const outDegreeMap = useMemo(() => {
-    const map: Record<string, number> = {}
-    for (const n of nodes) map[n.slug] = 0
-    for (const e of allEdges) {
-      map[e.source] = (map[e.source] ?? 0) + 1
-    }
-    return map
-  }, [nodes, allEdges])
-
-  const selectedNode = useMemo(
-    () => nodes.find((n) => n.slug === selectedNodeSlug) ?? nodes[0] ?? null,
-    [nodes, selectedNodeSlug],
-  )
-
-  const currentDomainMeta = domains.find((d) => d.slug === selectedDomain)
+  const sharedNodesCount = useMemo(() => nodes.filter((n) => n.is_shared).length, [nodes])
 
   return (
     <section
-      className="w-full max-w-[1760px] mx-auto px-4 sm:px-6 pb-8 space-y-6 text-on-surface"
+      className="w-full space-y-5 text-[#14241B]"
       data-testid="scr15-expert-domains"
     >
-      {/* 1. TOP CONTROL & DAG VALIDATION BAR */}
-      <div className="w-full bg-surface-container-lowest rounded-2xl border border-surface-container-high p-5 shadow-sm flex flex-col gap-4">
-        {/* Upper row: Domain switcher, Studio nav & Publish action */}
+      {/* Top Control Bar */}
+      <div className="bg-white rounded-2xl border border-[#D8E2D8] p-5 shadow-xs space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-3">
-            {/* Domain Selector */}
-            <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-surface-container-low border border-outline-variant/25">
-              <Network className="w-5 h-5 text-primary shrink-0" aria-hidden="true" />
+            <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-[#F6F8F5] border border-[#D8E2D8]">
+              <Network className="w-4 h-4 text-[#15803D] shrink-0" aria-hidden="true" />
               <div className="flex flex-col">
-                <span className="text-[10px] uppercase font-mono tracking-wider text-on-surface-variant font-bold">
-                  Lĩnh vực đang chọn
+                <span className="text-[10px] uppercase font-mono tracking-wider text-[#57534E] font-bold">
+                  Lĩnh vực đang biên tập
                 </span>
                 <div className="flex items-center gap-2">
                   <select
                     aria-label="Chọn lĩnh vực DAG"
                     value={selectedDomain}
-                    onChange={(e) => void handleSelectDomain(e.target.value)}
-                    className="font-headline font-bold text-sm text-on-surface bg-transparent focus:outline-none cursor-pointer"
+                    onChange={(e) => handleSelectDomain(e.target.value)}
+                    className="font-bold text-sm text-[#14241B] bg-transparent focus:outline-none cursor-pointer"
                   >
                     {domains.map((d) => (
                       <option key={d.slug} value={d.slug}>
@@ -329,128 +365,102 @@ export function ExpertDomainsPage({ onNavigate }: ExpertDomainsPageProps) {
                       </option>
                     ))}
                   </select>
-                  <span className="text-xs font-mono font-normal text-on-surface-variant bg-surface-container px-2 py-0.5 rounded-md">
-                    v{currentDomainMeta?.graph_version ?? 1} ({nodes.length} Nodes,{' '}
-                    {allEdges.length} Edges)
+                  <span className="text-[11px] font-mono text-[#57534E] bg-white border border-[#D8E2D8] px-2 py-0.5 rounded">
+                    v{graphVersion} • {nodes.length} nodes • {allEdges.length} edges
                   </span>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => void loadDomains()}
-                className="p-1.5 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container cursor-pointer transition-colors"
-                title="Làm mới danh sách lĩnh vực"
+                onClick={() => void loadDomainGraph(selectedDomain)}
+                className="p-1.5 rounded-lg text-[#57534E] hover:text-[#15803D] hover:bg-white cursor-pointer"
+                title="Tải lại đồ thị từ máy chủ"
               >
                 <RefreshCw
-                  className={`w-3.5 h-3.5 ${loadingDomains ? 'animate-spin' : ''}`}
+                  className={`w-3.5 h-3.5 ${loadingGraph ? 'animate-spin' : ''}`}
                   aria-hidden="true"
                 />
               </button>
             </div>
 
-            {/* Domain Quick Pills */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              {domains.map((d) => (
-                <button
-                  key={d.slug}
-                  type="button"
-                  onClick={() => void handleSelectDomain(d.slug)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                    selectedDomain === d.slug
-                      ? 'bg-primary-container text-on-primary-container shadow-2xs'
-                      : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
-                  }`}
-                >
-                  {d.title}
-                </button>
-              ))}
-            </div>
-
-            {/* Toggle New Domain Drawer/Panel */}
             <button
               type="button"
               onClick={() => setShowNewDomainForm((prev) => !prev)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary-container/60 hover:bg-primary-container text-on-primary-container text-xs font-semibold transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#F0FDF4] border border-[#BBF7D0] hover:bg-[#DCFCE7] text-[#14532D] text-xs font-bold cursor-pointer"
             >
-              <Plus className="w-4 h-4 text-primary" aria-hidden="true" />
-              <span>Tạo Lĩnh vực Mới (Không sửa code)</span>
+              <Plus className="w-4 h-4 text-[#15803D]" aria-hidden="true" />
+              <span>Tạo Lĩnh vực Mới</span>
             </button>
           </div>
 
-          {/* Primary Right Actions & Studio Nav */}
           <div className="flex flex-wrap items-center gap-2">
+            {isDirty && (
+              <button
+                type="button"
+                onClick={discardChanges}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#F6F8F5] border border-[#D8E2D8] hover:bg-white text-xs font-semibold text-[#3F5247] cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>Hoàn tác thay đổi</span>
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => onNavigate('expert_questions')}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-surface-container-low hover:bg-surface-container text-on-surface cursor-pointer transition-colors"
-            >
-              <FileQuestion className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
-              <span>2. Ngân hàng Đề 5 Tầng &amp; Rubric</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigate('expert_code')}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-surface-container-low hover:bg-surface-container text-on-surface cursor-pointer transition-colors"
-            >
-              <Code2 className="w-3.5 h-3.5 text-secondary" aria-hidden="true" />
-              <span>3. Bài tập Code Sandbox</span>
-            </button>
-            <button
-              type="button"
-              disabled={submitting || nodes.length === 0}
+              disabled={submitting || nodes.length === 0 || cycleAnalysis.hasCycle}
               onClick={() => void handlePublish()}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary hover:bg-primary-dim disabled:opacity-45 text-on-primary text-xs font-bold shadow-sm transition-all cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#15803D] hover:bg-[#166534] disabled:opacity-45 disabled:cursor-not-allowed text-white text-xs font-bold shadow-xs cursor-pointer"
               data-testid="expert-publish-dag-btn"
             >
               <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
               <span>
                 {submitting
-                  ? 'Đang kiểm tra chu trình...'
-                  : 'Kiểm tra Chu trình & Xuất bản Đồ thị'}
+                  ? 'Đang xuất bản đồ thị...'
+                  : cycleAnalysis.hasCycle
+                    ? 'Đang có chu trình — Không thể xuất bản'
+                    : 'Kiểm tra Chu trình & Xuất bản Đồ thị'}
               </span>
             </button>
           </div>
         </div>
 
-        {/* Collapsible New Domain Form */}
+        {/* Collapsible Create Domain Form */}
         {showNewDomainForm && (
           <form
             onSubmit={handleCreateDomain}
-            className="p-4 rounded-xl bg-surface-container-low border border-outline-variant/30 grid grid-cols-1 sm:grid-cols-12 gap-3 items-center"
+            className="p-4 rounded-xl bg-[#F6F8F5] border border-[#D8E2D8] grid grid-cols-1 sm:grid-cols-12 gap-3 items-center"
           >
             <input
               value={newSlug}
               onChange={(e) => setNewSlug(e.target.value)}
               placeholder="Mã slug (vd: data-engineering)"
-              className="sm:col-span-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest px-3 py-2 text-xs font-mono focus:border-primary focus:outline-none"
+              className="sm:col-span-3 rounded-lg border border-[#D8E2D8] bg-white px-3 py-2 text-xs font-mono focus:border-[#15803D] focus:outline-none"
               required
             />
             <input
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
               placeholder="Tên lĩnh vực (vd: Kỹ thuật Dữ liệu)"
-              className="sm:col-span-4 rounded-xl border border-outline-variant/40 bg-surface-container-lowest px-3 py-2 text-xs focus:border-primary focus:outline-none"
+              className="sm:col-span-4 rounded-lg border border-[#D8E2D8] bg-white px-3 py-2 text-xs focus:border-[#15803D] focus:outline-none"
               required
             />
             <input
               value={newDesc}
               onChange={(e) => setNewDesc(e.target.value)}
               placeholder="Mô tả lộ trình..."
-              className="sm:col-span-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest px-3 py-2 text-xs focus:border-primary focus:outline-none"
+              className="sm:col-span-3 rounded-lg border border-[#D8E2D8] bg-white px-3 py-2 text-xs focus:border-[#15803D] focus:outline-none"
             />
             <div className="sm:col-span-2 flex items-center gap-1.5">
               <button
                 type="submit"
                 disabled={creatingDomain}
-                className="flex-1 inline-flex items-center justify-center gap-1 py-2 px-3 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary-dim cursor-pointer"
+                className="flex-1 py-2 px-3 rounded-lg bg-[#15803D] text-white text-xs font-bold hover:bg-[#166534] cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5" aria-hidden="true" />
-                <span>{creatingDomain ? 'Đang tạo...' : 'Tạo'}</span>
+                {creatingDomain ? 'Đang tạo...' : 'Tạo'}
               </button>
               <button
                 type="button"
                 onClick={() => setShowNewDomainForm(false)}
-                className="p-2 rounded-xl bg-surface-container text-on-surface-variant hover:text-on-surface cursor-pointer"
+                className="p-2 rounded-lg bg-white border border-[#D8E2D8] text-[#57534E] cursor-pointer"
                 title="Đóng"
               >
                 <X className="w-3.5 h-3.5" aria-hidden="true" />
@@ -459,116 +469,111 @@ export function ExpertDomainsPage({ onNavigate }: ExpertDomainsPageProps) {
           </form>
         )}
 
-        {/* Lower row: Live Kahn's Algorithm Validation Status + Add Node Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-surface-container">
-          <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-primary-container/40 text-on-surface text-xs flex-wrap">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary" />
-            </span>
-            <span className="font-mono text-[11px] font-medium text-on-surface-variant">
-              Topological Sort Engine:
-            </span>
-            <span className="font-semibold text-primary">
-              Kahn&apos;s Acyclic Validator Active
-            </span>
-            <span className="text-outline-variant font-mono">|</span>
-            <span className="text-[11px] font-mono text-secondary-dim font-medium">
-              {sharedNodesCount} Node Giao thoa Liên thông (Cross-domain isomorphic)
-            </span>
-          </div>
+        {/* Real-time Client-side Kahn/DFS Validation Strip */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[#E7EFE7] text-xs">
+          {cycleAnalysis.hasCycle ? (
+            <div
+              role="alert"
+              data-testid="live-dag-cycle-alert"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#FFF1F2] border border-[#FDA4AF] text-[#9F1239] font-bold"
+            >
+              <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
+              <span>
+                Phát hiện chu trình DAG: {cycleAnalysis.cyclePath.join(' -> ')}
+              </span>
+            </div>
+          ) : (
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#F0FDF4] border border-[#BBF7D0] text-[#14532D] font-semibold">
+              <CheckCircle2 className="w-4 h-4 text-[#15803D]" aria-hidden="true" />
+              <span>
+                Đồ thị hợp lệ (Không chu trình) • {sharedNodesCount} khái niệm liên thông đa lĩnh vực
+              </span>
+            </div>
+          )}
 
-          <div className="text-xs font-mono text-on-surface-variant">
-            Studio Quản lý Knowledge Graph Đa lĩnh vực (SCR-15)
-          </div>
+          {isDirty && (
+            <span className="text-[11px] font-semibold text-[#B45309]">
+              Có thay đổi chưa xuất bản lên hệ thống học viên
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Status & Cycle Detection Alerts */}
       {errorMsg && (
         <div
           role="alert"
-          className="p-4 rounded-xl bg-error-container/20 border border-error/30 text-on-surface flex items-start gap-3"
+          className="p-3.5 rounded-xl bg-[#FFF1F2] border border-[#FDA4AF] text-xs font-bold text-[#9F1239] flex items-center gap-2"
         >
-          <AlertTriangle className="w-5 h-5 text-error shrink-0 mt-0.5" aria-hidden="true" />
-          <div className="flex flex-col gap-0.5">
-            <span className="font-mono text-xs font-bold text-error">
-              CẢNH BÁO KIỂM ĐỊNH ĐỒ THỊ DAG
-            </span>
-            <p className="text-xs text-on-surface">{errorMsg}</p>
-          </div>
+          <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
+          <span>{errorMsg}</span>
         </div>
       )}
 
       {statusMsg && (
-        <div className="p-4 rounded-xl bg-primary-container/30 border border-primary/30 text-xs font-bold text-on-primary-container flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-primary shrink-0" aria-hidden="true" />
+        <div className="p-3.5 rounded-xl bg-[#F0FDF4] border border-[#86EFAC] text-xs font-bold text-[#14532D] flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-[#15803D] shrink-0" aria-hidden="true" />
           <span>{statusMsg}</span>
         </div>
       )}
 
-      {/* 2. TWO-COLUMN STUDIO WORKSPACE (7/12 Canvas + 5/12 Node Inspector) */}
+      {/* Two-Column Workspace: Left DAG Canvas (7 cols) + Right Node & Lesson Inspector (5 cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* LEFT COLUMN: INTERACTIVE TIERED DAG CANVAS (7 cols) */}
-        <div className="lg:col-span-7 flex flex-col gap-6">
-          <div className="w-full bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/25 overflow-hidden flex flex-col">
-            {/* Canvas Toolbar Header */}
-            <div className="px-5 py-3.5 bg-surface-container-low/70 border-b border-surface-container flex flex-wrap items-center justify-between gap-3">
+        <div className="lg:col-span-7 space-y-5">
+          <div className="bg-white rounded-2xl border border-[#D8E2D8] shadow-xs overflow-hidden">
+            {/* Canvas Header */}
+            <div className="px-5 py-3.5 bg-[#F6F8F5] border-b border-[#D8E2D8] flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <GitBranch className="w-4 h-4 text-primary" aria-hidden="true" />
-                <h1 className="font-headline font-bold text-xs uppercase tracking-wider text-on-surface">
-                  Không gian Biên tập Cây Tri thức ({selectedDomain})
+                <GitBranch className="w-4 h-4 text-[#15803D]" aria-hidden="true" />
+                <h1 className="font-extrabold text-xs uppercase tracking-wider text-[#14241B]">
+                  Biên tập Đồ thị Tri thức ({selectedDomain})
                 </h1>
-                <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-surface-container text-on-surface-variant">
-                  4 Tầng &bull; {nodes.length} Khái niệm
-                </span>
               </div>
 
-              {/* View Filter Pills */}
-              <div className="flex items-center bg-surface-container rounded-lg p-0.5 text-xs font-medium text-on-surface-variant">
+              <div className="flex items-center bg-white border border-[#D8E2D8] rounded-lg p-0.5 text-xs">
                 <button
                   type="button"
                   onClick={() => setCanvasFilter('all')}
-                  className={`px-2.5 py-1 rounded transition-colors cursor-pointer ${
+                  className={`px-2.5 py-1 rounded-md font-semibold cursor-pointer ${
                     canvasFilter === 'all'
-                      ? 'bg-surface-container-lowest text-primary font-semibold shadow-2xs'
-                      : 'hover:text-on-surface'
+                      ? 'bg-[#15803D] text-white'
+                      : 'text-[#57534E] hover:text-[#14241B]'
                   }`}
                 >
-                  Tất cả ({nodes.length} nodes)
+                  Tất cả ({nodes.length})
                 </button>
                 <button
                   type="button"
                   onClick={() => setCanvasFilter('shared')}
-                  className={`px-2.5 py-1 rounded transition-colors cursor-pointer ${
+                  className={`px-2.5 py-1 rounded-md font-semibold cursor-pointer ${
                     canvasFilter === 'shared'
-                      ? 'bg-surface-container-lowest text-primary font-semibold shadow-2xs'
-                      : 'hover:text-on-surface'
+                      ? 'bg-[#1D4ED8] text-white'
+                      : 'text-[#57534E] hover:text-[#14241B]'
                   }`}
                 >
-                  Giao thoa ({sharedNodesCount} nodes)
+                  Liên thông ({sharedNodesCount})
                 </button>
               </div>
             </div>
 
-            {/* Add Node Quick Strip */}
-            <div className="px-5 py-3 bg-surface-container-low border-b border-surface-container grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+            {/* Add Node Strip */}
+            <div className="px-5 py-3 bg-[#F6F8F5]/60 border-b border-[#E7EFE7] grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
               <input
                 value={nodeSlug}
                 onChange={(e) => setNodeSlug(e.target.value)}
-                placeholder="slug node mới (vd: stream-kafka)"
-                className="sm:col-span-3 rounded-lg border border-outline-variant/40 bg-surface-container-lowest px-2.5 py-1.5 text-xs font-mono focus:border-primary focus:outline-none"
+                placeholder="slug mới (vd: stream-kafka)"
+                className="sm:col-span-3 rounded-lg border border-[#D8E2D8] bg-white px-2.5 py-1.5 text-xs font-mono focus:border-[#15803D] focus:outline-none"
               />
               <input
                 value={nodeTitle}
                 onChange={(e) => setNodeTitle(e.target.value)}
-                placeholder="Tên khái niệm hiển thị tiếng Việt"
-                className="sm:col-span-4 rounded-lg border border-outline-variant/40 bg-surface-container-lowest px-2.5 py-1.5 text-xs focus:border-primary focus:outline-none"
+                placeholder="Tên khái niệm tiếng Việt"
+                className="sm:col-span-4 rounded-lg border border-[#D8E2D8] bg-white px-2.5 py-1.5 text-xs focus:border-[#15803D] focus:outline-none"
               />
               <select
+                aria-label="Tầng cho khái niệm mới"
                 value={nodeTier}
                 onChange={(e) => setNodeTier(Number(e.target.value))}
-                className="sm:col-span-2 rounded-lg border border-outline-variant/40 bg-surface-container-lowest px-2 py-1.5 text-xs"
+                className="sm:col-span-2 rounded-lg border border-[#D8E2D8] bg-white px-2 py-1.5 text-xs"
               >
                 {[1, 2, 3, 4].map((t) => (
                   <option key={t} value={t}>
@@ -576,129 +581,115 @@ export function ExpertDomainsPage({ onNavigate }: ExpertDomainsPageProps) {
                   </option>
                 ))}
               </select>
-              <label className="sm:col-span-2 inline-flex items-center gap-1.5 text-xs font-medium text-on-surface cursor-pointer">
+              <label className="sm:col-span-2 inline-flex items-center gap-1.5 text-xs font-medium text-[#14241B] cursor-pointer">
                 <input
                   type="checkbox"
                   checked={nodeShared}
                   onChange={(e) => setNodeShared(e.target.checked)}
-                  className="accent-primary"
+                  className="accent-[#15803D]"
                 />
-                <span>Giao thoa</span>
+                <span>Liên thông</span>
               </label>
               <button
                 type="button"
                 onClick={handleAddNode}
-                className="sm:col-span-1 inline-flex items-center justify-center py-1.5 px-2 rounded-lg bg-primary text-on-primary text-xs font-bold hover:bg-primary-dim cursor-pointer"
-                title="Thêm node mới vào đồ thị"
+                className="sm:col-span-1 inline-flex items-center justify-center py-1.5 px-2 rounded-lg bg-[#15803D] text-white text-xs font-bold hover:bg-[#166534] cursor-pointer"
+                title="Thêm khái niệm mới"
               >
                 <Plus className="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
 
-            {/* DAG Canvas Area with Dot Graph Pattern */}
-            <div className="relative p-6 bg-[radial-gradient(#acb4af_1px,transparent_1px)] [background-size:18px_18px] bg-surface flex flex-col gap-6">
+            {/* Tiered Nodes Canvas */}
+            <div className="p-5 bg-[#F6F8F5] space-y-5">
               {loadingGraph ? (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {[0, 1, 2].map((i) => (
-                    <div
-                      key={i}
-                      className="h-24 rounded-xl bg-surface-container-low animate-pulse"
-                    />
+                    <div key={i} className="h-24 rounded-xl bg-white animate-pulse" />
                   ))}
                 </div>
               ) : nodes.length === 0 ? (
-                <div className="p-8 rounded-xl bg-surface-container-lowest border border-dashed border-outline-variant text-center text-xs text-on-surface-variant">
-                  Đồ thị chưa có khái niệm nào. Hãy thêm Root Node Tầng 1 đầu tiên ở thanh công cụ
-                  phía trên.
+                <div className="p-8 rounded-xl bg-white border border-dashed border-[#D8E2D8] text-center text-xs text-[#57534E]">
+                  Đồ thị chưa có khái niệm nào. Hãy thêm khái niệm Tầng 1 đầu tiên ở thanh công cụ phía trên.
                 </div>
               ) : (
                 [1, 2, 3, 4].map((tierNum) => {
                   const tierNodes = nodes.filter(
-                    (n) =>
-                      n.tier === tierNum && (canvasFilter === 'all' || n.is_shared),
+                    (n) => n.tier === tierNum && (canvasFilter === 'all' || n.is_shared),
                   )
                   if (tierNodes.length === 0) return null
                   const meta = TIER_HEADER_META[tierNum]
 
                   return (
-                    <div key={tierNum} className="flex flex-col gap-3">
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className={`w-2.5 h-2.5 rounded-full ${meta.dotColor}`} />
-                          <span className="font-headline font-extrabold text-xs uppercase tracking-wider text-on-surface">
-                            {meta.title}
-                          </span>
-                        </div>
-                        <span className="font-mono text-[11px] text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded">
-                          {meta.degreeNote}
+                    <div key={tierNum} className="space-y-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className={`w-2.5 h-2.5 rounded-full ${meta.dotColor}`} />
+                        <span className="font-extrabold text-xs uppercase tracking-wider text-[#14241B]">
+                          {meta.title}
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                         {tierNodes.map((node) => {
                           const isSelected = selectedNode?.slug === node.slug
-                          const outDeg = outDegreeMap[node.slug] ?? 0
+                          const inCycle = cycleAnalysis.cycleNodeSet.has(node.slug)
+                          const coveredTiers = [1, 2, 3, 4, 5].filter(
+                            (t) => (node.question_counts_by_tier[String(t)] ?? 0) > 0,
+                          ).length
+
                           return (
                             <div
                               key={node.slug}
-                              onClick={() => setSelectedNodeSlug(node.slug)}
+                              onClick={() => selectNode(node.slug)}
                               role="button"
                               tabIndex={0}
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter' || e.key === ' ') {
                                   e.preventDefault()
-                                  setSelectedNodeSlug(node.slug)
+                                  selectNode(node.slug)
                                 }
                               }}
-                              className={`relative p-4 rounded-xl bg-surface-container-lowest transition-all cursor-pointer text-left ${
-                                isSelected
-                                  ? 'ring-2 ring-primary shadow-md bg-gradient-to-br from-primary-container/20 to-transparent'
-                                  : 'border border-outline-variant/25 hover:shadow-md'
+                              className={`relative p-3.5 rounded-xl bg-white transition-all cursor-pointer text-left ${
+                                inCycle
+                                  ? 'ring-2 ring-[#9F1239] bg-[#FFF1F2]/60'
+                                  : isSelected
+                                    ? 'ring-2 ring-[#15803D] shadow-sm'
+                                    : 'border border-[#D8E2D8] hover:border-[#15803D]/60'
                               }`}
                             >
-                              {isSelected && (
-                                <div className="absolute -top-2.5 right-3 px-2 py-0.5 rounded-full bg-primary text-on-primary font-mono text-[9px] font-bold tracking-wider uppercase shadow-2xs">
-                                  Đang chọn
-                                </div>
-                              )}
-
-                              <div className="flex items-start justify-between gap-2 mb-2">
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  <span
-                                    className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${
-                                      isSelected
-                                        ? 'bg-primary-container text-on-primary-container'
-                                        : 'bg-surface-container-high text-on-surface'
-                                    }`}
-                                  >
-                                    <Layers className="w-3.5 h-3.5" aria-hidden="true" />
-                                  </span>
-                                  <span
-                                    className={`font-mono text-xs font-bold truncate ${
-                                      isSelected ? 'text-primary' : 'text-on-surface'
-                                    }`}
-                                  >
-                                    {node.slug}
-                                  </span>
-                                </div>
-
+                              <div className="flex items-start justify-between gap-2 mb-1.5">
+                                <span className="font-mono text-xs font-bold text-[#15803D] truncate">
+                                  {node.slug}
+                                </span>
                                 {node.is_shared && (
-                                  <span className="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-mono text-[10px] font-semibold shrink-0">
-                                    Giao thoa
+                                  <span className="px-2 py-0.5 rounded-full bg-[#EFF6FF] border border-[#93C5FD] text-[#1D4ED8] text-[10px] font-bold shrink-0">
+                                    Liên thông
                                   </span>
                                 )}
                               </div>
 
-                              <h3 className="font-headline font-bold text-xs text-on-surface leading-tight mb-2">
+                              <h3 className="font-bold text-xs text-[#14241B] leading-snug mb-2">
                                 {node.title}
                               </h3>
 
-                              <div className="flex items-center justify-between text-[10px] font-mono text-on-surface-variant pt-2 border-t border-surface-container">
+                              <div className="flex items-center justify-between text-[10px] font-mono text-[#57534E] pt-2 border-t border-[#E7EFE7]">
                                 <span>
-                                  In: {node.prerequisites.length} | Out: {outDeg}
+                                  In: {node.prerequisites.length} | Out: {outDegreeMap[node.slug] ?? 0}
                                 </span>
-                                <span className="text-primary font-semibold">
-                                  Tầng {node.tier}
+                                <span className="flex items-center gap-1.5">
+                                  <span
+                                    className={
+                                      coveredTiers < 5 ? 'text-[#D97706] font-bold' : 'text-[#15803D] font-bold'
+                                    }
+                                    title="Số tầng sâu đã có câu hỏi"
+                                  >
+                                    Đề: {coveredTiers}/5
+                                  </span>
+                                  {node.has_code_challenge && (
+                                    <span className="px-1.5 py-0.5 rounded bg-[#F0FDFA] text-[#0F766E] font-bold">
+                                      Code
+                                    </span>
+                                  )}
                                 </span>
                               </div>
                             </div>
@@ -712,60 +703,52 @@ export function ExpertDomainsPage({ onNavigate }: ExpertDomainsPageProps) {
             </div>
           </div>
 
-          {/* Active Prerequisite Edges Summary Table */}
-          <div className="w-full bg-surface-container-lowest rounded-2xl p-5 shadow-sm border border-outline-variant/25 flex flex-col gap-3">
+          {/* Prerequisite Edges Table */}
+          <div className="bg-white rounded-2xl border border-[#D8E2D8] p-5 shadow-xs space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <GitMerge className="w-4 h-4 text-secondary" aria-hidden="true" />
-                <h2 className="font-headline font-bold text-sm text-on-surface">
-                  Danh sách Cạnh Tiên quyết Hiện hành ({allEdges.length} Active Edges)
+                <GitMerge className="w-4 h-4 text-[#0D9488]" aria-hidden="true" />
+                <h2 className="font-bold text-sm text-[#14241B]">
+                  Danh sách Cạnh Tiên quyết ({allEdges.length})
                 </h2>
               </div>
-              <span className="text-xs font-mono text-on-surface-variant">
-                Topological Sorted Order
+              <span className="text-[11px] font-mono text-[#57534E]">
+                {cycleAnalysis.hasCycle ? 'Có cạnh gây chu trình (tô đỏ)' : 'Thứ tự Topo hợp lệ'}
               </span>
             </div>
 
             {allEdges.length === 0 ? (
-              <p className="text-xs text-on-surface-variant">
-                Chưa có cạnh tiên quyết nào trong đồ thị này.
-              </p>
+              <p className="text-xs text-[#57534E]">Chưa có cạnh tiên quyết nào trong đồ thị này.</p>
             ) : (
-              <div className="overflow-x-auto max-h-60 overflow-y-auto">
-                <table className="w-full text-left text-xs font-body">
+              <div className="overflow-x-auto max-h-56 overflow-y-auto">
+                <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="bg-surface-container-low text-on-surface-variant font-mono text-[11px] uppercase tracking-wider">
-                      <th className="py-2.5 px-3 rounded-l-lg">Node Tiên quyết (Source)</th>
-                      <th className="py-2.5 px-3">Node Nhận (Target)</th>
-                      <th className="py-2.5 px-3">Điều kiện Mở khóa</th>
-                      <th className="py-2.5 px-3 text-right rounded-r-lg">Thao tác</th>
+                    <tr className="bg-[#F6F8F5] text-[#57534E] font-mono text-[11px] uppercase">
+                      <th className="py-2 px-3">Tiên quyết (Source)</th>
+                      <th className="py-2 px-3">Khái niệm mở khóa (Target)</th>
+                      <th className="py-2 px-3 text-right">Thao tác</th>
                     </tr>
                   </thead>
-                  <tbody className="font-mono text-[11px]">
+                  <tbody className="font-mono text-[11px] divide-y divide-[#E7EFE7]">
                     {allEdges.map((edge) => {
-                      const isRelated =
-                        selectedNode?.slug === edge.source || selectedNode?.slug === edge.target
+                      const edgeKey = `${edge.source}->${edge.target}`
+                      const isCyclicEdge = cycleAnalysis.cycleEdgeKeys.has(edgeKey)
                       return (
                         <tr
-                          key={`${edge.source}->${edge.target}`}
-                          className={`hover:bg-surface-container-low transition-colors ${
-                            isRelated ? 'bg-primary-container/15' : ''
-                          }`}
+                          key={edgeKey}
+                          className={
+                            isCyclicEdge
+                              ? 'bg-[#FFF1F2] text-[#9F1239] font-bold'
+                              : 'hover:bg-[#F6F8F5]'
+                          }
                         >
-                          <td className="py-2 px-3 text-primary font-bold">{edge.source}</td>
-                          <td className="py-2 px-3 text-on-surface font-semibold">
-                            {edge.target}
-                          </td>
-                          <td className="py-2 px-3">
-                            <span className="px-2 py-0.5 rounded bg-primary-container/40 text-on-primary-container font-semibold">
-                              Bắt buộc (&ge; 75%)
-                            </span>
-                          </td>
+                          <td className="py-2 px-3 font-bold">{edge.source}</td>
+                          <td className="py-2 px-3">{edge.target}</td>
                           <td className="py-2 px-3 text-right">
                             <button
                               type="button"
-                              onClick={() => handleTogglePrereq(edge.target, edge.source)}
-                              className="text-on-surface-variant hover:text-error transition-colors cursor-pointer"
+                              onClick={() => togglePrereq(edge.target, edge.source)}
+                              className="text-[#9F1239] hover:underline cursor-pointer"
                             >
                               Gỡ cạnh
                             </button>
@@ -780,224 +763,280 @@ export function ExpertDomainsPage({ onNavigate }: ExpertDomainsPageProps) {
           </div>
         </div>
 
-        {/* RIGHT COLUMN: NODE & CROSS-DOMAIN LINK INSPECTOR (5 cols) */}
-        <div className="lg:col-span-5 flex flex-col gap-6">
-          <div className="w-full bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/25 p-6 flex flex-col gap-5">
+        {/* RIGHT COLUMN: Node Inspector + Lesson Markdown Editor (5 cols) */}
+        <div className="lg:col-span-5 space-y-5">
+          <div className="bg-white rounded-2xl border border-[#D8E2D8] p-5 shadow-xs space-y-4">
             {!selectedNode ? (
-              <div className="p-6 text-center text-xs text-on-surface-variant">
-                Chọn một khái niệm ở khung đồ thị bên trái để chỉnh sửa thuộc tính và cạnh tiên
-                quyết.
+              <div className="p-6 text-center text-xs text-[#57534E]">
+                Chọn một khái niệm trên đồ thị bên trái để chỉnh sửa thuộc tính, cạnh tiên quyết và nội dung bài giảng.
               </div>
             ) : (
               <>
                 {/* Inspector Header */}
-                <div className="flex items-start justify-between gap-4 pb-4 border-b border-surface-container">
-                  <div className="flex flex-col gap-1">
+                <div className="flex items-start justify-between gap-3 pb-3 border-b border-[#E7EFE7]">
+                  <div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="px-2.5 py-0.5 rounded-full bg-primary-container text-on-primary-container font-mono text-xs font-bold">
+                      <span className="px-2 py-0.5 rounded bg-[#F0FDF4] border border-[#BBF7D0] font-mono text-xs font-bold text-[#15803D]">
                         {selectedNode.slug}
                       </span>
-                      <span className="text-xs font-mono text-on-surface-variant bg-surface-container px-2 py-0.5 rounded">
-                        Tầng {selectedNode.tier} / 4
-                      </span>
-                      <span className="text-xs font-mono text-secondary-dim font-medium">
-                        {selectedDomain}
+                      <span className="text-[11px] font-mono text-[#57534E]">
+                        Tầng {selectedNode.tier}/4
                       </span>
                     </div>
-                    <h2 className="font-headline font-extrabold text-base text-on-surface">
-                      Thông số Khái niệm (Node Inspector)
+                    <h2 className="font-extrabold text-base text-[#14241B] mt-1">
+                      {selectedNode.title}
                     </h2>
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleRemoveNode(selectedNode.slug)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-error hover:bg-error-container/20 transition-colors cursor-pointer"
-                    title="Xóa node này khỏi đồ thị"
+                    onClick={() => setConfirmRemoveSlug(selectedNode.slug)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[#9F1239] hover:bg-[#FFF1F2] cursor-pointer"
                   >
                     <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
                     <span>Xóa Node</span>
                   </button>
                 </div>
 
-                {/* Cross-Domain Mapping Section (GNN Transfer Learning Banner) */}
-                <div className="p-4 rounded-xl bg-secondary-container/20 flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <GitMerge className="w-4 h-4 text-secondary" aria-hidden="true" />
-                      <span className="font-headline font-bold text-xs uppercase tracking-wider text-on-surface">
-                        Liên kết Khái niệm Giao thoa Dùng chung
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleToggleShared(selectedNode.slug)}
-                      className={`px-2.5 py-1 rounded-full text-[11px] font-bold cursor-pointer transition-colors ${
-                        selectedNode.is_shared
-                          ? 'bg-secondary text-on-secondary'
-                          : 'bg-surface-container-high text-on-surface-variant'
-                      }`}
-                    >
-                      {selectedNode.is_shared ? 'Giao thoa (Shared)' : 'Nội bộ Lĩnh vực'}
-                    </button>
-                  </div>
-                  <p className="text-xs text-on-surface-variant leading-relaxed">
-                    Khái niệm giao thoa (Isomorphic) cho phép hệ thống GNN-PPO chuyển giao trực tiếp
-                    vector năng lực 8 chiều giữa các lộ trình.
-                  </p>
-                  <div className="text-[11px] font-mono text-secondary-dim bg-secondary-fixed/30 p-2.5 rounded-lg flex items-center gap-2">
-                    <Info className="w-4 h-4 text-secondary shrink-0" aria-hidden="true" />
-                    <span>
-                      Học viên đạt &ge; 75% ở lĩnh vực gốc sẽ tự động đồng bộ trạng thái sang lĩnh
-                      vực liên thông.
-                    </span>
-                  </div>
-                </div>
-
-                {/* Node Identity & Metadata Form */}
-                <div className="flex flex-col gap-3.5">
-                  <div className="flex flex-col gap-1.5">
-                    <label
-                      htmlFor="inspector-node-title"
-                      className="text-xs font-semibold text-on-surface flex items-center justify-between"
-                    >
-                      <span>Tên hiển thị tiếng Việt</span>
-                      <span className="text-[11px] font-normal text-on-surface-variant">
-                        Hiển thị trên lộ trình
-                      </span>
-                    </label>
-                    <input
-                      id="inspector-node-title"
-                      type="text"
-                      value={selectedNode.title}
-                      onChange={(e) => handleUpdateNodeTitle(selectedNode.slug, e.target.value)}
-                      className="w-full px-3.5 py-2 rounded-xl bg-surface-container-low text-on-surface text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-xs font-semibold text-on-surface">
-                        Concept Slug (DAG ID)
-                      </span>
-                      <input
-                        type="text"
-                        disabled
-                        value={selectedNode.slug}
-                        className="w-full px-3 py-2 rounded-xl bg-surface-container text-on-surface-variant font-mono text-xs cursor-not-allowed"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label
-                        htmlFor="inspector-node-tier"
-                        className="text-xs font-semibold text-on-surface"
-                      >
-                        Tầng DAG (1–4)
-                      </label>
-                      <select
-                        id="inspector-node-tier"
-                        value={selectedNode.tier}
-                        onChange={(e) =>
-                          handleUpdateNodeTier(selectedNode.slug, Number(e.target.value))
-                        }
-                        className="w-full px-3 py-2 rounded-xl bg-surface-container-low text-on-surface text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary"
-                      >
-                        {[1, 2, 3, 4].map((t) => (
-                          <option key={t} value={t}>
-                            Tầng {t}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Prerequisite Edges Configuration */}
-                <div className="flex flex-col gap-3 pt-2 border-t border-surface-container">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-on-surface uppercase tracking-wider font-headline">
-                      Cạnh Tiên quyết Trực tiếp ({selectedNode.prerequisites.length})
-                    </span>
-                    <span className="text-[10px] font-mono text-on-surface-variant">
-                      Bấm để bật/tắt cạnh
-                    </span>
-                  </div>
-
-                  <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto p-1">
-                    {nodes
-                      .filter((other) => other.slug !== selectedNode.slug)
-                      .map((other) => {
-                        const checked = selectedNode.prerequisites.includes(other.slug)
-                        return (
-                          <button
-                            key={other.slug}
-                            type="button"
-                            onClick={() => handleTogglePrereq(selectedNode.slug, other.slug)}
-                            className={`px-2.5 py-1 rounded-lg border font-mono text-[11px] cursor-pointer transition-colors ${
-                              checked
-                                ? 'bg-primary text-on-primary border-primary font-bold shadow-2xs'
-                                : 'bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:border-primary'
-                            }`}
-                          >
-                            [T{other.tier}] {other.slug}
-                          </button>
-                        )
-                      })}
-                  </div>
-                </div>
-
-                {/* Quick SCR-16 & SCR-17 Links */}
-                <div className="pt-2 border-t border-surface-container flex flex-col gap-2">
+                {/* Inspector Tabs: Properties vs Lesson Markdown */}
+                <div className="flex items-center gap-1 p-1 rounded-xl bg-[#F6F8F5] border border-[#D8E2D8] text-xs font-semibold">
                   <button
                     type="button"
-                    onClick={() => onNavigate('expert_questions')}
-                    className="w-full py-2.5 px-4 rounded-xl bg-primary hover:bg-primary-dim text-on-primary text-xs font-bold flex items-center justify-center gap-2 shadow-2xs transition-all cursor-pointer"
+                    onClick={() => setInspectorTab('meta')}
+                    className={`flex-1 py-1.5 px-3 rounded-lg inline-flex items-center justify-center gap-1.5 cursor-pointer ${
+                      inspectorTab === 'meta'
+                        ? 'bg-white text-[#14241B] shadow-2xs'
+                        : 'text-[#57534E] hover:text-[#14241B]'
+                    }`}
                   >
-                    <span>Mở Ngân hàng Đề 5 Tầng &amp; Rubric (SCR-16)</span>
-                    <ArrowRight className="w-4 h-4" aria-hidden="true" />
+                    <Layers className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span>Thuộc tính &amp; Cạnh</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => onNavigate('expert_code')}
-                    className="w-full py-2 px-4 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
+                    onClick={() => setInspectorTab('lesson')}
+                    className={`flex-1 py-1.5 px-3 rounded-lg inline-flex items-center justify-center gap-1.5 cursor-pointer ${
+                      inspectorTab === 'lesson'
+                        ? 'bg-white text-[#15803D] shadow-2xs'
+                        : 'text-[#57534E] hover:text-[#14241B]'
+                    }`}
                   >
-                    <Code2 className="w-4 h-4 text-secondary" aria-hidden="true" />
-                    <span>Thiết kế Bài tập Code Sandbox (SCR-17)</span>
+                    <BookOpen className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span>Bài giảng Playbook (Markdown)</span>
+                  </button>
+                </div>
+
+                {inspectorTab === 'meta' ? (
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor="inspector-node-title"
+                        className="text-xs font-bold text-[#14241B] block"
+                      >
+                        Tên hiển thị tiếng Việt
+                      </label>
+                      <input
+                        id="inspector-node-title"
+                        type="text"
+                        value={selectedNode.title}
+                        onChange={(e) => updateNode(selectedNode.slug, { title: e.target.value })}
+                        className="w-full px-3 py-2 rounded-lg border border-[#D8E2D8] bg-[#F6F8F5] text-xs font-medium focus:bg-white focus:border-[#15803D] focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label
+                          htmlFor="inspector-node-tier"
+                          className="text-xs font-bold text-[#14241B] block"
+                        >
+                          Tầng DAG (1–4)
+                        </label>
+                        <select
+                          id="inspector-node-tier"
+                          value={selectedNode.tier}
+                          onChange={(e) =>
+                            updateNode(selectedNode.slug, { tier: Number(e.target.value) })
+                          }
+                          className="w-full px-3 py-2 rounded-lg border border-[#D8E2D8] bg-[#F6F8F5] text-xs font-semibold focus:border-[#15803D] focus:outline-none"
+                        >
+                          {[1, 2, 3, 4].map((t) => (
+                            <option key={t} value={t}>
+                              Tầng {t}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <span className="text-xs font-bold text-[#14241B] block">
+                          Liên thông đa lĩnh vực
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateNode(selectedNode.slug, { is_shared: !selectedNode.is_shared })
+                          }
+                          className={`w-full px-3 py-2 rounded-lg text-xs font-bold border cursor-pointer ${
+                            selectedNode.is_shared
+                              ? 'bg-[#EFF6FF] border-[#93C5FD] text-[#1D4ED8]'
+                              : 'bg-[#F6F8F5] border-[#D8E2D8] text-[#57534E]'
+                          }`}
+                        >
+                          {selectedNode.is_shared ? 'Khái niệm Liên thông' : 'Nội bộ Lĩnh vực'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Prerequisite Toggle Chips */}
+                    <div className="space-y-2 pt-2 border-t border-[#E7EFE7]">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-[#14241B]">
+                          Cạnh Tiên quyết Trực tiếp ({selectedNode.prerequisites.length})
+                        </span>
+                        <span className="text-[11px] text-[#57534E]">Nhấp để bật/tắt</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 max-h-44 overflow-y-auto p-1">
+                        {nodes
+                          .filter((other) => other.slug !== selectedNode.slug)
+                          .map((other) => {
+                            const checked = selectedNode.prerequisites.includes(other.slug)
+                            const edgeKey = `${other.slug}->${selectedNode.slug}`
+                            const cyclic = cycleAnalysis.cycleEdgeKeys.has(edgeKey)
+                            return (
+                              <button
+                                key={other.slug}
+                                type="button"
+                                onClick={() => togglePrereq(selectedNode.slug, other.slug)}
+                                className={`px-2.5 py-1 rounded-lg border font-mono text-[11px] cursor-pointer ${
+                                  cyclic
+                                    ? 'bg-[#9F1239] text-white border-[#9F1239] font-bold'
+                                    : checked
+                                      ? 'bg-[#15803D] text-white border-[#15803D] font-bold'
+                                      : 'bg-[#F6F8F5] text-[#3F5247] border-[#D8E2D8] hover:border-[#15803D]'
+                                }`}
+                              >
+                                [T{other.tier}] {other.slug}
+                              </button>
+                            )
+                          })}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3" data-testid="lesson-markdown-editor-panel">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-bold text-[#14241B]">
+                        Nội dung Playbook ({selectedNode.lesson_markdown.length} ký tự)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setLessonPreview((p) => !p)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#F6F8F5] border border-[#D8E2D8] text-[11px] font-semibold text-[#14241B] cursor-pointer"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-[#15803D]" aria-hidden="true" />
+                        <span>{lessonPreview ? 'Quay về Soạn thảo' : 'Xem trước Playbook'}</span>
+                      </button>
+                    </div>
+
+                    {lessonPreview ? (
+                      <div className="p-4 rounded-xl bg-[#F6F8F5] border border-[#D8E2D8] max-h-80 overflow-y-auto">
+                        <SimpleMarkdownPreview markdown={selectedNode.lesson_markdown} />
+                      </div>
+                    ) : (
+                      <textarea
+                        aria-label="Nội dung bài giảng Playbook Markdown"
+                        rows={12}
+                        value={selectedNode.lesson_markdown}
+                        onChange={(e) =>
+                          updateNode(selectedNode.slug, { lesson_markdown: e.target.value })
+                        }
+                        placeholder="Nhập nội dung bài giảng Markdown (tiêu đề ##, khối code ```, danh sách -)..."
+                        className="w-full rounded-xl border border-[#D8E2D8] bg-[#F6F8F5] p-3 text-xs font-mono text-[#14241B] focus:bg-white focus:border-[#15803D] focus:outline-none leading-relaxed"
+                      />
+                    )}
+                  </div>
+                )}
+
+                {/* Context-Preserving Jump Links to Questions & Code Challenges */}
+                <div className="pt-3 border-t border-[#E7EFE7] grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onNavigate('expert_questions', {
+                        domainSlug: selectedDomain,
+                        conceptSlug: selectedNode.slug,
+                      })
+                    }
+                    className="py-2 px-3 rounded-xl bg-[#15803D] hover:bg-[#166534] text-white text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <FileQuestion className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span>Đề 5 Tầng &amp; Rubric</span>
+                    <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onNavigate('expert_code', {
+                        domainSlug: selectedDomain,
+                        conceptSlug: selectedNode.slug,
+                      })
+                    }
+                    className="py-2 px-3 rounded-xl bg-[#F6F8F5] border border-[#D8E2D8] hover:border-[#15803D] text-[#14241B] text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Code2 className="w-3.5 h-3.5 text-[#0D9488]" aria-hidden="true" />
+                    <span>Bài tập Code Sandbox</span>
                   </button>
                 </div>
               </>
             )}
           </div>
+        </div>
+      </div>
 
-          {/* All Nodes Quick Selector List */}
-          <div className="w-full bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/25 p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-on-surface font-headline flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-primary" aria-hidden="true" />
-                <span>Danh mục Node ({nodes.length})</span>
-              </h3>
-              <span className="text-[11px] font-mono text-on-surface-variant">
-                Bấm chọn để nạp Inspector
-              </span>
+      {/* Confirm Remove Node Modal */}
+      {confirmRemoveSlug && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
+        >
+          <div className="bg-white max-w-md w-full rounded-2xl border border-[#D8E2D8] p-6 shadow-xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#FFF1F2] border border-[#FDA4AF] flex items-center justify-center text-[#9F1239]">
+                <Trash2 className="w-5 h-5" aria-hidden="true" />
+              </div>
+              <div>
+                <h3 className="text-sm font-extrabold text-[#14241B]">
+                  Xác nhận xóa khái niệm khỏi đồ thị
+                </h3>
+                <p className="text-xs text-[#57534E]">
+                  Khái niệm <code className="font-mono font-bold">{confirmRemoveSlug}</code> và các
+                  cạnh tiên quyết liên kết sẽ bị gỡ khỏi bản nháp đồ thị.
+                </p>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
-              {nodes.map((n) => (
-                <button
-                  key={n.slug}
-                  type="button"
-                  onClick={() => setSelectedNodeSlug(n.slug)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-mono transition-colors cursor-pointer ${
-                    selectedNode?.slug === n.slug
-                      ? 'bg-primary text-on-primary font-bold'
-                      : 'bg-surface-container-low text-on-surface hover:bg-surface-container'
-                  }`}
-                >
-                  {n.slug}
-                </button>
-              ))}
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmRemoveSlug(null)}
+                className="px-4 py-2 rounded-lg bg-[#F6F8F5] border border-[#D8E2D8] text-xs font-semibold text-[#14241B] cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  removeNode(confirmRemoveSlug)
+                  setConfirmRemoveSlug(null)
+                }}
+                className="px-4 py-2 rounded-lg bg-[#9F1239] hover:bg-[#881337] text-xs font-bold text-white cursor-pointer"
+              >
+                Xác nhận xóa
+              </button>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </section>
   )
 }

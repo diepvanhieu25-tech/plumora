@@ -1,8 +1,9 @@
-"""Pydantic schemas for Phase 3 Assessment v2, Code Sandbox, AI Tutor, and Ebbinghaus."""
+"""Pydantic schemas for Phase 3/v3 Assessment, Playbook Completion, Code Sandbox & Recommendations."""
 
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -54,6 +55,36 @@ class PlacementAnswerResponse(BaseModel):
     initialized_nodes: list[PlacementInitializedNode]
 
 
+class PlaybookCompleteRequest(BaseModel):
+    """Request for POST /api/v2/domains/{domain_slug}/concepts/{slug}/playbook/complete (INV-SEQ-01)."""
+
+    submission_id: uuid.UUID | None = None
+    quick_check_answers: list[dict[str, str]] = Field(default_factory=list)
+
+
+class UpdatedCompetencyOut(BaseModel):
+    """Updated competency & real Ebbinghaus memory state."""
+
+    depth_level_norm: float
+    depth_label: str
+    confidence: float
+    stability_s: float
+    stability_s_before: float | None = None
+    stability_s_after: float | None = None
+    retention_ebbinghaus: float
+    next_review_due_at: datetime | None = None
+
+
+class PlaybookCompleteResponse(BaseModel):
+    """Response for POST /api/v2/domains/{domain_slug}/concepts/{slug}/playbook/complete."""
+
+    domain_slug: str
+    concept_slug: str
+    playbook_completed: bool
+    idempotent_replay: bool = False
+    updated_competency: UpdatedCompetencyOut
+
+
 class AssessmentStartRequest(BaseModel):
     """Request for POST /api/v2/assessments/start."""
 
@@ -92,16 +123,6 @@ class AssessmentSubmitRequest(BaseModel):
     written_explanation: str | None = None
 
 
-class UpdatedCompetencyOut(BaseModel):
-    """Updated competency & Ebbinghaus memory state."""
-
-    depth_level_norm: float
-    depth_label: str
-    confidence: float
-    stability_s: float
-    retention_ebbinghaus: float
-
-
 class TutorFeedbackOut(BaseModel):
     """AI Tutor & Rubric breakdown output."""
 
@@ -124,8 +145,16 @@ class AssessmentSubmitResponse(BaseModel):
     tutor_feedback: TutorFeedbackOut | None = None
 
 
+class AssessmentAbandonResponse(BaseModel):
+    """Response for POST /api/v2/assessments/{session_id}/abandon."""
+
+    session_id: uuid.UUID
+    session_status: str
+    updated_competency: UpdatedCompetencyOut
+
+
 class CodeChallengeOut(BaseModel):
-    """Public Code Challenge payload for SCR-13."""
+    """Public Code Challenge payload."""
 
     challenge_id: uuid.UUID
     concept_slug: str

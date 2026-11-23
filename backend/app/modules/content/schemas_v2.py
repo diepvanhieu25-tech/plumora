@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from datetime import datetime
+
+from pydantic import BaseModel, Field
 
 
 class DomainUserSummary(BaseModel):
@@ -17,7 +19,7 @@ class DomainUserSummary(BaseModel):
 
 
 class DomainListItem(BaseModel):
-    """Summary card for a Knowledge Graph domain (SCR-09)."""
+    """Summary card for a Knowledge Graph domain."""
 
     slug: str
     title: str
@@ -35,7 +37,7 @@ class DomainsListResponse(BaseModel):
 
 
 class DomainRoadmapNode(BaseModel):
-    """Node item in GET /api/v2/domains/{slug}/roadmap (SCR-11)."""
+    """Node item in GET /api/v2/domains/{slug}/roadmap."""
 
     node_idx: int
     slug: str
@@ -43,6 +45,7 @@ class DomainRoadmapNode(BaseModel):
     tier: int
     is_shared: bool
     prerequisites: list[str]
+    prerequisite_titles: list[dict[str, str]] = Field(default_factory=list)
     lesson_markdown: str
     depth_level_norm: float
     depth_label: str
@@ -52,6 +55,10 @@ class DomainRoadmapNode(BaseModel):
     is_eligible: bool
     needs_review: bool
     code_practice_score: float
+    has_code_challenge: bool = False
+    playbook_completed: bool = False
+    last_practiced_at: datetime | None = None
+    next_review_due_at: datetime | None = None
 
 
 class DomainRoadmapResponse(BaseModel):
@@ -61,3 +68,11 @@ class DomainRoadmapResponse(BaseModel):
     domain_title: str
     graph_version: int
     nodes: list[DomainRoadmapNode]
+
+
+class ConceptPlaybookDetailResponse(BaseModel):
+    """Response for GET /api/v2/domains/{domain_slug}/concepts/{concept_slug}."""
+
+    domain_slug: str
+    domain_title: str
+    node: DomainRoadmapNode

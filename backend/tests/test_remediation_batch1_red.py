@@ -51,6 +51,11 @@ def test_f02_depth_probe_rejects_resubmitting_tier1_question_to_climb_tiers() ->
     """F02: Re-submitting Tier 1 question with new submission_id must be rejected once session is at Tier 2."""
     with TestClient(app) as client:
         _register_fresh_user(client, "f02_depth")
+        pb = client.post(
+            "/api/v2/domains/frontend/concepts/fe-dom-events/playbook/complete",
+            json={"submission_id": str(uuid.uuid4())},
+        )
+        assert pb.status_code == 200
         start = client.post(
             "/api/v2/assessments/start",
             json={

@@ -1,9 +1,13 @@
 # Active Session Memory
 
 - **Project:** Plumora — Adaptive Personalized Learning-Path Recommendation & Management using RL.
-- **Current Branch:** `fix/review-remediation-2026-11-20` (uncommitted working tree from `c8b6693`; no commit/push/merge/deploy).
+- **Current Branch:** `main` (merged `refactor/production-arch-ux-v3` after 7/7 `./scripts/ci_check.sh` gates passed).
 - **Phase Status:**
-  - Phase 1 MVP (`v1.0.0`): Completed.
-  - Phase 3 (`v2.0.0` — `D-16`..`D-26`): Completion Review (`C01`–`C05`), Round 3 (`R3-01`–`R3-09`), and `F01`–`F13` remediated; obsolete historical docs, artifacts, and legacy unused frontend files cleaned up for user review.
+  - Phase 1 MVP (`v1.0.0`) & Phase 3 Baseline (`v2.0.0`): Completed.
+  - **Production Architecture & Real-User UX Refactor (`v3.0` — 4-Phase Hybrid Staged Swarm):** **COMPLETED, VERIFIED (7/7 CI Gates PASS) & MERGED TO `main`**.
+    - **Phase 1 (Shared RL Kernel & Hexagonal Backend):** Zero-Torch `plumora_rl.domain` & `plumora_rl.inference` shared with `backend/`, `ContentCatalogPort`/`CompetencyReaderPort`, 3-Phase `SqlAlchemyUnitOfWork`, shared `RedisConnectionProvider`, 4-schema `outbox_events` (`0010` migration) + `SKIP LOCKED` + `DomainGraphUpdatedEvent` consumer, `db-migrate-seed` cold-boot service, `k8s/` env & egress fixes.
+    - **Phase 2 (Sequential Engine & Authentic Content):** `INV-SEQ-01..04` (`playbook/complete`, `abandon -> insufficient_evidence`, Code Sandbox anti-shortcut `INV-SEQ-02`, `PlacementDagNavigator` transitive promotion `0.75`), `TaskGraderRegistry` (bilingual VN-EN + Socratic hints), `BaseSubprocessSandboxRunner` (`setup_sql`, `sqlite3.set_authorizer`, real `ru_maxrss`), Full Expert CRUD + Live Rubric Dry-Run + Dual Sandbox Verification + Cohort Analytics, Admin MLOps (`eval_metrics`, Buffer Summary, Policy Inspector + What-If Clock, Outbox Relay & DLQ), upgraded 3-domain curriculum (`frontend`/`devops` 5-part playbooks >= 2,950 chars, 110 balanced 5-depth questions, 22/22 code challenges).
+    - **Phase 3 (De-Demoed Dual-Portal Frontend):** Strict physical separation of **Web Client** (`LearnerAppShell`, `LearnerAuthPage` with 0 demo buttons/passwords/jargon, `PlaybookQuickDrawer`, `CodeEditorCanvas` Tab/Ctrl+Enter, real `next_review_due_at`) and **Back-Office Console** (`BackOfficeAppShell` 240px sidebar, `BackOfficeLoginPage`, `BackOfficeStudioContext`, Full CRUD Studio, Cohort Heatmap, Live MLOps & Infra Ops), unified `@theme` Botanical Sprout tokens, `ApiDomainError<T>`, URL-driven `useRouter()`.
+    - **Phase 4 (Architectural Fitness Functions & E2E):** 5 Architectural Fitness Functions (`13 tests` in `backend/tests/architecture/`), `10/10` RL pytest, `85/85` Backend pytest, `8/8` Frontend Vitest unit tests, Frontend production build, Live Fullstack Integration, Real Chromium E2E + Negative Control, and Docker Compose config checks — all **EXIT 0**.
 - **Next User Decision Needed:**
-  - Review the cleaned workspace and authorize commit/merge when ready.
+  - Review changes on `refactor/production-arch-ux-v3`, manually verify Web Client & Back-Office flows, and authorize commit/merge to `main` when ready.

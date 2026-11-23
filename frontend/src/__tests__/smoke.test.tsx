@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { App } from '../App'
 
-describe('ENV-01 Frontend Smoke Suite', () => {
-  it('renders the Botanical Sprout Plumora brand logo and zero emoji', () => {
+describe('Plumora Web Client Smoke Suite', () => {
+  it('renders the clean LearnerAuthPage with zero demo buttons and SVG icons', () => {
+    window.history.pushState({}, '', '/login')
     const { container } = render(<App />)
-    expect(screen.getByText(/Plumora — Học thích ứng Đa ngành/i)).toBeInTheDocument()
-    expect(screen.getByTestId('env01-scaffold-ready')).toBeInTheDocument()
-    expect(screen.getAllByAltText(/Plumora Logo/i).length).toBeGreaterThan(0)
+    expect(screen.getByTestId('learner-auth-page')).toBeInTheDocument()
+    expect(screen.getByText(/Plumora Learning/i)).toBeInTheDocument()
+    expect(screen.queryByText(/PlumoraDemo#2026/i)).toBeNull()
+    expect(screen.queryByText(/learner_new/i)).toBeNull()
     expect(container.querySelector('svg')).not.toBeNull()
   })
 })

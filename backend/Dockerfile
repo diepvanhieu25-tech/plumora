@@ -28,10 +28,13 @@ RUN groupadd -g 10001 plumora && \
 # Copy virtual environment from builder
 COPY --from=builder --chown=plumora:plumora /app/.venv /app/.venv
 
-# Copy application code, microservices entrypoints, and RL artifacts
+# Copy application code, microservices entrypoints, shared zero-Torch RL kernel, and RL artifacts
 COPY --chown=plumora:plumora backend/app /app/backend/app
 COPY --chown=plumora:plumora backend/services /app/backend/services
 COPY --chown=plumora:plumora backend/pyproject.toml /app/backend/pyproject.toml
+COPY --chown=plumora:plumora rl/src/plumora_rl/__init__.py /app/backend/plumora_rl/__init__.py
+COPY --chown=plumora:plumora rl/src/plumora_rl/domain /app/backend/plumora_rl/domain
+COPY --chown=plumora:plumora rl/src/plumora_rl/inference /app/backend/plumora_rl/inference
 COPY --chown=plumora:plumora rl/artifacts /app/rl/artifacts
 
 USER plumora

@@ -4,155 +4,171 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any
 
 from fastapi import HTTPException, status
+from plumora_rl.domain import EbbinghausMemoryModel
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db.models import (
-    AssessmentSessionModel,
+    CodeChallengeModel,
     ConceptModel,
     DomainConceptMapModel,
     DomainModel,
     UserConceptMasteryModel,
-    UserNodeCompetencyModel,
 )
 from app.modules.assessment.depth_state_machine import depth_label_for_norm
-from app.modules.assessment.ebbinghaus import (
-    INITIAL_STABILITY_DAYS,
-    compute_elapsed_days,
-    compute_retention,
-    is_review_needed,
-)
 from app.modules.content.schemas_v2 import (
+    ConceptPlaybookDetailResponse,
     DomainListItem,
     DomainRoadmapNode,
     DomainRoadmapResponse,
     DomainsListResponse,
     DomainUserSummary,
 )
-from app.modules.events.internal_client import (
-    assessment_service_url,
-    fetch_user_competencies_internal,
-)
+from app.modules.contracts.adapters import get_competency_reader_port
+from app.modules.contracts.dtos import UserCompetencySnapshotDTO, UserNodeCompetencyDTO
+from app.modules.contracts.ports import CompetencyReaderPort
+
+
+def _overlay_mvp_mastery_readonly(
+    db: Session,
+    user_id: uuid.UUID,
+    comp_map: dict[str, UserNodeCompetencyDTO],
+) -> dict[str, UserNodeCompetencyDTO]:
+    """Overlay legacy MVP user_concept_mastery rows in memory without mutating or committing DB."""
+    try:
+        mvp_rows = db.execute(
+            select(UserConceptMasteryModel, ConceptModel.slug)
+            .join(ConceptModel, ConceptModel.action_id == UserConceptMasteryModel.concept_action_id)
+            .where(UserConceptMasteryModel.user_id == user_id)
+        ).all()
+    except SQLAlchemyError:
+        db.rollback()
+        return comp_map
+
+    merged = dict(comp_map)
+    for mastery_row, slug in mvp_rows:
+        score = float(mastery_row.mastery_score)
+        if score <= 0.0:
+            continue
+        existing = merged.get(slug)
+        if existing is None:
+            merged[slug] = UserNodeCompetencyDTO(
+                concept_slug=slug,
+                depth_level_norm=score,
+                peak_depth_level_norm=score,
+                depth_label=depth_label_for_norm(score),
+                confidence=0.85 if score >= 0.75 else 0.65,
+                stability_s=EbbinghausMemoryModel.INITIAL_STABILITY_DAYS,
+                last_practiced_at=mastery_row.updated_at or datetime.now(UTC),
+                playbook_completed_at=mastery_row.updated_at or datetime.now(UTC),
+                code_practice_score=0.0,
+            )
+        elif score > existing.depth_level_norm:
+            merged[slug] = UserNodeCompetencyDTO(
+                concept_slug=slug,
+                depth_level_norm=score,
+                peak_depth_level_norm=max(existing.peak_depth_level_norm, score),
+                depth_label=depth_label_for_norm(score),
+                confidence=max(existing.confidence, 0.85 if score >= 0.75 else 0.65),
+                stability_s=existing.stability_s,
+                last_practiced_at=existing.last_practiced_at or mastery_row.updated_at or datetime.now(UTC),
+                playbook_completed_at=existing.playbook_completed_at or mastery_row.updated_at or datetime.now(UTC),
+                code_practice_score=existing.code_practice_score,
+            )
+    return merged
 
 
 def sync_mvp_mastery_to_v2_competency(db: Session, user_id: uuid.UUID) -> None:
-    """Sync existing MVP user_concept_mastery rows into user_node_competency (batch, anti-N+1)."""
-    mvp_rows = db.execute(
-        select(UserConceptMasteryModel, ConceptModel.slug)
-        .join(ConceptModel, ConceptModel.action_id == UserConceptMasteryModel.concept_action_id)
-        .where(UserConceptMasteryModel.user_id == user_id)
-    ).all()
-
-    positive_rows = [(m, slug) for m, slug in mvp_rows if m.mastery_score > 0.0]
-    if not positive_rows:
-        return
-
-    slugs = [slug for _, slug in positive_rows]
-    existing_rows = db.scalars(
-        select(UserNodeCompetencyModel).where(
-            UserNodeCompetencyModel.user_id == user_id,
-            UserNodeCompetencyModel.concept_slug.in_(slugs),
-        )
-    ).all()
-    existing_map = {r.concept_slug: r for r in existing_rows}
-
-    changed = False
-    for mastery_row, slug in positive_rows:
-        comp = existing_map.get(slug)
-        if comp is None:
-            comp = UserNodeCompetencyModel(
-                user_id=user_id,
-                concept_slug=slug,
-                depth_level_norm=mastery_row.mastery_score,
-                peak_depth_level_norm=mastery_row.mastery_score,
-                depth_label=depth_label_for_norm(mastery_row.mastery_score),
-                confidence=0.85 if mastery_row.mastery_score >= 0.75 else 0.65,
-                stability_s=INITIAL_STABILITY_DAYS,
-                last_practiced_at=mastery_row.updated_at or datetime.now(UTC),
-                code_practice_score=0.0,
-            )
-            db.add(comp)
-            existing_map[slug] = comp
-            changed = True
-        elif mastery_row.mastery_score > comp.depth_level_norm:
-            comp.depth_level_norm = mastery_row.mastery_score
-            comp.peak_depth_level_norm = max(comp.peak_depth_level_norm, mastery_row.mastery_score)
-            comp.depth_label = depth_label_for_norm(mastery_row.mastery_score)
-            if comp.last_practiced_at is None:
-                comp.last_practiced_at = mastery_row.updated_at or datetime.now(UTC)
-            changed = True
-
-    if changed:
-        db.commit()
+    """Backward-compatible no-op for read paths (MVP overlay is strictly read-only now)."""
+    _ = (db, user_id)
 
 
-def _competency_from_dict(user_id: uuid.UUID, item: dict[str, Any]) -> UserNodeCompetencyModel:
-    lp_raw = item.get("last_practiced_at")
-    lp_dt = datetime.fromisoformat(str(lp_raw)) if lp_raw else None
-    return UserNodeCompetencyModel(
-        user_id=user_id,
-        concept_slug=str(item["concept_slug"]),
-        depth_level_norm=float(item["depth_level_norm"]),
-        peak_depth_level_norm=float(item["peak_depth_level_norm"]),
-        depth_label=str(item["depth_label"]),
-        confidence=float(item["confidence"]),
-        stability_s=float(item["stability_s"]),
-        last_practiced_at=lp_dt,
-        code_practice_score=float(item.get("code_practice_score", 0.0)),
+def _load_user_snapshot(
+    db: Session,
+    user_id: uuid.UUID,
+    competency_port: CompetencyReaderPort | None = None,
+) -> tuple[UserCompetencySnapshotDTO, dict[str, UserNodeCompetencyDTO]]:
+    port = competency_port or get_competency_reader_port(db)
+    snapshot = port.get_user_competency_snapshot(user_id)
+    comp_map = _overlay_mvp_mastery_readonly(db, user_id, snapshot.by_slug())
+    return snapshot, comp_map
+
+
+def _build_roadmap_node(
+    n: DomainConceptMapModel,
+    comp_map: dict[str, UserNodeCompetencyDTO],
+    title_by_slug: dict[str, str],
+    challenge_slugs: set[str],
+    effective_offset: float,
+) -> DomainRoadmapNode:
+    c = comp_map.get(n.concept_slug)
+    depth_norm = c.depth_level_norm if c is not None else 0.0
+    depth_lbl = c.depth_label if c is not None else "Untested / Below Surface"
+    confidence = c.confidence if c is not None else 0.0
+    stability_s = c.stability_s if c is not None else EbbinghausMemoryModel.INITIAL_STABILITY_DAYS
+    code_score = c.code_practice_score if c is not None else 0.0
+    last_practiced = c.last_practiced_at if c is not None else None
+    playbook_done = (c is not None and c.playbook_completed_at is not None) or depth_norm >= 0.25
+
+    if c is not None and last_practiced is not None and depth_norm >= EbbinghausMemoryModel.MIN_DEPTH_FOR_RETENTION:
+        dt = EbbinghausMemoryModel.compute_elapsed_days(last_practiced, effective_offset)
+        ret = EbbinghausMemoryModel.compute_retention(dt, stability_s)
+    else:
+        ret = 1.0
+
+    prereqs = list(n.prerequisites_json or [])
+    prereq_titles = [{"slug": p, "title": title_by_slug.get(p, p)} for p in prereqs]
+    eligible = all(
+        (comp_map.get(p) is not None and comp_map[p].depth_level_norm >= 0.75)
+        for p in prereqs
+    )
+    review_flag = EbbinghausMemoryModel.is_review_needed(depth_norm, ret)
+    next_due = EbbinghausMemoryModel.compute_next_review_due_at(
+        last_practiced, stability_s, depth_norm
+    )
+
+    return DomainRoadmapNode(
+        node_idx=n.node_idx,
+        slug=n.concept_slug,
+        title=n.title,
+        tier=n.tier,
+        is_shared=n.is_shared,
+        prerequisites=prereqs,
+        prerequisite_titles=prereq_titles,
+        lesson_markdown=n.lesson_markdown,
+        depth_level_norm=round(depth_norm, 4),
+        depth_label=depth_lbl,
+        confidence=round(confidence, 4),
+        stability_s=round(stability_s, 4),
+        retention_ebbinghaus=round(ret, 4),
+        is_eligible=eligible,
+        needs_review=review_flag,
+        code_practice_score=round(code_score, 4),
+        has_code_challenge=n.concept_slug in challenge_slugs,
+        playbook_completed=playbook_done,
+        last_practiced_at=last_practiced,
+        next_review_due_at=next_due,
     )
 
 
-def _load_user_competencies(db: Session, user_id: uuid.UUID) -> dict[str, UserNodeCompetencyModel]:
-    if assessment_service_url():
-        items = fetch_user_competencies_internal(user_id)
-        if items is not None:
-            return {str(it["concept_slug"]): _competency_from_dict(user_id, it) for it in items}
-    try:
-        sync_mvp_mastery_to_v2_competency(db, user_id)
-        rows = db.scalars(
-            select(UserNodeCompetencyModel).where(UserNodeCompetencyModel.user_id == user_id)
-        ).all()
-        return {r.concept_slug: r for r in rows}
-    except SQLAlchemyError:
-        db.rollback()
-        items = fetch_user_competencies_internal(user_id) or []
-        return {str(it["concept_slug"]): _competency_from_dict(user_id, it) for it in items}
-
-
-def list_domains_for_user(db: Session, user_id: uuid.UUID) -> DomainsListResponse:
-    """List all published domains with cross-domain node counts and user summary (batch, anti-N+1)."""
+def list_domains_for_user(
+    db: Session,
+    user_id: uuid.UUID,
+    competency_port: CompetencyReaderPort | None = None,
+) -> DomainsListResponse:
+    """List all published domains with cross-domain node counts and user summary (read-only)."""
     domains = db.scalars(
         select(DomainModel)
         .where(DomainModel.is_published.is_(True))
         .order_by(DomainModel.slug)
         .limit(100)
     ).all()
-    comp_map = _load_user_competencies(db, user_id)
-
-    if assessment_service_url():
-        completed_placements = set()
-    else:
-        try:
-            completed_placements = set(
-                db.scalars(
-                    select(AssessmentSessionModel.domain_slug)
-                    .distinct()
-                    .where(
-                        AssessmentSessionModel.user_id == user_id,
-                        AssessmentSessionModel.session_mode == "placement",
-                        AssessmentSessionModel.status == "completed",
-                    )
-                    .limit(100)
-                ).all()
-            )
-        except SQLAlchemyError:
-            db.rollback()
-            completed_placements = set()
+    snapshot, comp_map = _load_user_snapshot(db, user_id, competency_port)
+    completed_placements = set(snapshot.completed_placement_domains)
 
     domain_slugs = [d.slug for d in domains]
     all_nodes = (
@@ -169,7 +185,6 @@ def list_domains_for_user(db: Session, user_id: uuid.UUID) -> DomainsListRespons
         nodes_by_domain.setdefault(node.domain_slug, []).append(node)
 
     items: list[DomainListItem] = []
-    # Preferred display order: backend, frontend, devops, then alphabetical
     order_rank = {"backend": 0, "frontend": 1, "devops": 2}
     sorted_domains = sorted(domains, key=lambda d: (order_rank.get(d.slug, 99), d.slug))
 
@@ -195,10 +210,11 @@ def list_domains_for_user(db: Session, user_id: uuid.UUID) -> DomainsListRespons
             else:
                 surface += 1
 
-            dt = compute_elapsed_days(c.last_practiced_at, 0.0)
-            ret = compute_retention(dt, c.stability_s)
-            if is_review_needed(c.depth_level_norm, ret):
-                needs_rev += 1
+            if c.last_practiced_at is not None and c.depth_level_norm >= EbbinghausMemoryModel.MIN_DEPTH_FOR_RETENTION:
+                dt = EbbinghausMemoryModel.compute_elapsed_days(c.last_practiced_at, 0.0)
+                ret = EbbinghausMemoryModel.compute_retention(dt, c.stability_s)
+                if EbbinghausMemoryModel.is_review_needed(c.depth_level_norm, ret):
+                    needs_rev += 1
 
         items.append(
             DomainListItem(
@@ -227,6 +243,7 @@ def get_domain_roadmap_for_user(
     user_id: uuid.UUID,
     domain_slug: str,
     simulated_time_offset_days: float = 0.0,
+    competency_port: CompetencyReaderPort | None = None,
 ) -> DomainRoadmapResponse:
     """Return full domain DAG roadmap with cross-domain competency & Ebbinghaus retention."""
     domain = db.get(DomainModel, domain_slug)
@@ -250,53 +267,91 @@ def get_domain_roadmap_for_user(
         .where(DomainConceptMapModel.domain_slug == domain_slug)
         .order_by(DomainConceptMapModel.node_idx)
     ).all()
-    comp_map = _load_user_competencies(db, user_id)
-
-    roadmap_nodes: list[DomainRoadmapNode] = []
-    for n in nodes:
-        c = comp_map.get(n.concept_slug)
-        depth_norm = c.depth_level_norm if c is not None else 0.0
-        depth_lbl = c.depth_label if c is not None else "Untested / Below Surface"
-        confidence = c.confidence if c is not None else 0.0
-        stability_s = c.stability_s if c is not None else INITIAL_STABILITY_DAYS
-        code_score = c.code_practice_score if c is not None else 0.0
-
-        if c is not None and c.last_practiced_at is not None and depth_norm >= 0.25:
-            dt = compute_elapsed_days(c.last_practiced_at, effective_offset)
-            ret = compute_retention(dt, stability_s)
-        else:
-            ret = 1.0
-
-        prereqs = list(n.prerequisites_json)
-        eligible = all(
-            (comp_map.get(p) is not None and comp_map[p].depth_level_norm >= 0.75)
-            for p in prereqs
+    slugs = [n.concept_slug for n in nodes]
+    challenge_slugs = (
+        set(
+            db.scalars(
+                select(CodeChallengeModel.concept_slug).where(
+                    CodeChallengeModel.concept_slug.in_(slugs),
+                    CodeChallengeModel.is_active.is_(True),
+                )
+            ).all()
         )
-        review_flag = is_review_needed(depth_norm, ret)
+        if slugs
+        else set()
+    )
+    title_by_slug = {n.concept_slug: n.title for n in nodes}
+    _, comp_map = _load_user_snapshot(db, user_id, competency_port)
 
-        roadmap_nodes.append(
-            DomainRoadmapNode(
-                node_idx=n.node_idx,
-                slug=n.concept_slug,
-                title=n.title,
-                tier=n.tier,
-                is_shared=n.is_shared,
-                prerequisites=prereqs,
-                lesson_markdown=n.lesson_markdown,
-                depth_level_norm=round(depth_norm, 4),
-                depth_label=depth_lbl,
-                confidence=round(confidence, 4),
-                stability_s=round(stability_s, 4),
-                retention_ebbinghaus=round(ret, 4),
-                is_eligible=eligible,
-                needs_review=review_flag,
-                code_practice_score=round(code_score, 4),
-            )
-        )
+    roadmap_nodes = [
+        _build_roadmap_node(n, comp_map, title_by_slug, challenge_slugs, effective_offset)
+        for n in nodes
+    ]
 
     return DomainRoadmapResponse(
         domain_slug=domain.slug,
         domain_title=domain.title,
         graph_version=domain.graph_version,
         nodes=roadmap_nodes,
+    )
+
+
+def get_concept_playbook_detail(
+    db: Session,
+    user_id: uuid.UUID,
+    domain_slug: str,
+    concept_slug: str,
+    competency_port: CompetencyReaderPort | None = None,
+) -> ConceptPlaybookDetailResponse:
+    """Return single concept playbook and learner competency state strictly by (domain_slug, concept_slug)."""
+    domain = db.get(DomainModel, domain_slug)
+    if domain is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error_code": "DOMAIN_NOT_FOUND",
+                "message": f"Domain '{domain_slug}' does not exist.",
+            },
+        )
+    node = db.get(DomainConceptMapModel, (domain_slug, concept_slug))
+    if node is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error_code": "CONCEPT_NOT_FOUND",
+                "message": f"Concept '{concept_slug}' does not exist in domain '{domain_slug}'.",
+            },
+        )
+
+    prereqs = list(node.prerequisites_json or [])
+    prereq_rows = (
+        db.scalars(
+            select(DomainConceptMapModel).where(
+                DomainConceptMapModel.domain_slug == domain_slug,
+                DomainConceptMapModel.concept_slug.in_(prereqs),
+            )
+        ).all()
+        if prereqs
+        else []
+    )
+    title_by_slug = {r.concept_slug: r.title for r in prereq_rows}
+    title_by_slug[node.concept_slug] = node.title
+
+    has_ch = (
+        db.scalars(
+            select(CodeChallengeModel.id).where(
+                CodeChallengeModel.concept_slug == concept_slug,
+                CodeChallengeModel.is_active.is_(True),
+            )
+        ).first()
+        is not None
+    )
+    challenge_slugs = {concept_slug} if has_ch else set()
+    _, comp_map = _load_user_snapshot(db, user_id, competency_port)
+
+    node_out = _build_roadmap_node(node, comp_map, title_by_slug, challenge_slugs, 0.0)
+    return ConceptPlaybookDetailResponse(
+        domain_slug=domain.slug,
+        domain_title=domain.title,
+        node=node_out,
     )

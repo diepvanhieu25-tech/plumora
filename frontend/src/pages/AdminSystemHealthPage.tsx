@@ -6,12 +6,22 @@ import {
   Database,
   FileText,
   Layers,
-  Lock,
+  Loader2,
+  Play,
   RefreshCw,
+  ShieldAlert,
   Zap,
 } from 'lucide-react'
-import { apiAdminGetSystemHealth } from '../api'
-import type { SystemHealthResponse } from '../types'
+import {
+  apiAdminGetStreamsDlq,
+  apiAdminGetSystemHealth,
+  apiAdminTriggerOutboxRelay,
+} from '../api'
+import type {
+  ManualOutboxRelayResponse,
+  StreamsDlqResponse,
+  SystemHealthResponse,
+} from '../types/admin'
 
 const SERVICE_META: Array<{
   key: string
@@ -20,7 +30,6 @@ const SERVICE_META: Array<{
   port: string
   schema: string
   role: string
-  outboxEvent: string
 }> = [
   {
     key: 'auth',
@@ -28,8 +37,7 @@ const SERVICE_META: Array<{
     label: 'user-auth-service',
     port: '8001',
     schema: 'auth_svc',
-    role: 'Argon2id + HttpOnly Session & RBAC',
-    outboxEvent: 'UserRegisteredEvent',
+    role: 'Xác thực Argon2id, HttpOnly Session & RBAC',
   },
   {
     key: 'content_kg',
@@ -37,8 +45,7 @@ const SERVICE_META: Array<{
     label: 'content-kg-service',
     port: '8002',
     schema: 'content_svc',
-    role: 'Kahn Topological DAG (Multi-Domain)',
-    outboxEvent: 'DomainGraphPublishedEvent',
+    role: 'Đồ thị Kiến thức Đa lĩnh vực, Câu hỏi 5 tầng & Rubric',
   },
   {
     key: 'assessment_grader',
@@ -46,8 +53,7 @@ const SERVICE_META: Array<{
     label: 'assessment-grader-service',
     port: '8003',
     schema: 'assess_svc',
-    role: 'Sandbox Worker + Rubric Grader',
-    outboxEvent: 'CompetencyUpdatedEvent',
+    role: '5-Depth State Machine, Code Sandbox Worker & Ebbinghaus',
   },
   {
     key: 'recommendation_ai',
@@ -55,8 +61,7 @@ const SERVICE_META: Array<{
     label: 'recommendation-ai-service',
     port: '8004',
     schema: 'rec_ai_svc',
-    role: 'Masked GNN-PPO + Policy Guardrail',
-    outboxEvent: 'CandidateModelReadyEvent',
+    role: 'Suy luận GNN-PPO, Policy Guardrail & Safe Online RL',
   },
 ]
 
@@ -72,6 +77,12 @@ export function AdminSystemHealthPage() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Actionable Ops Controls: Manual Outbox Relay & DLQ Inspector
+  const [relaying, setRelaying] = useState(false)
+  const [relayStats, setRelayStats] = useState<ManualOutboxRelayResponse | null>(null)
+  const [loadingDlq, setLoadingDlq] = useState(false)
+  const [dlqData, setDlqData] = useState<StreamsDlqResponse | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -93,448 +104,322 @@ export function AdminSystemHealthPage() {
     void load()
   }, [load])
 
+  async function handleRelayOutbox() {
+    setRelaying(true)
+    setError(null)
+    try {
+      const res = await apiAdminTriggerOutboxRelay()
+      setRelayStats(res)
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Lỗi đẩy bù sự kiện Outbox')
+    } finally {
+      setRelaying(false)
+    }
+  }
+
+  async function handleInspectDlq() {
+    setLoadingDlq(true)
+    setError(null)
+    try {
+      const res = await apiAdminGetStreamsDlq(50)
+      setDlqData(res)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Lỗi đọc Dead-Letter Queue')
+    } finally {
+      setLoadingDlq(false)
+    }
+  }
+
   const serviceEntries = health ? Object.entries(health.services) : []
   const healthyCount = serviceEntries.filter(([, st]) => isServiceHealthy(st)).length
   const totalServices = Math.max(serviceEntries.length, SERVICE_META.length)
+  const outboxByType = health?.outbox_pending_by_event_type ?? {}
+  const streamLengths = health?.stream_lengths_by_event_type ?? {}
+  const eventTypes = Array.from(
+    new Set(['CompetencyUpdatedEvent', 'DomainGraphUpdatedEvent', ...Object.keys(outboxByType)]),
+  )
 
   return (
     <section
-      className="w-full px-4 sm:px-6 lg:px-10 py-6 space-y-8 max-w-[1720px] mx-auto"
+      className="w-full space-y-6 text-[#14241B]"
       data-testid="scr20-admin-health"
     >
-      {/* Section 1: Breadcrumb & Page Header (Stitch SCR-20) */}
-      <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-6 pb-6 border-b border-surface-container-high">
-        <div className="space-y-2">
-          <nav
-            aria-label="Breadcrumbs"
-            className="flex items-center gap-2 text-xs font-label text-on-surface-variant flex-wrap"
-          >
-            <span>Quản trị Hệ thống</span>
-            <span className="text-outline-variant font-mono">/</span>
-            <span>Kiến trúc Phân tán</span>
-            <span className="text-outline-variant font-mono">/</span>
-            <span className="text-primary font-medium">
-              Cụm 4 Microservices &amp; Outbox Health
-            </span>
-          </nav>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl lg:text-3xl font-headline font-bold text-on-surface tracking-tight">
-              Giám sát Cụm 4 Microservices, Transactional Outbox &amp; Hạ tầng K8s
-            </h1>
-            {health && (
-              <span
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-medium ${
-                  healthyCount === totalServices
-                    ? 'bg-primary-container text-on-primary-container'
-                    : 'bg-[#FFFBEB] text-[#92400E]'
-                }`}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                {healthyCount}/{totalServices} Ready
-              </span>
-            )}
-          </div>
-
-          <p className="text-sm text-on-surface-variant font-body max-w-4xl">
-            Kiểm soát tính độc lập Database Schema, Độ trễ Redis Streams Event Bus, Idempotency và Trạng thái hạ tầng theo chuẩn Kiến trúc Phân tán Plumora.
+      {/* Header */}
+      <div className="bg-white rounded-2xl border border-[#D8E2D8] p-5 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-extrabold text-[#14241B] tracking-tight">
+            Giám sát Hạ tầng, 4 Microservices &amp; Transactional Outbox / DLQ
+          </h1>
+          <p className="text-xs text-[#3F5247] mt-1">
+            Dữ liệu thăm dò trực tiếp từ CSDL, Redis Streams và các dịch vụ thành phần — kèm công cụ đẩy bù Outbox và thanh tra DLQ.
           </p>
           {lastUpdated && (
-            <p className="text-xs text-on-surface-variant font-label">
-              Cập nhật lúc <span className="font-mono">{lastUpdated}</span> • Độ trễ API thực tế:{' '}
-              <span className="font-mono">{latencyMs ?? 0} ms</span>
+            <p className="text-[11px] font-mono text-[#57534E] mt-1">
+              Cập nhật lúc {lastUpdated} • Độ trễ API: {latencyMs ?? 0}ms
             </p>
           )}
         </div>
 
-        {/* Right Header Action Group */}
-        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={relaying}
+            onClick={() => void handleRelayOutbox()}
+            data-testid="trigger-outbox-relay-btn"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#15803D] hover:bg-[#166534] disabled:opacity-45 text-white text-xs font-bold cursor-pointer"
+          >
+            {relaying ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+            ) : (
+              <Play className="w-3.5 h-3.5" aria-hidden="true" />
+            )}
+            <span>Đẩy bù Outbox (Relay)</span>
+          </button>
+
+          <button
+            type="button"
+            disabled={loadingDlq}
+            onClick={() => void handleInspectDlq()}
+            data-testid="inspect-dlq-btn"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#FFFBEB] border border-[#F59E0B] text-[#78350F] hover:bg-[#FEF3C7] text-xs font-bold cursor-pointer"
+          >
+            <ShieldAlert className="w-3.5 h-3.5 text-[#D97706]" aria-hidden="true" />
+            <span>Kiểm tra DLQ ({health?.dlq_count ?? 0})</span>
+          </button>
+
           <button
             type="button"
             onClick={() => void load()}
-            className="inline-flex items-center gap-2 px-4 min-h-[44px] sm:min-h-[38px] rounded-lg bg-primary hover:bg-primary-dim text-on-primary font-medium text-xs shadow-sm transition-all cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#F6F8F5] border border-[#D8E2D8] hover:bg-[#F0FDF4] text-xs font-semibold cursor-pointer"
           >
-            <RefreshCw className="w-4 h-4" aria-hidden="true" />
-            <span>Làm mới Trạng thái</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
+            <span>Làm mới</span>
           </button>
         </div>
       </div>
 
-      {/* Error State */}
-      {error && !loading && (
+      {error && (
         <div
           role="alert"
-          className="p-4 rounded-xl bg-[#FEF2F2] border border-[#FECACA] text-xs font-bold text-[#991B1B] flex flex-wrap items-center justify-between gap-3"
+          className="p-3.5 rounded-xl bg-[#FFF1F2] border border-[#FDA4AF] text-xs font-bold text-[#9F1239] flex items-center gap-2"
         >
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
-            <span>{error}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => void load()}
-            className="px-3 py-1.5 rounded-lg bg-white border border-[#FECACA] text-[#991B1B] hover:bg-[#FEE2E2] cursor-pointer"
-          >
-            Thử lại
-          </button>
+          <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
 
-      {/* Loading Skeleton */}
-      {loading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {[0, 1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="h-36 rounded-xl bg-surface-container-lowest border border-outline-variant/20 animate-pulse"
-            />
-          ))}
+      {relayStats && (
+        <div
+          role="status"
+          className="p-3.5 rounded-xl bg-[#F0FDF4] border border-[#86EFAC] text-xs font-mono text-[#14532D] flex items-center gap-2"
+        >
+          <CheckCircle2 className="w-4 h-4 text-[#15803D] shrink-0" aria-hidden="true" />
+          <span>
+            Outbox Relay hoàn tất: relayed={relayStats.relayed}, consumed={relayStats.consumed},
+            acked={relayStats.acked}, reclaimed={relayStats.reclaimed}, dlq={relayStats.dlq}.
+          </span>
         </div>
       )}
 
-      {/* Section 2: Top Overview Key Metric Cards */}
       {!loading && health && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {/* Card 1 */}
-            <div className="p-5 rounded-xl bg-surface-container-lowest shadow-sm border border-outline-variant/15 flex flex-col justify-between space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-label uppercase tracking-wider text-on-surface-variant">
-                  {health.mode === 'monolith' ? 'Modules (Monolith)' : 'Tổng số Microservices'}
+          {/* 4 Metric Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-5 rounded-xl bg-white border border-[#D8E2D8] shadow-xs space-y-2">
+              <div className="flex items-center justify-between text-xs text-[#57534E]">
+                <span className="font-bold uppercase">
+                  {health.mode === 'monolith' ? 'Chế độ Monolith' : 'Cụm Microservices'}
                 </span>
-                <div className="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary">
-                  <Layers className="w-4 h-4" aria-hidden="true" />
-                </div>
+                <Layers className="w-4 h-4 text-[#15803D]" aria-hidden="true" />
               </div>
-              <div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-headline font-bold text-on-surface tracking-tight">
-                    {healthyCount} / {totalServices}
-                  </span>
-                  <span className="text-xs font-semibold text-primary">
-                    {health.mode === 'monolith' ? 'In-Process' : 'Active'}
-                  </span>
-                </div>
-                <p className="text-xs text-on-surface-variant mt-1">
-                  Trạng thái kết nối các module dịch vụ
-                </p>
+              <div className="text-3xl font-extrabold font-mono">
+                {healthyCount} / {totalServices}
               </div>
-              <div className="pt-3 border-t border-surface-container flex items-center justify-between text-[11px] font-mono">
-                <span className="text-on-surface-variant">Multi-Schema</span>
-                <span
-                  className={`px-2 py-0.5 rounded font-semibold ${
-                    health.schemas_isolated
-                      ? 'bg-primary-container text-on-primary-container'
-                      : 'bg-[#FFFBEB] text-[#92400E]'
-                  }`}
-                >
-                  {health.schemas_isolated ? 'Schema Isolated' : 'Unverified'}
-                </span>
+              <div className="text-[11px] font-mono text-[#57534E]">
+                CSDL: <strong>{health.db_dialect ?? 'unknown'}</strong> • Cô lập 4 schema:{' '}
+                <strong className={health.schemas_isolated ? 'text-[#15803D]' : 'text-[#D97706]'}>
+                  {health.schemas_isolated ? 'Verified (PostgreSQL)' : 'Chưa bật cô lập'}
+                </strong>
               </div>
             </div>
 
-            {/* Card 2 */}
-            <div className="p-5 rounded-xl bg-surface-container-lowest shadow-sm border border-outline-variant/15 flex flex-col justify-between space-y-4">
-              <div className="flex items-center justify-between">
-                  <span className="text-xs font-label uppercase tracking-wider text-on-surface-variant">
-                    Redis Ping &amp; Stream Pending
-                  </span>
-                  <div className="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-secondary">
-                    <Zap className="w-4 h-4" aria-hidden="true" />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-headline font-bold text-secondary tracking-tight">
-                      {health.redis_stream_lag_ms != null && health.redis_stream_lag_ms >= 0
-                        ? `${health.redis_stream_lag_ms}ms`
-                        : 'Unknown'}
-                    </span>
-                    <span className="text-xs font-semibold text-secondary">
-                      {health.consumer_group_active
-                        ? `Pending: ${health.redis_stream_pending != null && health.redis_stream_pending >= 0 ? health.redis_stream_pending : 'Unknown'}`
-                        : 'Consumer: Unverified'}
-                    </span>
-                  </div>
-                <p className="text-xs text-on-surface-variant mt-1">
-                  {health.redis_connected
-                    ? 'Redis 7 đã kết nối ổn định'
-                    : 'Redis mất kết nối — chạy fallback'}
-                </p>
+            <div className="p-5 rounded-xl bg-white border border-[#D8E2D8] shadow-xs space-y-2">
+              <div className="flex items-center justify-between text-xs text-[#57534E]">
+                <span className="font-bold uppercase">Redis Streams &amp; Độ trễ</span>
+                <Zap className="w-4 h-4 text-[#0D9488]" aria-hidden="true" />
               </div>
-              <div className="pt-3 border-t border-surface-container flex items-center justify-between text-[11px] font-mono">
-                <span className="text-on-surface-variant">Realtime Event Bus</span>
-                <span
-                  className={`px-2 py-0.5 rounded font-semibold ${
-                    health.redis_connected
-                      ? 'bg-secondary-container text-on-secondary-container'
-                      : 'bg-[#FEE2E2] text-[#991B1B]'
-                  }`}
-                >
-                  {health.redis_connected ? 'Connected' : 'Disconnected'}
-                </span>
+              <div className="text-3xl font-extrabold font-mono text-[#0D9488]">
+                {health.redis_stream_lag_ms >= 0 ? `${health.redis_stream_lag_ms}ms` : 'N/A'}
+              </div>
+              <div className="text-[11px] font-mono text-[#57534E]">
+                {health.redis_connected ? 'Redis Connected' : 'Redis Disconnected'} • p95 C2C:{' '}
+                {health.outbox_commit_to_consume_p95_ms != null
+                  ? `${health.outbox_commit_to_consume_p95_ms}ms`
+                  : '--'}
               </div>
             </div>
 
-            {/* Card 3 */}
-            <div className="p-5 rounded-xl bg-surface-container-lowest shadow-sm border border-outline-variant/15 flex flex-col justify-between space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-label uppercase tracking-wider text-on-surface-variant">
-                  Hàng đợi Outbox Tồn đọng
-                </span>
-                <div className="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary">
-                  <FileText className="w-4 h-4" aria-hidden="true" />
-                </div>
+            <div className="p-5 rounded-xl bg-white border border-[#D8E2D8] shadow-xs space-y-2">
+              <div className="flex items-center justify-between text-xs text-[#57534E]">
+                <span className="font-bold uppercase">Outbox Tồn đọng &amp; DLQ</span>
+                <FileText className="w-4 h-4 text-[#15803D]" aria-hidden="true" />
               </div>
-              <div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-headline font-bold text-on-surface tracking-tight">
-                    {health.outbox_pending_count >= 0 ? health.outbox_pending_count : 'Unknown'}
-                  </span>
-                  <span className="text-xs font-semibold text-primary">bản ghi</span>
-                </div>
-                <p className="text-xs text-on-surface-variant mt-1">
-                  Transactional Outbox đồng bộ sự kiện
-                </p>
+              <div className="text-3xl font-extrabold font-mono">
+                {health.outbox_pending_count >= 0 ? health.outbox_pending_count : 'Unknown'}
               </div>
-              <div className="pt-3 border-t border-surface-container flex items-center justify-between text-[11px] font-mono">
-                <span className="text-on-surface-variant">Trạng thái Outbox</span>
-                <span className="px-2 py-0.5 rounded bg-primary-container text-on-primary-container font-semibold">
-                  Transactional Outbox
-                </span>
+              <div className="text-[11px] font-mono text-[#57534E]">
+                Bản tin lỗi DLQ:{' '}
+                <strong className={(health.dlq_count ?? 0) > 0 ? 'text-[#9F1239]' : 'text-[#15803D]'}>
+                  {health.dlq_count ?? 0}
+                </strong>
               </div>
             </div>
 
-            {/* Card 4 */}
-            <div className="p-5 rounded-xl bg-surface-container-lowest shadow-sm border border-outline-variant/15 flex flex-col justify-between space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-label uppercase tracking-wider text-on-surface-variant">
-                  Cache Hit Graph-State
-                </span>
-                <div className="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-tertiary">
-                  <BarChart3 className="w-4 h-4" aria-hidden="true" />
-                </div>
+            <div className="p-5 rounded-xl bg-white border border-[#D8E2D8] shadow-xs space-y-2">
+              <div className="flex items-center justify-between text-xs text-[#57534E]">
+                <span className="font-bold uppercase">Graph-State Cache Hit</span>
+                <BarChart3 className="w-4 h-4 text-[#D97706]" aria-hidden="true" />
               </div>
-              <div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-headline font-bold text-on-surface tracking-tight">
-                    {(health.graph_cache_hit_rate * 100).toFixed(1)}%
-                  </span>
-                  <span className="text-xs font-semibold text-tertiary">Cache Rate</span>
-                </div>
-                <p className="text-xs text-on-surface-variant mt-1">
-                  Tỷ lệ trúng bộ nhớ đệm Redis Graph State
-                </p>
+              <div className="text-3xl font-extrabold font-mono">
+                {(health.graph_cache_hit_rate * 100).toFixed(1)}%
               </div>
-              <div className="pt-3 border-t border-surface-container flex items-center justify-between text-[11px] font-mono">
-                <span className="text-on-surface-variant">API Latency</span>
-                <span className="px-2 py-0.5 rounded bg-surface-container-high text-on-surface font-semibold">
-                  {latencyMs ?? 0}ms
-                </span>
+              <div className="text-[11px] font-mono text-[#57534E]">
+                RL Checkpoint:{' '}
+                <strong className={health.rl_checkpoint_verified ? 'text-[#15803D]' : 'text-[#9F1239]'}>
+                  {health.rl_checkpoint_verified ? 'SHA-256 OK' : 'Missing / Fallback'}
+                </strong>
               </div>
             </div>
           </div>
 
-          {/* Section 3: 4 Microservices Health & Schema Ownership Cards */}
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-lg font-headline font-bold text-on-surface">
-                  Trạng thái Cụm 4 Microservices &amp; Schema Ownership
-                </h2>
-                <span className="text-xs font-mono text-on-surface-variant">
-                  (Strict Database Isolation • Không Cross-Schema JOIN)
-                </span>
-              </div>
-            </div>
+          {/* 4 Services Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {SERVICE_META.map((svc) => {
+              const rawStatus = health.services[svc.key] ?? 'unknown'
+              const ok = isServiceHealthy(rawStatus)
+              return (
+                <div
+                  key={svc.key}
+                  className="p-4 rounded-xl bg-white border border-[#D8E2D8] shadow-xs space-y-2.5"
+                >
+                  <div className="flex items-center justify-between gap-2 text-xs font-mono">
+                    <span className="px-2 py-0.5 rounded bg-[#F6F8F5] text-[#57534E]">
+                      Port {svc.port}
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                        ok ? 'bg-[#DCFCE7] text-[#14532D]' : 'bg-[#FFF1F2] text-[#9F1239]'
+                      }`}
+                    >
+                      {rawStatus.toUpperCase()}
+                    </span>
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-extrabold text-[#14241B]">
+                      {svc.order}. {svc.label}
+                    </h2>
+                    <p className="text-xs text-[#57534E] mt-0.5">{svc.role}</p>
+                  </div>
+                  <div className="pt-2 border-t border-[#E7EFE7] flex items-center justify-between text-[11px] font-mono">
+                    <span className="text-[#57534E]">Schema:</span>
+                    <span className="font-bold text-[#15803D] inline-flex items-center gap-1">
+                      <Database className="w-3 h-3" aria-hidden="true" />
+                      {svc.schema}
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-              {SERVICE_META.map((svc) => {
-                const rawStatus = health.services[svc.key] ?? 'unknown'
-                const ok = isServiceHealthy(rawStatus)
-                return (
-                  <div
-                    key={svc.key}
-                    className="p-5 rounded-xl bg-surface-container-lowest shadow-sm border border-outline-variant/15 flex flex-col justify-between space-y-4"
-                  >
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-surface-container text-on-surface-variant">
-                          Port {svc.port}
-                        </span>
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-mono font-medium ${
-                            ok
-                              ? 'bg-primary-container text-on-primary-container'
-                              : 'bg-[#FEE2E2] text-[#991B1B]'
-                          }`}
-                        >
+          {/* Real Per-Event-Type Outbox & Redis Streams Table (ZERO hardcoded events) */}
+          <div className="bg-white rounded-2xl border border-[#D8E2D8] p-5 shadow-xs space-y-3">
+            <h2 className="text-sm font-extrabold text-[#14241B]">
+              Thống kê Thực tế Transactional Outbox &amp; Redis Streams theo Loại Sự kiện
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs font-mono border-collapse">
+                <thead>
+                  <tr className="bg-[#F6F8F5] text-[#57534E] uppercase text-[11px]">
+                    <th className="py-2.5 px-3">Loại Sự kiện (event_type)</th>
+                    <th className="py-2.5 px-3 text-center">Outbox Pending (DB)</th>
+                    <th className="py-2.5 px-3 text-center">Độ dài Redis Stream</th>
+                    <th className="py-2.5 px-3 text-right">Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#E7EFE7]">
+                  {eventTypes.map((evType) => {
+                    const pending = outboxByType[evType] ?? 0
+                    const streamLen = streamLengths[evType] ?? 0
+                    return (
+                      <tr key={evType} className="hover:bg-[#F6F8F5]">
+                        <td className="py-2.5 px-3 font-bold text-[#14241B]">{evType}</td>
+                        <td className="py-2.5 px-3 text-center">
                           <span
-                            className={`w-1.5 h-1.5 rounded-full ${
-                              ok ? 'bg-primary animate-pulse' : 'bg-[#9F1239]'
+                            className={`px-2 py-0.5 rounded font-bold ${
+                              pending > 0
+                                ? 'bg-[#FFFBEB] text-[#B45309]'
+                                : 'bg-[#F0FDF4] text-[#14532D]'
                             }`}
-                          />
-                          {rawStatus.toUpperCase()}
-                        </span>
-                      </div>
-                      <div>
-                        <h3 className="text-base font-headline font-bold text-on-surface">
-                          {svc.order}. {svc.label}
-                        </h3>
-                        <p className="text-xs font-body text-on-surface-variant mt-0.5">
-                          {svc.role}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="p-3 rounded-lg bg-surface-container-low space-y-2">
-                      <div className="flex items-center justify-between text-xs gap-2">
-                        <span className="text-on-surface-variant font-label">DB Schema:</span>
-                        <span className="font-mono text-primary font-semibold flex items-center gap-1">
-                          <Lock className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                          {svc.schema}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="text-[11px] font-mono text-on-surface-variant truncate">
-                      <span className="text-on-surface font-medium">Outbox:</span> {svc.outboxEvent}
-                    </div>
-                  </div>
-                )
-              })}
+                          >
+                            {pending}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-center">{streamLen}</td>
+                        <td className="py-2.5 px-3 text-right">
+                          {pending === 0 ? (
+                            <span className="text-[#15803D] font-bold">Đã đồng bộ</span>
+                          ) : (
+                            <span className="text-[#D97706] font-bold">Đang chờ Relay</span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
 
-          {/* Section 4: Transactional Outbox & Infrastructure Summary */}
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-            <div className="xl:col-span-7 p-6 rounded-xl bg-surface-container-lowest shadow-sm border border-outline-variant/15 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-surface-container">
-                <div>
-                  <h2 className="text-base font-headline font-bold text-on-surface">
-                    Bảng Giám sát Transactional Outbox &amp; Redis Streams Event Bus
-                  </h2>
-                  <p className="text-xs text-on-surface-variant mt-0.5">
-                    Bảo toàn tính nhất quán eventual consistency giữa các dịch vụ (No Distributed 2PC).
-                  </p>
-                </div>
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface-container text-xs font-mono text-on-surface shrink-0">
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      health.redis_connected ? 'bg-primary' : 'bg-[#9F1239]'
-                    }`}
-                  />
-                  Redis 7 Streams
+          {/* DLQ Inspector Panel */}
+          {dlqData && (
+            <div
+              className="bg-white rounded-2xl border border-[#D8E2D8] p-5 shadow-xs space-y-3"
+              data-testid="dlq-inspector-panel"
+            >
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-extrabold text-[#14241B]">
+                  Thanh tra Hàng đợi Lỗi Dead-Letter Queue ({dlqData.dlq_count} bản tin)
+                </h2>
+                <span className="text-[11px] font-mono text-[#57534E]">
+                  Redis: {dlqData.redis_connected ? 'Connected' : 'Offline'}
                 </span>
               </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="text-[11px] font-mono text-on-surface-variant border-b border-surface-container uppercase">
-                      <th className="py-3 px-3">Sự kiện &amp; Luồng đi</th>
-                      <th className="py-3 px-2 text-center">Pending Outbox</th>
-                      <th className="py-3 px-2 text-center">Stream Lag</th>
-                      <th className="py-3 px-3 text-right">Trạng thái</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-surface-container text-xs font-mono">
-                    <tr className="hover:bg-surface-container-low transition-colors">
-                      <td className="py-3.5 px-3">
-                        <div className="font-bold text-on-surface">CompetencyUpdatedEvent</div>
-                        <div className="text-[11px] text-on-surface-variant flex items-center gap-1 mt-0.5">
-                          <span className="text-primary font-medium">assess_svc</span>
-                          <span>-&gt;</span>
-                          <span className="text-secondary font-medium">rec_ai_svc</span>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-2 text-center">
-                        <span className="px-2 py-0.5 rounded bg-surface-container text-on-surface font-semibold">
-                          {health.outbox_pending_count >= 0 ? health.outbox_pending_count : 'Unknown'}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-2 text-center text-primary font-semibold">
-                        {health.redis_stream_lag_ms != null && health.redis_stream_lag_ms >= 0
-                          ? `${health.redis_stream_lag_ms}ms`
-                          : 'Unknown'}
-                      </td>
-                      <td className="py-3.5 px-3 text-right">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-primary-container text-on-primary-container font-semibold text-[11px]">
-                          <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
-                          Active
-                        </span>
-                      </td>
-                    </tr>
-                    <tr className="hover:bg-surface-container-low transition-colors">
-                      <td className="py-3.5 px-3">
-                        <div className="font-bold text-on-surface">DomainGraphPublishedEvent</div>
-                        <div className="text-[11px] text-on-surface-variant flex items-center gap-1 mt-0.5">
-                          <span className="text-primary font-medium">content_svc</span>
-                          <span>-&gt;</span>
-                          <span className="text-secondary font-medium">rec_ai_svc</span>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-2 text-center">
-                        <span className="px-2 py-0.5 rounded bg-surface-container text-on-surface font-semibold">
-                          0
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-2 text-center text-primary font-semibold">
-                        {health.redis_stream_lag_ms != null && health.redis_stream_lag_ms >= 0
-                          ? `${health.redis_stream_lag_ms}ms`
-                          : 'Unknown'}
-                      </td>
-                      <td className="py-3.5 px-3 text-right">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-secondary-container text-on-secondary-container font-semibold text-[11px]">
-                          <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
-                          Synced
-                        </span>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              {dlqData.entries.length === 0 ? (
+                <div className="p-4 rounded-xl bg-[#F0FDF4] border border-[#BBF7D0] text-xs text-[#14532D]">
+                  Không có bản tin lỗi nào trong Dead-Letter Queue.
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {dlqData.entries.map((entry) => (
+                    <div
+                      key={`${entry.stream}-${entry.msg_id}`}
+                      className="p-3 rounded-xl bg-[#FFF1F2]/60 border border-[#FDA4AF] text-[11px] font-mono space-y-1"
+                    >
+                      <div className="flex justify-between font-bold text-[#9F1239]">
+                        <span>{entry.stream}</span>
+                        <span>{entry.msg_id}</span>
+                      </div>
+                      <pre className="text-[10px] text-[#3F5247] whitespace-pre-wrap break-all">
+                        {JSON.stringify(entry.fields, null, 2)}
+                      </pre>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-
-            <div className="xl:col-span-5 p-6 rounded-xl bg-surface-container-lowest shadow-sm border border-outline-variant/15 space-y-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-                  <Database className="w-4 h-4" aria-hidden="true" />
-                </div>
-                <div>
-                  <h2 className="text-base font-headline font-bold text-on-surface">
-                    Cô lập Schema &amp; Hạ tầng Kubernetes
-                  </h2>
-                  <p className="text-xs text-on-surface-variant">
-                    Khai báo sẵn trong <code className="font-mono">k8s/</code> &amp; Docker Compose profiles
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-2.5 text-xs font-mono bg-surface-container-low p-4 rounded-xl">
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-on-surface-variant font-label">4-Schema Isolation:</span>
-                  <span className="font-bold text-primary">
-                    {health.schemas_isolated ? 'Verified (4 schemas)' : 'Degraded'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-on-surface-variant font-label">Redis State Cache:</span>
-                  <span className="font-bold text-on-surface">
-                    {health.redis_connected ? 'Connected' : 'Fallback'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-on-surface-variant font-label">Sandbox Network Policy:</span>
-                  <span className="font-bold text-on-surface">k8s/network-policy.yaml</span>
-                </div>
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-on-surface-variant font-label">Auto-scaling (HPA):</span>
-                  <span className="font-bold text-on-surface">k8s/hpa.yaml</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          )}
         </>
       )}
     </section>

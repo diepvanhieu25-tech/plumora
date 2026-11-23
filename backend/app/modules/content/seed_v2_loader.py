@@ -135,7 +135,7 @@ def seed_phase3_v2_data(db: Session) -> None:
     dq_raw = json.loads(
         (SEED_DIR / "depth_questions_and_rubrics.json").read_text(encoding="utf-8")
     )
-    for q in dq_raw["questions"]:
+    for idx, q in enumerate(dq_raw["questions"]):
         q_id = uuid.UUID(str(q["id"]))
         existing_q = db.get(DepthQuestionModel, q_id)
         if existing_q is None:
@@ -148,13 +148,20 @@ def seed_phase3_v2_data(db: Session) -> None:
                 options_json=q.get("options"),
                 correct_option_key=q.get("correct_option_key"),
                 is_placement_eligible=bool(q.get("is_placement_eligible", False)),
+                is_active=bool(q.get("is_active", True)),
+                version=int(q.get("version", 1)),
+                display_order=int(q.get("display_order", idx)),
             )
             db.add(existing_q)
         else:
+            existing_q.task_type = str(q["task_type"])
             existing_q.prompt = str(q["prompt"])
             existing_q.options_json = q.get("options")
             existing_q.correct_option_key = q.get("correct_option_key")
             existing_q.is_placement_eligible = bool(q.get("is_placement_eligible", False))
+            existing_q.is_active = bool(q.get("is_active", True))
+            existing_q.version = int(q.get("version", existing_q.version))
+            existing_q.display_order = int(q.get("display_order", idx))
         db.flush()
 
         rubric_data = q.get("rubric")
@@ -176,7 +183,7 @@ def seed_phase3_v2_data(db: Session) -> None:
 
     # Seed code challenges
     cc_raw = json.loads((SEED_DIR / "code_challenges.json").read_text(encoding="utf-8"))
-    for ch in cc_raw["challenges"]:
+    for idx, ch in enumerate(cc_raw["challenges"]):
         ch_id = uuid.UUID(str(ch["id"]))
         existing_ch = db.get(CodeChallengeModel, ch_id)
         if existing_ch is None:
@@ -192,13 +199,22 @@ def seed_phase3_v2_data(db: Session) -> None:
                     test_cases_json=list(ch["test_cases"]),
                     timeout_ms=int(ch.get("timeout_ms", 3000)),
                     memory_limit_mb=int(ch.get("memory_limit_mb", 128)),
+                    setup_sql=ch.get("setup_sql"),
+                    is_active=bool(ch.get("is_active", True)),
+                    version=int(ch.get("version", 1)),
+                    display_order=int(ch.get("display_order", idx)),
                 )
             )
         else:
             existing_ch.title = str(ch["title"])
+            existing_ch.language = str(ch["language"])
             existing_ch.prompt = str(ch["prompt"])
             existing_ch.buggy_starter_code = str(ch["buggy_starter_code"])
             existing_ch.solution_code = str(ch["solution_code"])
             existing_ch.test_cases_json = list(ch["test_cases"])
+            existing_ch.setup_sql = ch.get("setup_sql")
+            existing_ch.is_active = bool(ch.get("is_active", True))
+            existing_ch.version = int(ch.get("version", existing_ch.version))
+            existing_ch.display_order = int(ch.get("display_order", idx))
 
     db.commit()

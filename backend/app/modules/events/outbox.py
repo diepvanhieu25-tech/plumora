@@ -1,8 +1,9 @@
-"""Transactional Outbox, Redis Streams Publisher, and Idempotent Consumer (PL3-ARCH-01)."""
+"""Transactional Outbox, Redis Streams Publisher, and Idempotent Consumers (PL3-ARCH-01)."""
 
 from __future__ import annotations
 
 import json
+import logging
 import time
 import uuid
 from datetime import UTC, datetime
@@ -19,6 +20,10 @@ from app.db.models import (
     OutboxEventModel,
     RlExperienceBufferModel,
 )
+from app.db.redis_pool import get_redis_client
+from app.modules.events.internal_client import invalidate_bundle_cache
+
+logger = logging.getLogger(__name__)
 
 
 def record_outbox_event_in_tx(
@@ -48,18 +53,24 @@ def relay_pending_outbox_events(
     *,
     redis_url_override: str | None = None,
 ) -> int:
-    """Relay unpublished outbox events to Redis Streams; safely leaves pending on outage."""
-    pending = db.scalars(
+    """Relay unpublished outbox events to Redis Streams using SKIP LOCKED on PostgreSQL."""
+    stmt = (
         select(OutboxEventModel)
         .where(OutboxEventModel.published_at.is_(None))
         .order_by(OutboxEventModel.created_at)
-    ).all()
+        .limit(100)
+    )
+    bind = db.get_bind()
+    if bind is not None and bind.dialect.name == "postgresql":
+        stmt = stmt.with_for_update(skip_locked=True)
+
+    pending = db.scalars(stmt).all()
     if not pending:
         return 0
 
-    client: redis.Redis = redis.Redis.from_url(
+    client = get_redis_client(
         redis_url_override or settings.redis_url,
-        socket_connect_timeout=0.5,
+        decode_responses=True,
         socket_timeout=0.5,
     )
     relayed = 0
@@ -80,10 +91,9 @@ def relay_pending_outbox_events(
             ev.published_at = datetime.now(UTC)
             relayed += 1
         db.commit()
-    except redis.RedisError:
+    except (redis.RedisError, OSError) as exc:
+        logger.warning("Outbox relay to Redis Streams failed (events kept pending): %s", exc)
         db.rollback()
-    finally:
-        client.close()
     return relayed
 
 
@@ -143,11 +153,10 @@ def consume_competency_stream_once(
     transient_errors = 0
     dlq_stream = f"{stream_name}:dlq"
 
-    client: redis.Redis = redis.Redis.from_url(
+    client = get_redis_client(
         redis_url_override or settings.redis_url,
-        socket_connect_timeout=0.5,
-        socket_timeout=0.5,
         decode_responses=True,
+        socket_timeout=0.5,
     )
     try:
         try:
@@ -193,6 +202,13 @@ def consume_competency_stream_once(
                     acked += 1
                 except (json.JSONDecodeError, ValueError, KeyError, TypeError, DataError) as exc:
                     db.rollback()
+                    logger.warning(
+                        "Routing poison message %s on %s to DLQ (%s): %s",
+                        msg_id,
+                        stream_name,
+                        type(exc).__name__,
+                        exc,
+                    )
                     client.xadd(
                         dlq_stream,
                         {
@@ -207,9 +223,15 @@ def consume_competency_stream_once(
                     )
                     client.xack(stream_name, consumer_group, msg_id)
                     dlq += 1
-                except (SQLAlchemyError, redis.RedisError, OSError, TimeoutError, ConnectionError):
+                except (SQLAlchemyError, redis.RedisError, OSError, TimeoutError, ConnectionError) as exc:
                     # Transient DB/infra error: leave pending in PEL for xautoclaim retry, never DLQ
                     db.rollback()
+                    logger.warning(
+                        "Transient error processing message %s on %s (left in PEL for retry): %s",
+                        msg_id,
+                        stream_name,
+                        exc,
+                    )
                     transient_errors += 1
 
         # 1. Recover pending messages from crashed consumers (idle >= min_idle_ms)
@@ -227,8 +249,8 @@ def consume_competency_stream_once(
                 reclaimed = len(reclaimed_msgs)
                 if reclaimed_msgs:
                     _process_messages(reclaimed_msgs)
-        except redis.ResponseError:
-            pass
+        except redis.ResponseError as exc:
+            logger.warning("XAUTOCLAIM failed on %s/%s: %s", stream_name, consumer_group, exc)
 
         # 2. Read new messages delivered to this consumer group
         raw_entries = client.xreadgroup(
@@ -244,10 +266,8 @@ def consume_competency_stream_once(
         )
         for _sname, messages in entries:
             _process_messages(messages)
-    except redis.RedisError:
-        pass
-    finally:
-        client.close()
+    except (redis.RedisError, OSError) as exc:
+        logger.warning("Competency stream consumer loop error on %s: %s", stream_name, exc)
 
     return {
         "consumed": consumed,
@@ -256,6 +276,89 @@ def consume_competency_stream_once(
         "dlq": dlq,
         "transient_errors": transient_errors,
     }
+
+
+def consume_domain_events_stream_once(
+    db: Session,
+    *,
+    redis_url_override: str | None = None,
+    consumer_group: str = "assess_cg",
+    consumer_name: str = "worker-1",
+    stream_name: str = "plumora:stream:domain_events",
+) -> dict[str, int]:
+    """Consume DomainGraphUpdatedEvent messages to invalidate Redis KG & in-memory bundle caches."""
+    consumed = 0
+    acked = 0
+    client = get_redis_client(
+        redis_url_override or settings.redis_url,
+        decode_responses=True,
+        socket_timeout=0.5,
+    )
+    try:
+        try:
+            client.xgroup_create(stream_name, consumer_group, id="0", mkstream=True)
+        except redis.ResponseError as exc:
+            if "BUSYGROUP" not in str(exc):
+                raise
+
+        raw_entries = client.xreadgroup(
+            groupname=consumer_group,
+            consumername=consumer_name,
+            streams={stream_name: ">"},
+            count=50,
+            block=1,
+        )
+        entries = cast(
+            list[tuple[str, list[tuple[str, dict[str, Any]]]]],
+            raw_entries or [],
+        )
+        for _sname, messages in entries:
+            for msg_id, fields in messages:
+                try:
+                    ev_id_raw = str(fields.get("event_id", ""))
+                    payload_raw = str(fields.get("payload", "{}"))
+                    payload_dict = json.loads(payload_raw)
+                    domain_slug = str(payload_dict.get("domain_slug", "")).strip() or None
+
+                    if ev_id_raw:
+                        ev_uuid = uuid.UUID(ev_id_raw)
+                        if db.get(ConsumedEventModel, ev_uuid) is None:
+                            db.add(
+                                ConsumedEventModel(
+                                    event_id=ev_uuid,
+                                    consumer_group=consumer_group,
+                                    consumed_at=datetime.now(UTC),
+                                )
+                            )
+                            db.commit()
+                    if domain_slug:
+                        client.delete(f"plumora:kg:{domain_slug}")
+                    invalidate_bundle_cache(domain_slug)
+                    consumed += 1
+                    client.xack(stream_name, consumer_group, msg_id)
+                    acked += 1
+                except (json.JSONDecodeError, ValueError, KeyError, TypeError) as exc:
+                    db.rollback()
+                    logger.warning(
+                        "Invalid DomainGraphUpdatedEvent %s on %s (acked to avoid blocking): %s",
+                        msg_id,
+                        stream_name,
+                        exc,
+                    )
+                    client.xack(stream_name, consumer_group, msg_id)
+                    acked += 1
+                except (SQLAlchemyError, redis.RedisError, OSError) as exc:
+                    db.rollback()
+                    logger.warning(
+                        "Transient error consuming domain event %s on %s: %s",
+                        msg_id,
+                        stream_name,
+                        exc,
+                    )
+    except (redis.RedisError, OSError) as exc:
+        logger.warning("Domain events stream consumer error on %s: %s", stream_name, exc)
+
+    return {"consumed": consumed, "acked": acked}
 
 
 def run_outbox_relay_and_consume_once(
@@ -277,4 +380,10 @@ def run_outbox_relay_and_consume_once(
         stream_name=stream_name,
         min_idle_ms=min_idle_ms,
     )
-    return {"relayed": relayed, **stats}
+    domain_stats = consume_domain_events_stream_once(
+        db,
+        redis_url_override=redis_url_override,
+        consumer_group=f"{consumer_group}_domain",
+        consumer_name=consumer_name,
+    )
+    return {"relayed": relayed, **stats, "domain_events_consumed": domain_stats["consumed"]}

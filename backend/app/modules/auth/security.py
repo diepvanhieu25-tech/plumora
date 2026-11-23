@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.config import resolve_jwt_secret, settings
 from app.db.models import UserModel
+from app.db.redis_pool import get_redis_client
 
 logger = logging.getLogger(__name__)
 password_hasher = PasswordHasher()
@@ -33,11 +34,10 @@ def _revoked_jti_key(jti: str) -> str:
 
 
 def _open_redis() -> redis.Redis:
-    return redis.Redis.from_url(
+    return get_redis_client(
         settings.redis_url,
-        socket_connect_timeout=0.3,
-        socket_timeout=0.3,
         decode_responses=True,
+        socket_timeout=0.3,
     )
 
 

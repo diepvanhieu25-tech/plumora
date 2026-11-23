@@ -66,6 +66,11 @@ def test_fg3_01_sandbox_blocks_dunder_escape_builtins_and_200mb_ram() -> None:
     try:
         with TestClient(app) as client:
             uname, _ = _register_fresh_user(client)
+            pb = client.post(
+                "/api/v2/domains/backend/concepts/net-internet/playbook/complete",
+                json={"submission_id": str(uuid.uuid4())},
+            )
+            assert pb.status_code == 200
             ch = client.get("/api/v2/concepts/net-internet/code-challenge").json()
 
             # 1. getattr(__builtins__, ...)
@@ -201,6 +206,12 @@ def test_fg3_03_concurrent_duplicate_submissions_never_return_500() -> None:
             headers = {"Authorization": f"Bearer {token}"}
 
             # A. Concurrent Depth Assessment submit
+            pb = client.post(
+                "/api/v2/domains/backend/concepts/net-internet/playbook/complete",
+                json={"submission_id": str(uuid.uuid4())},
+                headers=headers,
+            )
+            assert pb.status_code == 200
             start_res = client.post(
                 "/api/v2/assessments/start",
                 json={

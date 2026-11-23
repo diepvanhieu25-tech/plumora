@@ -18,8 +18,16 @@ from app.db.models import (
 )
 from app.modules.auth import extract_current_user
 from app.modules.auth.security import require_internal_service
-from app.modules.content.kg_service import get_domain_roadmap_for_user, list_domains_for_user
-from app.modules.content.schemas_v2 import DomainRoadmapResponse, DomainsListResponse
+from app.modules.content.kg_service import (
+    get_concept_playbook_detail,
+    get_domain_roadmap_for_user,
+    list_domains_for_user,
+)
+from app.modules.content.schemas_v2 import (
+    ConceptPlaybookDetailResponse,
+    DomainRoadmapResponse,
+    DomainsListResponse,
+)
 
 router = APIRouter(prefix="/api/v2", tags=["content_kg"])
 
@@ -61,6 +69,21 @@ def get_domain_roadmap(
     )
 
 
+@router.get(
+    "/domains/{domain_slug}/concepts/{concept_slug}",
+    response_model=ConceptPlaybookDetailResponse,
+)
+def get_concept_playbook(
+    domain_slug: str,
+    concept_slug: str,
+    request: Request,
+    db: DbSession,
+) -> ConceptPlaybookDetailResponse:
+    """Get lightweight concept Playbook + competency state strictly by (domain_slug, concept_slug)."""
+    user = _require_user(request, db)
+    return get_concept_playbook_detail(db, user.id, domain_slug, concept_slug)
+
+
 @router.get("/internal/domains/{slug}/bundle", dependencies=[Depends(require_internal_service)])
 def get_domain_bundle_internal(slug: str, db: DbSession) -> dict[str, Any]:
     """Internal endpoint for assessment/recommendation services under strict schema isolation."""
@@ -79,8 +102,15 @@ def get_domain_bundle_internal(slug: str, db: DbSession) -> dict[str, Any]:
     questions = (
         db.scalars(
             select(DepthQuestionModel)
-            .where(DepthQuestionModel.concept_slug.in_(slugs))
-            .order_by(DepthQuestionModel.depth_tier)
+            .where(
+                DepthQuestionModel.concept_slug.in_(slugs),
+                DepthQuestionModel.is_active.is_(True),
+            )
+            .order_by(
+                DepthQuestionModel.depth_tier,
+                DepthQuestionModel.version.desc(),
+                DepthQuestionModel.display_order,
+            )
         ).all()
         if slugs
         else []
@@ -92,8 +122,25 @@ def get_domain_bundle_internal(slug: str, db: DbSession) -> dict[str, Any]:
         else []
     )
     rubric_by_q = {str(r.question_id): r for r in rubrics}
+    ch_slugs = (
+        set(
+            db.scalars(
+                select(CodeChallengeModel.concept_slug).where(
+                    CodeChallengeModel.concept_slug.in_(slugs),
+                    CodeChallengeModel.is_active.is_(True),
+                )
+            ).all()
+        )
+        if slugs
+        else set()
+    )
     return {
-        "domain": {"slug": dom.slug, "title": dom.title, "graph_version": dom.graph_version},
+        "domain": {
+            "slug": dom.slug,
+            "title": dom.title,
+            "description": dom.description,
+            "graph_version": dom.graph_version,
+        },
         "nodes": [
             {
                 "domain_slug": n.domain_slug,
@@ -103,6 +150,7 @@ def get_domain_bundle_internal(slug: str, db: DbSession) -> dict[str, Any]:
                 "tier": n.tier,
                 "is_shared": n.is_shared,
                 "prerequisites_json": list(n.prerequisites_json or []),
+                "has_code_challenge": n.concept_slug in ch_slugs,
             }
             for n in nodes
         ],
@@ -116,6 +164,9 @@ def get_domain_bundle_internal(slug: str, db: DbSession) -> dict[str, Any]:
                 "options_json": q.options_json,
                 "correct_option_key": q.correct_option_key,
                 "is_placement_eligible": q.is_placement_eligible,
+                "is_active": q.is_active,
+                "version": q.version,
+                "display_order": q.display_order,
                 "rubric": (
                     {
                         "criteria_json": rubric_by_q[str(q.id)].criteria_json,
@@ -131,11 +182,19 @@ def get_domain_bundle_internal(slug: str, db: DbSession) -> dict[str, Any]:
 
 
 @router.get("/internal/concepts/{concept_slug}/bundle", dependencies=[Depends(require_internal_service)])
-def get_concept_bundle_internal(concept_slug: str, db: DbSession) -> dict[str, Any]:
-    """Internal endpoint returning concept node, questions, rubrics, and code challenge."""
-    node = db.scalars(
-        select(DomainConceptMapModel).where(DomainConceptMapModel.concept_slug == concept_slug)
-    ).first()
+def get_concept_bundle_internal(
+    concept_slug: str,
+    db: DbSession,
+    domain_slug: str | None = Query(default=None),
+) -> dict[str, Any]:
+    """Internal endpoint returning concept node, active questions, rubrics, and active code challenge."""
+    node = db.get(DomainConceptMapModel, (domain_slug, concept_slug)) if domain_slug else None
+    if node is None:
+        node = db.scalars(
+            select(DomainConceptMapModel)
+            .where(DomainConceptMapModel.concept_slug == concept_slug)
+            .order_by(DomainConceptMapModel.domain_slug)
+        ).first()
     if node is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -143,8 +202,15 @@ def get_concept_bundle_internal(concept_slug: str, db: DbSession) -> dict[str, A
         )
     questions = db.scalars(
         select(DepthQuestionModel)
-        .where(DepthQuestionModel.concept_slug == concept_slug)
-        .order_by(DepthQuestionModel.depth_tier)
+        .where(
+            DepthQuestionModel.concept_slug == concept_slug,
+            DepthQuestionModel.is_active.is_(True),
+        )
+        .order_by(
+            DepthQuestionModel.depth_tier,
+            DepthQuestionModel.version.desc(),
+            DepthQuestionModel.display_order,
+        )
     ).all()
     q_ids = [q.id for q in questions]
     rubrics = (
@@ -154,7 +220,12 @@ def get_concept_bundle_internal(concept_slug: str, db: DbSession) -> dict[str, A
     )
     rubric_by_q = {str(r.question_id): r for r in rubrics}
     ch = db.scalars(
-        select(CodeChallengeModel).where(CodeChallengeModel.concept_slug == concept_slug)
+        select(CodeChallengeModel)
+        .where(
+            CodeChallengeModel.concept_slug == concept_slug,
+            CodeChallengeModel.is_active.is_(True),
+        )
+        .order_by(CodeChallengeModel.version.desc(), CodeChallengeModel.display_order)
     ).first()
     return {
         "node": {
@@ -165,6 +236,8 @@ def get_concept_bundle_internal(concept_slug: str, db: DbSession) -> dict[str, A
             "tier": node.tier,
             "is_shared": node.is_shared,
             "prerequisites_json": list(node.prerequisites_json or []),
+            "lesson_markdown": node.lesson_markdown,
+            "has_code_challenge": ch is not None,
         },
         "questions": [
             {
@@ -176,6 +249,9 @@ def get_concept_bundle_internal(concept_slug: str, db: DbSession) -> dict[str, A
                 "options_json": q.options_json,
                 "correct_option_key": q.correct_option_key,
                 "is_placement_eligible": q.is_placement_eligible,
+                "is_active": q.is_active,
+                "version": q.version,
+                "display_order": q.display_order,
                 "rubric": (
                     {
                         "criteria_json": rubric_by_q[str(q.id)].criteria_json,
@@ -198,6 +274,10 @@ def get_concept_bundle_internal(concept_slug: str, db: DbSession) -> dict[str, A
                 "test_cases_json": ch.test_cases_json,
                 "timeout_ms": ch.timeout_ms,
                 "memory_limit_mb": ch.memory_limit_mb,
+                "setup_sql": ch.setup_sql,
+                "is_active": ch.is_active,
+                "version": ch.version,
+                "display_order": ch.display_order,
             }
             if ch is not None
             else None
