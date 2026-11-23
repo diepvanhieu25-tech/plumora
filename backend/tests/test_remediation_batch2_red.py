@@ -323,6 +323,11 @@ def test_f06_microservices_end_to_end_with_isolated_db_roles() -> None:
             assert doms.status_code == 200, f"Gateway domains failed: {doms.text}"
             place = client.post("/api/v2/domains/frontend/placement/start")
             assert place.status_code == 201, f"Gateway placement start failed: {place.text}"
+            pb = client.post(
+                "/api/v2/domains/frontend/concepts/fe-dom-events/playbook/complete",
+                json={"submission_id": str(uuid.uuid4())},
+            )
+            assert pb.status_code == 200, f"Gateway playbook complete failed: {pb.text}"
             assess = client.post(
                 "/api/v2/assessments/start",
                 json={"domain_slug": "frontend", "concept_slug": "fe-dom-events", "session_mode": "depth_probe"},

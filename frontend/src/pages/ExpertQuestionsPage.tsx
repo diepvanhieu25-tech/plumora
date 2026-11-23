@@ -1,98 +1,101 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
-  Brain,
   CheckCircle2,
-  Code2,
   FileQuestion,
-  GitBranch,
   Layers,
+  Loader2,
+  Play,
   Plus,
-  ShieldCheck,
-  Sparkles,
-  Terminal,
+  RefreshCw,
   Trash2,
 } from 'lucide-react'
-import { apiExpertCreateQuestion, apiGetDomainRoadmap, apiGetDomains } from '../api'
-import type { ActiveView, DomainListItem, DomainRoadmapNode } from '../types'
+import {
+  apiExpertCreateQuestion,
+  apiExpertDeleteQuestion,
+  apiExpertGetDomainGraph,
+  apiExpertListQuestions,
+  apiExpertRubricDryRun,
+  apiExpertUpdateQuestion,
+  apiGetDomains,
+} from '../api'
+import { useOptionalBackOfficeStudio } from '../shells/BackOfficeStudioContext'
+import type {
+  BackOfficeView,
+  ExpertGraphNodeItem,
+  ExpertQuestionItem,
+  ExpertRubricDryRunResponse,
+  ExpertTaskType,
+} from '../types/expert'
+import type { DomainListItem } from '../types/learnerV2'
 
-interface ExpertQuestionsPageProps {
-  onNavigate: (view: ActiveView) => void
+export interface ExpertQuestionsPageProps {
+  onNavigate?: (view: BackOfficeView, params?: { domainSlug?: string; conceptSlug?: string }) => void
 }
 
 interface RubricRow {
   name: string
   weight: number
   keywords: string
+  socratic_hint: string
 }
 
 const DEPTH_TIER_META: Array<{
   tier: number
   short: string
   desc: string
-  defaultTask: string
+  defaultTask: ExpertTaskType
 }> = [
   { tier: 1, short: 'Tầng 1: What', desc: 'Khái niệm & Mô hình', defaultTask: 'mcq' },
   { tier: 2, short: 'Tầng 2: How', desc: 'Cơ chế Vận hành', defaultTask: 'mcq' },
-  {
-    tier: 3,
-    short: 'Tầng 3: Pitfalls',
-    desc: 'Tình huống & Cạm bẫy',
-    defaultTask: 'troubleshooting',
-  },
+  { tier: 3, short: 'Tầng 3: Pitfalls', desc: 'Sự cố & Code Review', defaultTask: 'troubleshooting' },
   {
     tier: 4,
     short: 'Tầng 4: Trade-offs',
     desc: 'Thay đổi Ràng buộc',
     defaultTask: 'constraint_shifting',
   },
-  {
-    tier: 5,
-    short: 'Tầng 5: Internals',
-    desc: 'Nội tại & Teach-back',
-    defaultTask: 'teach_back',
-  },
+  { tier: 5, short: 'Tầng 5: Internals', desc: 'Nội tại & Teach-back', defaultTask: 'teach_back' },
 ]
 
-const FORMAT_CARDS: Array<{
-  key: string
-  tag: string
-  title: string
-  tiers: string
-}> = [
-  {
-    key: 'mcq',
-    tag: 'Khách quan',
-    title: 'Trắc nghiệm 4 Đáp án (A/B/C/D)',
-    tiers: 'Tầng 1–2',
-  },
-  {
-    key: 'troubleshooting',
-    tag: 'Dạng 1',
-    title: 'Xử lý sự cố (Troubleshooting)',
-    tiers: 'Tầng 3',
-  },
-  {
-    key: 'constraint_shifting',
-    tag: 'Dạng 3',
-    title: 'Thay đổi Ràng buộc (Shifting)',
-    tiers: 'Tầng 4',
-  },
-  {
-    key: 'teach_back',
-    tag: 'Dạng 4',
-    title: 'Giải thích ngược (Feynman)',
-    tiers: 'Tầng 5',
-  },
+const TASK_TYPE_OPTIONS: Array<{ value: ExpertTaskType; label: string }> = [
+  { value: 'mcq', label: 'Trắc nghiệm 4 phương án (Tầng 1–2)' },
+  { value: 'troubleshooting', label: 'Xử lý sự cố (Troubleshooting)' },
+  { value: 'code_review', label: 'Đánh giá mã nguồn (Code Review)' },
+  { value: 'constraint_shifting', label: 'Thay đổi ràng buộc (Constraint Shifting)' },
+  { value: 'teach_back', label: 'Giải thích ngược (Teach-back)' },
 ]
 
-export function ExpertQuestionsPage({ onNavigate }: ExpertQuestionsPageProps) {
-  const [domains, setDomains] = useState<DomainListItem[]>([])
-  const [selectedDomain, setSelectedDomain] = useState('backend')
-  const [concepts, setConcepts] = useState<DomainRoadmapNode[]>([])
-  const [conceptSlug, setConceptSlug] = useState('net-internet')
-  const [depthTier, setDepthTier] = useState(3)
-  const [taskType, setTaskType] = useState('troubleshooting')
+function defaultRubricRows(): RubricRow[] {
+  return [
+    { name: 'Xác định đúng nguyên nhân / cơ chế cốt lõi', weight: 0.5, keywords: '', socratic_hint: '' },
+    { name: 'Đề xuất giải pháp & phân tích đánh đổi', weight: 0.5, keywords: '', socratic_hint: '' },
+  ]
+}
+
+export function ExpertQuestionsPage({ onNavigate }: ExpertQuestionsPageProps = {}) {
+  void onNavigate
+  const studio = useOptionalBackOfficeStudio()
+  const [localDomains, setLocalDomains] = useState<DomainListItem[]>([])
+  const [localDomain, setLocalDomain] = useState('backend')
+  const [localConcept, setLocalConcept] = useState('net-internet')
+
+  const domains = studio ? studio.domains : localDomains
+  const selectedDomain = studio ? studio.selectedDomainSlug : localDomain
+  const setSelectedDomain = studio ? studio.setSelectedDomainSlug : setLocalDomain
+  const conceptSlug = studio ? studio.selectedConceptSlug : localConcept
+  const setConceptSlug = studio ? studio.setSelectedConceptSlug : setLocalConcept
+
+  const [concepts, setConcepts] = useState<ExpertGraphNodeItem[]>([])
+  const [questions, setQuestions] = useState<ExpertQuestionItem[]>([])
+  const [loadingQuestions, setLoadingQuestions] = useState(false)
+
+  // Master-Detail Editing State (null => CREATE mode, string => EDIT mode)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+
+  const [depthTier, setDepthTier] = useState<number>(studio?.selectedDepthTier ?? 3)
+  const [taskType, setTaskType] = useState<ExpertTaskType>('troubleshooting')
   const [prompt, setPrompt] = useState('')
   const [mcqOptions, setMcqOptions] = useState<{ A: string; B: string; C: string; D: string }>({
     A: '',
@@ -101,43 +104,126 @@ export function ExpertQuestionsPage({ onNavigate }: ExpertQuestionsPageProps) {
     D: '',
   })
   const [correctOptionKey, setCorrectOptionKey] = useState<'A' | 'B' | 'C' | 'D'>('A')
-  const [criteria, setCriteria] = useState<RubricRow[]>([
-    { name: 'Tiêu chí 1 (Nguyên nhân / Cơ chế)', weight: 0.5, keywords: 'dns, ip' },
-    { name: 'Tiêu chí 2 (Xử lý / Đánh đổi)', weight: 0.5, keywords: 'tcp, handshake' },
-  ])
+  const [criteria, setCriteria] = useState<RubricRow[]>(defaultRubricRows())
   const [refExp, setRefExp] = useState('')
+
+  // Live Rubric Dry-Run State
+  const [sampleAnswer, setSampleAnswer] = useState('')
+  const [dryRunning, setDryRunning] = useState(false)
+  const [dryRunResult, setDryRunResult] = useState<ExpertRubricDryRunResponse | null>(null)
+
   const [submitting, setSubmitting] = useState(false)
   const [statusMsg, setStatusMsg] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   useEffect(() => {
+    if (studio) return
     void (async () => {
       try {
         const res = await apiGetDomains()
-        setDomains(res.domains)
-        if (res.domains.length > 0) {
-          setSelectedDomain(res.domains[0].slug)
-        }
+        setLocalDomains(res.domains)
+        if (res.domains.length > 0) setLocalDomain(res.domains[0].slug)
       } catch {
-        // Handled cleanly if domains fail to load
+        // handled cleanly
       }
     })()
-  }, [])
+  }, [studio])
 
   useEffect(() => {
     if (!selectedDomain) return
     void (async () => {
       try {
-        const rm = await apiGetDomainRoadmap(selectedDomain, 0)
-        setConcepts(rm.nodes)
-        if (rm.nodes.length > 0) {
-          setConceptSlug(rm.nodes[0].slug)
+        const graph = await apiExpertGetDomainGraph(selectedDomain)
+        setConcepts(graph.nodes)
+        if (graph.nodes.length > 0 && !graph.nodes.some((n) => n.slug === conceptSlug)) {
+          setConceptSlug(graph.nodes[0].slug)
         }
       } catch {
         setConcepts([])
       }
     })()
-  }, [selectedDomain])
+  }, [selectedDomain, conceptSlug, setConceptSlug])
+
+  const loadQuestions = useCallback(async (slug: string) => {
+    if (!slug) return
+    setLoadingQuestions(true)
+    setErrorMsg(null)
+    try {
+      const res = await apiExpertListQuestions(slug)
+      setQuestions(res.questions)
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Không thể tải ngân hàng câu hỏi')
+      setQuestions([])
+    } finally {
+      setLoadingQuestions(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadQuestions(conceptSlug)
+  }, [conceptSlug, loadQuestions])
+
+  function resetToNewQuestion(tier: number) {
+    const meta = DEPTH_TIER_META.find((m) => m.tier === tier) ?? DEPTH_TIER_META[2]
+    setEditingId(null)
+    setDepthTier(tier)
+    studio?.setSelectedDepthTier(tier)
+    setTaskType(meta.defaultTask)
+    setPrompt('')
+    setMcqOptions({ A: '', B: '', C: '', D: '' })
+    setCorrectOptionKey('A')
+    setCriteria(defaultRubricRows())
+    setRefExp('')
+    setDryRunResult(null)
+    setStatusMsg(null)
+    setErrorMsg(null)
+  }
+
+  function loadQuestionIntoEditor(q: ExpertQuestionItem) {
+    setEditingId(q.id)
+    setDepthTier(q.depth_tier)
+    studio?.setSelectedDepthTier(q.depth_tier)
+    setTaskType(q.task_type)
+    setPrompt(q.prompt)
+    setMcqOptions({
+      A: q.options?.A ?? '',
+      B: q.options?.B ?? '',
+      C: q.options?.C ?? '',
+      D: q.options?.D ?? '',
+    })
+    const key = (q.correct_option_key?.toUpperCase() ?? 'A') as 'A' | 'B' | 'C' | 'D'
+    setCorrectOptionKey(['A', 'B', 'C', 'D'].includes(key) ? key : 'A')
+    if (q.rubric && q.rubric.criteria.length > 0) {
+      setCriteria(
+        q.rubric.criteria.map((c) => ({
+          name: c.name,
+          weight: c.weight,
+          keywords: (c.required_keywords || []).join(', '),
+          socratic_hint: c.socratic_hint ?? '',
+        })),
+      )
+      setRefExp(q.rubric.reference_explanation)
+    } else {
+      setCriteria(defaultRubricRows())
+      setRefExp('')
+    }
+    setDryRunResult(null)
+    setStatusMsg(null)
+    setErrorMsg(null)
+  }
+
+  const tierCounts = useMemo(() => {
+    const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+    for (const q of questions) {
+      counts[q.depth_tier] = (counts[q.depth_tier] ?? 0) + 1
+    }
+    return counts
+  }, [questions])
+
+  const filteredTierQuestions = useMemo(
+    () => questions.filter((q) => q.depth_tier === depthTier),
+    [questions, depthTier],
+  )
 
   const totalWeight = Number(
     criteria.reduce((sum, c) => sum + Number(c.weight || 0), 0).toFixed(4),
@@ -146,27 +232,30 @@ export function ExpertQuestionsPage({ onNavigate }: ExpertQuestionsPageProps) {
   const isMcqValid =
     taskType !== 'mcq' ||
     (['A', 'B', 'C', 'D'] as const).every((k) => mcqOptions[k].trim().length > 0)
+  const hasAllKeywords =
+    taskType === 'mcq' ||
+    criteria.every(
+      (c) =>
+        c.name.trim().length > 0 &&
+        c.keywords
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean).length > 0,
+    )
 
-  const totalKeywordsCount = criteria.reduce(
-    (acc, row) =>
-      acc +
-      row.keywords
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean).length,
-    0,
-  )
-
-  function handleAddCriterion() {
-    setCriteria((prev) => [
-      ...prev,
-      { name: `Tiêu chí ${prev.length + 1}`, weight: 0, keywords: '' },
-    ])
-  }
-
-  function handleRemoveCriterion(idx: number) {
-    if (criteria.length <= 1) return
-    setCriteria((prev) => prev.filter((_, i) => i !== idx))
+  function buildRubricPayload() {
+    return {
+      criteria: criteria.map((c) => ({
+        name: c.name.trim(),
+        weight: Number(c.weight),
+        required_keywords: c.keywords
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+        socratic_hint: c.socratic_hint.trim() || null,
+      })),
+      reference_explanation: refExp.trim() || 'Giải thích tham chiếu chuẩn theo tiêu chí Rubric.',
+    }
   }
 
   async function handleSave() {
@@ -174,10 +263,10 @@ export function ExpertQuestionsPage({ onNavigate }: ExpertQuestionsPageProps) {
     setStatusMsg(null)
     setSubmitting(true)
     try {
-      const res = await apiExpertCreateQuestion(conceptSlug.trim(), {
+      const payload = {
         depth_tier: depthTier,
         task_type: taskType,
-        prompt,
+        prompt: prompt.trim(),
         options:
           taskType === 'mcq'
             ? {
@@ -188,24 +277,18 @@ export function ExpertQuestionsPage({ onNavigate }: ExpertQuestionsPageProps) {
               }
             : null,
         correct_option_key: taskType === 'mcq' ? correctOptionKey : null,
-        rubric:
-          taskType === 'mcq'
-            ? null
-            : {
-                criteria: criteria.map((c) => ({
-                  name: c.name,
-                  weight: Number(c.weight),
-                  required_keywords: c.keywords
-                    .split(',')
-                    .map((s) => s.trim())
-                    .filter(Boolean),
-                })),
-                reference_explanation: refExp || 'Giải thích chuẩn theo Rubric.',
-              },
-      })
-      setStatusMsg(`Đã lưu câu hỏi & Rubric thành công (ID: ${res.item_id}).`)
-      setPrompt('')
-      setMcqOptions({ A: '', B: '', C: '', D: '' })
+        rubric: taskType === 'mcq' ? null : buildRubricPayload(),
+        is_active: true,
+      }
+      if (editingId) {
+        const res = await apiExpertUpdateQuestion(editingId, payload)
+        setStatusMsg(`Đã cập nhật câu hỏi thành công (v${res.version}).`)
+      } else {
+        const res = await apiExpertCreateQuestion(conceptSlug, payload)
+        setStatusMsg(`Đã tạo câu hỏi mới thành công (v${res.version}).`)
+        setEditingId(res.item_id)
+      }
+      await loadQuestions(conceptSlug)
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Không thể lưu câu hỏi')
     } finally {
@@ -213,313 +296,327 @@ export function ExpertQuestionsPage({ onNavigate }: ExpertQuestionsPageProps) {
     }
   }
 
+  async function handleConfirmDelete(id: string) {
+    setErrorMsg(null)
+    setStatusMsg(null)
+    try {
+      await apiExpertDeleteQuestion(id)
+      setConfirmDeleteId(null)
+      if (editingId === id) {
+        resetToNewQuestion(depthTier)
+      }
+      setStatusMsg('Đã xóa câu hỏi khỏi ngân hàng đề đang hoạt động.')
+      await loadQuestions(conceptSlug)
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Không thể xóa câu hỏi')
+    }
+  }
+
+  async function handleDryRunRubric() {
+    if (taskType === 'mcq' || !sampleAnswer.trim() || !isWeightValid || !hasAllKeywords) return
+    setDryRunning(true)
+    setErrorMsg(null)
+    try {
+      const res = await apiExpertRubricDryRun({
+        prompt: prompt.trim() || 'Câu hỏi đánh giá tự luận',
+        sample_answer: sampleAnswer.trim(),
+        rubric: buildRubricPayload(),
+      })
+      setDryRunResult(res)
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Lỗi chạy thử bộ chấm Rubric')
+    } finally {
+      setDryRunning(false)
+    }
+  }
+
   return (
     <section
-      className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 space-y-5 text-on-surface"
+      className="w-full space-y-5 text-[#14241B]"
       data-testid="scr16-expert-questions"
     >
-      {/* 1. Top Command & Breadcrumb Surface */}
-      <div className="w-full bg-surface-container-lowest rounded-2xl border border-surface-container-highest p-5 shadow-sm flex flex-col gap-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          {/* Breadcrumb and Metadata Badges */}
-          <div className="flex flex-wrap items-center gap-2.5">
-            <nav
-              aria-label="Breadcrumb"
-              className="flex items-center gap-1.5 text-xs text-on-surface-variant font-medium flex-wrap"
+      {/* Top Selection Bar */}
+      <div className="bg-white rounded-2xl border border-[#D8E2D8] p-5 shadow-xs space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-extrabold text-[#14241B] tracking-tight">
+              Ngân hàng Câu hỏi 5 Tầng &amp; Kiểm thử Rubric
+            </h1>
+            <p className="text-xs text-[#3F5247] mt-0.5">
+              Quản lý toàn bộ câu hỏi hiện có của khái niệm, chỉnh sửa tiêu chí chấm và chạy thử bộ chấm trực tiếp.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void loadQuestions(conceptSlug)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#F6F8F5] border border-[#D8E2D8] hover:bg-[#F0FDF4] text-xs font-semibold cursor-pointer"
+          >
+            <RefreshCw
+              className={`w-3.5 h-3.5 ${loadingQuestions ? 'animate-spin' : ''}`}
+              aria-hidden="true"
+            />
+            <span>Làm mới danh sách</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="bg-[#F6F8F5] p-3 rounded-xl border border-[#D8E2D8]">
+            <label
+              htmlFor="scr16-select-domain"
+              className="block text-[10px] uppercase font-bold text-[#57534E] mb-1"
             >
-              <span>Chuyên gia</span>
-              <span className="text-outline-variant">/</span>
-              <span>Ngân hàng Câu hỏi 5 Tầng &amp; Rubric (SCR-16)</span>
-              <span className="text-outline-variant">/</span>
-              <span className="font-mono text-primary font-semibold px-2 py-0.5 rounded bg-primary-container/40">
-                {conceptSlug}
-              </span>
-            </nav>
-            <span className="w-1 h-1 rounded-full bg-outline-variant hidden sm:inline" />
-            <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-tertiary-fixed/20 text-tertiary text-[11px] font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-tertiary" />
-              <span>Tầng {depthTier} &bull; {taskType}</span>
-            </div>
+              Lĩnh vực
+            </label>
+            <select
+              id="scr16-select-domain"
+              value={selectedDomain}
+              onChange={(e) => setSelectedDomain(e.target.value)}
+              className="w-full text-xs font-bold text-[#14241B] bg-transparent focus:outline-none cursor-pointer"
+            >
+              {domains.map((d) => (
+                <option key={d.slug} value={d.slug}>
+                  {d.title} ({d.total_nodes} nodes)
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* Studio Navigation Controls */}
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => onNavigate('expert_domains')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container-low hover:bg-surface-container text-xs font-semibold text-on-surface transition-all shadow-2xs cursor-pointer"
+          <div className="bg-[#F6F8F5] p-3 rounded-xl border border-[#D8E2D8]">
+            <label
+              htmlFor="scr16-select-concept"
+              className="block text-[10px] uppercase font-bold text-[#57534E] mb-1"
             >
-              <GitBranch className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
-              <span>1. Đồ thị DAG</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigate('expert_code')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container-low hover:bg-surface-container text-xs font-semibold text-on-surface transition-all shadow-2xs cursor-pointer"
+              Khái niệm mục tiêu
+            </label>
+            <select
+              id="scr16-select-concept"
+              value={conceptSlug}
+              onChange={(e) => {
+                setConceptSlug(e.target.value)
+                setEditingId(null)
+              }}
+              className="w-full text-xs font-bold font-mono text-[#14241B] bg-transparent focus:outline-none cursor-pointer"
             >
-              <Code2 className="w-3.5 h-3.5 text-secondary" aria-hidden="true" />
-              <span>3. Code Sandbox</span>
-            </button>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-container text-on-primary-container font-semibold text-xs shadow-2xs">
-              <ShieldCheck className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
-              <span>INV-DEPTH-01 Guardrail</span>
-            </div>
+              {concepts.map((c) => (
+                <option key={c.slug} value={c.slug}>
+                  [T{c.tier}] {c.title} ({c.slug})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="bg-[#F6F8F5] p-3 rounded-xl border border-[#D8E2D8]">
+            <label
+              htmlFor="scr16-select-tier"
+              className="block text-[10px] uppercase font-bold text-[#57534E] mb-1"
+            >
+              Tầng sâu (1–5)
+            </label>
+            <select
+              id="scr16-select-tier"
+              value={depthTier}
+              onChange={(e) => {
+                const t = Number(e.target.value)
+                setDepthTier(t)
+                studio?.setSelectedDepthTier(t)
+              }}
+              className="w-full text-xs font-bold text-[#14241B] bg-transparent focus:outline-none cursor-pointer"
+            >
+              {[1, 2, 3, 4, 5].map((t) => (
+                <option key={t} value={t}>
+                  Tầng {t} ({tierCounts[t]} câu)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="bg-[#F6F8F5] p-3 rounded-xl border border-[#D8E2D8]">
+            <label
+              htmlFor="scr16-select-tasktype"
+              className="block text-[10px] uppercase font-bold text-[#57534E] mb-1"
+            >
+              Dạng bài Đánh giá
+            </label>
+            <select
+              id="scr16-select-tasktype"
+              value={taskType}
+              onChange={(e) => setTaskType(e.target.value as ExpertTaskType)}
+              className="w-full text-xs font-bold text-[#14241B] bg-transparent focus:outline-none cursor-pointer"
+            >
+              {TASK_TYPE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
-        {/* 2. Filter & 5-Depth Concept Navigation Bar (4 primary selects first: Domain, Concept, Tier, TaskType) */}
-        <div className="p-4 rounded-xl bg-surface-container-low/80 border border-outline-variant/25 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {/* Select 0: Domain */}
-            <div className="bg-surface-container-lowest p-3 rounded-xl shadow-2xs border border-outline-variant/20">
-              <label
-                htmlFor="scr16-select-domain"
-                className="block text-[10px] uppercase font-bold tracking-wider text-on-surface-variant mb-1"
+        {/* 5-Depth Coverage Strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          {DEPTH_TIER_META.map((item) => {
+            const count = tierCounts[item.tier] ?? 0
+            const active = depthTier === item.tier
+            return (
+              <button
+                key={item.tier}
+                type="button"
+                onClick={() => {
+                  setDepthTier(item.tier)
+                  studio?.setSelectedDepthTier(item.tier)
+                  if (!editingId) setTaskType(item.defaultTask)
+                }}
+                className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                  active
+                    ? 'bg-[#F0FDF4] border-[#15803D] ring-1 ring-[#15803D]'
+                    : 'bg-white border-[#D8E2D8] hover:bg-[#F6F8F5]'
+                }`}
               >
-                Lĩnh vực kiến trúc
-              </label>
-              <select
-                id="scr16-select-domain"
-                value={selectedDomain}
-                onChange={(e) => setSelectedDomain(e.target.value)}
-                className="w-full text-xs font-bold text-on-surface bg-transparent focus:outline-none cursor-pointer"
-              >
-                {domains.map((d) => (
-                  <option key={d.slug} value={d.slug}>
-                    {d.title} ({d.total_nodes} Nodes)
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Select 1: Concept Node */}
-            <div className="bg-surface-container-lowest p-3 rounded-xl shadow-2xs border border-outline-variant/20">
-              <label
-                htmlFor="scr16-select-concept"
-                className="block text-[10px] uppercase font-bold tracking-wider text-on-surface-variant mb-1"
-              >
-                Khái niệm mục tiêu (Node)
-              </label>
-              <select
-                id="scr16-select-concept"
-                value={conceptSlug}
-                onChange={(e) => setConceptSlug(e.target.value)}
-                className="w-full text-xs font-bold font-mono text-on-surface bg-transparent focus:outline-none cursor-pointer"
-              >
-                {concepts.map((c) => (
-                  <option key={c.slug} value={c.slug}>
-                    [T{c.tier}] {c.title} ({c.slug})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Select 2: Depth Tier */}
-            <div className="bg-surface-container-lowest p-3 rounded-xl shadow-2xs border border-outline-variant/20">
-              <label
-                htmlFor="scr16-select-tier"
-                className="block text-[10px] uppercase font-bold tracking-wider text-on-surface-variant mb-1"
-              >
-                Tầng sâu (1–5)
-              </label>
-              <select
-                id="scr16-select-tier"
-                value={depthTier}
-                onChange={(e) => setDepthTier(Number(e.target.value))}
-                className="w-full text-xs font-bold text-on-surface bg-transparent focus:outline-none cursor-pointer"
-              >
-                {[1, 2, 3, 4, 5].map((t) => (
-                  <option key={t} value={t}>
-                    Tầng {t}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Select 3: Task Type (IMPORTANT: 4th select index 3 for E2E audit) */}
-            <div className="bg-surface-container-lowest p-3 rounded-xl shadow-2xs border border-outline-variant/20">
-              <label
-                htmlFor="scr16-select-tasktype"
-                className="block text-[10px] uppercase font-bold tracking-wider text-on-surface-variant mb-1"
-              >
-                Dạng bài Đánh giá
-              </label>
-              <select
-                id="scr16-select-tasktype"
-                value={taskType}
-                onChange={(e) => setTaskType(e.target.value)}
-                className="w-full text-xs font-bold text-on-surface bg-transparent focus:outline-none cursor-pointer"
-              >
-                <option value="mcq">Trắc nghiệm (Tầng 1–2)</option>
-                <option value="troubleshooting">Troubleshooting (Tầng 3)</option>
-                <option value="constraint_shifting">Constraint Shifting (Tầng 4)</option>
-                <option value="teach_back">Teach-back (Tầng 5)</option>
-              </select>
-            </div>
-          </div>
-
-          {/* 5-Depth Stepper / Interactive Tabs */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
-            {DEPTH_TIER_META.map((item) => {
-              const isActive = depthTier === item.tier
-              return (
-                <button
-                  key={item.tier}
-                  type="button"
-                  onClick={() => {
-                    setDepthTier(item.tier)
-                    setTaskType(item.defaultTask)
-                  }}
-                  className={`flex items-start gap-2.5 p-2.5 rounded-xl text-left transition-all relative overflow-hidden cursor-pointer ${
-                    isActive
-                      ? 'bg-primary-container/35 shadow-sm ring-1 ring-primary'
-                      : 'bg-surface-container-lowest hover:bg-surface-container shadow-2xs'
-                  }`}
-                >
-                  {isActive && <div className="absolute top-0 left-0 right-0 h-1 bg-primary" />}
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-[11px] font-bold text-[#14241B]">{item.short}</span>
                   <span
-                    className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 font-bold text-xs ${
-                      isActive
-                        ? 'bg-primary text-on-primary'
-                        : 'bg-secondary-container text-on-secondary-container'
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
+                      count === 0
+                        ? 'bg-[#FFFBEB] text-[#B45309] border border-[#F59E0B]/50'
+                        : 'bg-[#DCFCE7] text-[#14532D]'
                     }`}
                   >
-                    {item.tier}
+                    {count === 0 ? 'Thiếu' : `${count} câu`}
                   </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-1">
-                      <span
-                        className={`text-[11px] font-bold tracking-tight uppercase ${
-                          isActive ? 'text-primary' : 'text-on-surface'
-                        }`}
-                      >
-                        {item.short}
-                      </span>
-                      <span
-                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                          isActive
-                            ? 'bg-tertiary-fixed/30 text-tertiary'
-                            : 'bg-surface-container text-on-surface-variant'
-                        }`}
-                      >
-                        {isActive ? 'Đang chọn' : `T${item.tier}`}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-on-surface-variant truncate mt-0.5">
-                      {item.desc}
-                    </p>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
+                </div>
+                <p className="text-[10px] text-[#57534E] truncate mt-0.5">{item.desc}</p>
+              </button>
+            )
+          })}
         </div>
       </div>
 
-      {/* 3. Main Authoring Workspace: 2-Column Bespoke Layout (7/12 Left + 5/12 Right) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* LEFT COLUMN: 5-Depth Question & Scenario Editor (7 cols) */}
-        <div className="lg:col-span-7 space-y-5">
-          {/* Editor Header & Format Selector Card */}
-          <div className="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-outline-variant/25 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex p-1.5 rounded-md bg-primary-container text-primary">
-                    <Brain className="w-4 h-4" aria-hidden="true" />
-                  </span>
-                  <h1 className="text-sm font-bold text-on-surface uppercase tracking-wide">
-                    Trình biên tập Tình huống Đánh giá Thực tế
-                  </h1>
-                </div>
-                <p className="text-xs text-on-surface-variant mt-0.5">
-                  Thiết lập câu hỏi đào sâu tư duy kiến trúc &amp; tiêu chí chấm điểm cho khái niệm{' '}
-                  <code className="font-mono font-bold text-primary">{conceptSlug}</code>
-                </p>
-              </div>
-              <span className="px-2.5 py-1 rounded bg-surface-container font-mono text-xs font-bold text-on-surface">
-                {conceptSlug.toUpperCase()}-T{depthTier}
-              </span>
+      {/* Master-Detail Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        {/* LEFT MASTER LIST (4 cols) */}
+        <div className="lg:col-span-4 bg-white rounded-2xl border border-[#D8E2D8] p-4 shadow-xs space-y-3">
+          <div className="flex items-center justify-between gap-2 pb-2 border-b border-[#E7EFE7]">
+            <div className="flex items-center gap-1.5">
+              <FileQuestion className="w-4 h-4 text-[#15803D]" aria-hidden="true" />
+              <h2 className="text-xs font-extrabold uppercase tracking-wider text-[#14241B]">
+                Câu hỏi Tầng {depthTier} ({filteredTierQuestions.length})
+              </h2>
             </div>
-
-            {/* Format Quick Cards */}
-            <div className="space-y-1.5">
-              <span className="text-[11px] uppercase font-bold text-on-surface-variant tracking-wider block">
-                Định dạng Đánh giá Thực tiễn
-              </span>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {FORMAT_CARDS.map((fmt) => {
-                  const activeFmt = taskType === fmt.key
-                  return (
-                    <button
-                      key={fmt.key}
-                      type="button"
-                      onClick={() => setTaskType(fmt.key)}
-                      className={`px-3 py-2 rounded-xl text-left transition-colors cursor-pointer ${
-                        activeFmt
-                          ? 'bg-primary text-on-primary shadow-sm'
-                          : 'bg-surface-container-low hover:bg-surface-container text-on-surface'
-                      }`}
-                    >
-                      <span className="text-[11px] font-bold flex items-center justify-between">
-                        <span>{fmt.tag}</span>
-                        <span className="font-mono text-[10px] opacity-85">{fmt.tiers}</span>
-                      </span>
-                      <span
-                        className={`text-[10px] block leading-tight mt-0.5 ${
-                          activeFmt ? 'text-on-primary/90' : 'text-on-surface-variant'
-                        }`}
-                      >
-                        {fmt.title}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
+            <button
+              type="button"
+              onClick={() => resetToNewQuestion(depthTier)}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#15803D] hover:bg-[#166534] text-white text-[11px] font-bold cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Tạo mới</span>
+            </button>
           </div>
 
-          {/* Prompt & Progressive Constraint Card */}
-          <div className="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-outline-variant/25 space-y-4">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-tertiary" aria-hidden="true" />
-                <h2 className="text-xs font-bold text-on-surface uppercase tracking-wide">
-                  Đề bài Thách thức Đào sâu (Prompt Học viên)
-                </h2>
-              </div>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-surface-container text-on-surface-variant">
-                Ngưỡng đạt tầng &ge; 75%
-              </span>
+          {loadingQuestions ? (
+            <div className="space-y-2">
+              {[0, 1].map((i) => (
+                <div key={i} className="h-16 rounded-xl bg-[#F6F8F5] animate-pulse" />
+              ))}
+            </div>
+          ) : filteredTierQuestions.length === 0 ? (
+            <div className="p-4 rounded-xl bg-[#FFFBEB] border border-[#F59E0B]/50 text-xs text-[#78350F] space-y-1">
+              <div className="font-bold">Chưa có câu hỏi nào ở Tầng {depthTier}</div>
+              <p className="text-[11px]">
+                Hãy soạn ít nhất 1 câu hỏi cho tầng này để hoàn thiện chuỗi đào sâu 5 tầng của khái niệm{' '}
+                <code className="font-mono font-bold">{conceptSlug}</code>.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+              {filteredTierQuestions.map((q) => {
+                const isSelected = editingId === q.id
+                return (
+                  <div
+                    key={q.id}
+                    className={`p-3 rounded-xl border transition-all ${
+                      isSelected
+                        ? 'bg-[#F0FDF4] border-[#15803D]'
+                        : 'bg-[#F6F8F5] border-[#D8E2D8] hover:border-[#15803D]/60'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => loadQuestionIntoEditor(q)}
+                        className="text-left flex-1 min-w-0 cursor-pointer"
+                      >
+                        <div className="flex items-center gap-1.5 text-[10px] font-mono text-[#57534E] mb-1">
+                          <span className="px-1.5 py-0.5 rounded bg-white border border-[#D8E2D8] font-bold text-[#15803D]">
+                            {q.task_type}
+                          </span>
+                          <span>v{q.version}</span>
+                        </div>
+                        <p className="text-xs font-semibold text-[#14241B] line-clamp-2">
+                          {q.prompt}
+                        </p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(q.id)}
+                        className="p-1.5 rounded-lg text-[#57534E] hover:text-[#9F1239] hover:bg-[#FFF1F2] cursor-pointer shrink-0"
+                        title="Xóa câu hỏi"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT DETAIL EDITOR + LIVE RUBRIC DRY-RUN (8 cols) */}
+        <div className="lg:col-span-8 space-y-5">
+          <div className="bg-white rounded-2xl border border-[#D8E2D8] p-5 shadow-xs space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-[#E7EFE7]">
+              <h2 className="text-sm font-extrabold text-[#14241B]">
+                {editingId ? 'Chỉnh sửa Câu hỏi Hiện có' : 'Soạn Câu hỏi Mới'} —{' '}
+                <code className="font-mono text-[#15803D]">{conceptSlug}</code> (Tầng {depthTier})
+              </h2>
+              {editingId && (
+                <button
+                  type="button"
+                  onClick={() => resetToNewQuestion(depthTier)}
+                  className="text-xs font-semibold text-[#15803D] hover:underline cursor-pointer"
+                >
+                  Chuyển sang tạo câu mới
+                </button>
+              )}
             </div>
 
+            {/* Prompt Input */}
             <div>
               <label
                 htmlFor="scr16-prompt-textarea"
-                className="block text-xs font-bold text-on-surface-variant mb-1.5"
+                className="block text-xs font-bold text-[#14241B] mb-1.5"
               >
-                Nội dung tình huống kỹ thuật hoặc câu hỏi phản biện:
+                Nội dung câu hỏi / Tình huống kỹ thuật
               </label>
               <textarea
                 id="scr16-prompt-textarea"
                 rows={4}
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Nhập nội dung câu hỏi đánh giá chiều sâu, thông số tải mục tiêu, giới hạn tài nguyên..."
-                className="w-full rounded-xl border border-outline-variant/40 bg-surface-container-low p-3.5 text-sm text-on-surface focus:bg-surface-container-lowest focus:border-primary focus:outline-none leading-relaxed"
+                placeholder="Nhập câu hỏi, tình huống sự cố, đoạn code cần review hoặc yêu cầu giải thích..."
+                className="w-full rounded-xl border border-[#D8E2D8] bg-[#F6F8F5] p-3 text-xs text-[#14241B] focus:bg-white focus:border-[#15803D] focus:outline-none leading-relaxed"
               />
             </div>
 
-            {/* Gate 3 Invariant: MCQ 4 options A/B/C/D + correct_option_key when taskType === 'mcq' */}
-            {taskType === 'mcq' && (
-              <div className="p-4 rounded-xl bg-surface-container-low border border-outline-variant/30 space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-bold">
-                  <span className="text-on-surface flex items-center gap-1.5">
-                    <Layers className="w-4 h-4 text-primary" aria-hidden="true" />
-                    <span>4 Phương án Trắc nghiệm Khách quan (A, B, C, D)</span>
+            {taskType === 'mcq' ? (
+              <div className="p-4 rounded-xl bg-[#F6F8F5] border border-[#D8E2D8] space-y-3">
+                <div className="flex items-center justify-between gap-2 text-xs font-bold">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Layers className="w-4 h-4 text-[#15803D]" aria-hidden="true" />
+                    <span>4 Phương án Trắc nghiệm (A, B, C, D)</span>
                   </span>
                   <div className="flex items-center gap-2">
-                    <label htmlFor="mcq-correct-key" className="text-on-surface-variant">
+                    <label htmlFor="mcq-correct-key" className="text-[#57534E]">
                       Đáp án đúng:
                     </label>
                     <select
@@ -528,7 +625,7 @@ export function ExpertQuestionsPage({ onNavigate }: ExpertQuestionsPageProps) {
                       onChange={(e) =>
                         setCorrectOptionKey(e.target.value as 'A' | 'B' | 'C' | 'D')
                       }
-                      className="rounded-lg border border-outline-variant/40 bg-surface-container-lowest px-2.5 py-1 text-xs font-mono font-bold text-primary"
+                      className="rounded-lg border border-[#D8E2D8] bg-white px-2.5 py-1 text-xs font-mono font-bold text-[#15803D]"
                     >
                       {(['A', 'B', 'C', 'D'] as const).map((k) => (
                         <option key={k} value={k}>
@@ -540,182 +637,109 @@ export function ExpertQuestionsPage({ onNavigate }: ExpertQuestionsPageProps) {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                  {(['A', 'B', 'C', 'D'] as const).map((k) => {
-                    const isCorrect = correctOptionKey === k
-                    return (
-                      <div
-                        key={k}
-                        className={`flex items-center gap-2 p-2.5 rounded-xl border transition-colors ${
-                          isCorrect
-                            ? 'bg-primary-container/20 border-primary'
-                            : 'bg-surface-container-lowest border-outline-variant/30'
+                  {(['A', 'B', 'C', 'D'] as const).map((k) => (
+                    <div
+                      key={k}
+                      className={`flex items-center gap-2 p-2.5 rounded-xl border bg-white ${
+                        correctOptionKey === k ? 'border-[#15803D]' : 'border-[#D8E2D8]'
+                      }`}
+                    >
+                      <span
+                        className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold shrink-0 ${
+                          correctOptionKey === k
+                            ? 'bg-[#15803D] text-white'
+                            : 'bg-[#F6F8F5] text-[#14241B]'
                         }`}
                       >
-                        <span
-                          className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold shrink-0 ${
-                            isCorrect
-                              ? 'bg-primary text-on-primary'
-                              : 'bg-surface-container text-on-surface'
-                          }`}
-                        >
-                          {k}
-                        </span>
-                        <input
-                          value={mcqOptions[k]}
-                          onChange={(e) =>
-                            setMcqOptions((prev) => ({ ...prev, [k]: e.target.value }))
-                          }
-                          placeholder={`Nội dung phương án ${k}`}
-                          className="flex-1 text-xs bg-transparent text-on-surface focus:outline-none"
-                        />
-                      </div>
-                    )
-                  })}
+                        {k}
+                      </span>
+                      <input
+                        value={mcqOptions[k]}
+                        onChange={(e) =>
+                          setMcqOptions((prev) => ({ ...prev, [k]: e.target.value }))
+                        }
+                        placeholder={`Nội dung phương án ${k}`}
+                        className="flex-1 text-xs bg-transparent focus:outline-none"
+                      />
+                    </div>
+                  ))}
                 </div>
               </div>
-            )}
+            ) : (
+              <div className="space-y-4">
+                {/* Structured Rubric Criteria */}
+                <div className="p-4 rounded-xl bg-[#F6F8F5] border border-[#D8E2D8] space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-bold">
+                    <span>Bảng Tiêu chí Rubric (Tổng trọng số = 1.0)</span>
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`font-mono ${isWeightValid ? 'text-[#15803D]' : 'text-[#9F1239]'}`}
+                      >
+                        Tổng: {totalWeight}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCriteria((prev) => [
+                            ...prev,
+                            { name: `Tiêu chí ${prev.length + 1}`, weight: 0, keywords: '', socratic_hint: '' },
+                          ])
+                        }
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-[#D8E2D8] text-[#15803D] cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+                        <span>Thêm tiêu chí</span>
+                      </button>
+                    </div>
+                  </div>
 
-            {taskType !== 'mcq' && (
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="scr16-ref-exp"
-                  className="block text-xs font-bold text-on-surface-variant"
-                >
-                  Lời giải thích chuẩn tham chiếu cho Gia sư AI Socratic (Reference Explanation):
-                </label>
-                <input
-                  id="scr16-ref-exp"
-                  value={refExp}
-                  onChange={(e) => setRefExp(e.target.value)}
-                  placeholder="Lời giải thích tham khảo chuẩn kiến trúc cho AI Tutor..."
-                  className="w-full rounded-xl border border-outline-variant/40 bg-surface-container-low px-3.5 py-2.5 text-xs text-on-surface focus:bg-surface-container-lowest focus:border-primary focus:outline-none"
-                />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* RIGHT COLUMN: Structured Rubric & Deterministic Fallback Builder (5 cols) */}
-        <div className="lg:col-span-5 space-y-5">
-          {/* Rubric Header Card */}
-          <div className="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-outline-variant/25 space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="inline-flex p-1.5 rounded-md bg-secondary-container text-on-secondary-container">
-                  <FileQuestion className="w-4 h-4" aria-hidden="true" />
-                </span>
-                <h2 className="text-sm font-bold text-on-surface uppercase tracking-wide">
-                  Cấu hình Tiêu chí Rubric Có Cấu trúc
-                </h2>
-              </div>
-              <span className="text-xs font-mono font-bold text-primary">
-                {taskType === 'mcq' ? 'MCQ Tất định' : `${criteria.length} Tiêu chí`}
-              </span>
-            </div>
-            <p className="text-xs text-on-surface-variant leading-relaxed">
-              Tiêu chí chấm điểm dùng cho LLM Evaluator kết hợp cơ chế Fallback Tất định (
-              <em className="italic">Deterministic Keyword Guardrail</em>) nếu LLM không phản hồi.
-            </p>
-          </div>
-
-          {taskType === 'mcq' ? (
-            <div className="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-outline-variant/25 space-y-3">
-              <div className="flex items-center justify-between text-xs font-bold">
-                <span className="text-on-surface">Chế độ Chấm Trắc nghiệm Tất định</span>
-                <span className="font-mono text-primary">Đáp án chuẩn: {correctOptionKey}</span>
-              </div>
-              <p className="text-xs text-on-surface-variant leading-relaxed">
-                Ở Tầng 1–2 (What / How), hệ thống đối chiếu trực tiếp khóa đáp án{' '}
-                <code className="font-mono font-bold text-primary">
-                  correct_option_key = {correctOptionKey}
-                </code>{' '}
-                với độ trễ &lt; 5ms. Chọn sang Tầng 3–5 (Troubleshooting / Constraint Shifting /
-                Teach-back) để cấu hình bảng trọng số Rubric.
-              </p>
-            </div>
-          ) : (
-            <div className="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-outline-variant/25 space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-bold">
-                <span className="text-on-surface">Bảng Trọng số Rubric (Tổng phải bằng 1.0)</span>
-                <div className="flex items-center gap-3">
-                  <span className={isWeightValid ? 'text-primary font-mono' : 'text-error font-mono'}>
-                    Tổng hiện tại: {totalWeight}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleAddCriterion}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container-low border border-outline-variant/30 text-primary hover:bg-surface-container cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" aria-hidden="true" />
-                    <span>Thêm tiêu chí</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {criteria.map((row, idx) => {
-                  const kwList = row.keywords
-                    .split(',')
-                    .map((s) => s.trim())
-                    .filter(Boolean)
-                  return (
-                    <div
-                      key={idx}
-                      className="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/25 space-y-2.5 text-xs"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="inline-flex items-center gap-1.5 font-bold text-on-surface">
-                          <span className="w-5 h-5 rounded-full bg-secondary-container text-on-secondary-container text-[11px] font-bold flex items-center justify-center">
-                            {idx + 1}
-                          </span>
-                          <span>Tiêu chí #{idx + 1}</span>
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-bold text-primary">
-                            {Math.round(Number(row.weight || 0) * 100)} Điểm
-                          </span>
-                          <button
-                            type="button"
-                            disabled={criteria.length <= 1}
-                            onClick={() => handleRemoveCriterion(idx)}
-                            className="p-1 rounded-lg text-error hover:bg-error-container/20 disabled:opacity-30 cursor-pointer"
-                            title="Xóa tiêu chí"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
-                          </button>
+                  <div className="space-y-2.5">
+                    {criteria.map((row, idx) => (
+                      <div
+                        key={idx}
+                        className="p-3 rounded-xl bg-white border border-[#D8E2D8] space-y-2 text-xs"
+                      >
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                          <input
+                            value={row.name}
+                            onChange={(e) =>
+                              setCriteria((prev) =>
+                                prev.map((r, i) => (i === idx ? { ...r, name: e.target.value } : r)),
+                              )
+                            }
+                            placeholder="Tên tiêu chí đánh giá"
+                            className="sm:col-span-7 rounded-lg border border-[#D8E2D8] bg-[#F6F8F5] px-2.5 py-1.5"
+                          />
+                          <input
+                            type="number"
+                            step="0.05"
+                            min="0"
+                            max="1"
+                            value={row.weight}
+                            onChange={(e) =>
+                              setCriteria((prev) =>
+                                prev.map((r, i) =>
+                                  i === idx ? { ...r, weight: Number(e.target.value) } : r,
+                                ),
+                              )
+                            }
+                            aria-label={`Trọng số tiêu chí ${idx + 1}`}
+                            className="sm:col-span-3 rounded-lg border border-[#D8E2D8] bg-[#F6F8F5] px-2.5 py-1.5 font-mono"
+                          />
+                          <div className="sm:col-span-2 flex justify-end">
+                            <button
+                              type="button"
+                              disabled={criteria.length <= 1}
+                              onClick={() =>
+                                setCriteria((prev) => prev.filter((_, i) => i !== idx))
+                              }
+                              className="p-1.5 rounded-lg text-[#9F1239] hover:bg-[#FFF1F2] disabled:opacity-30 cursor-pointer"
+                              title="Xóa tiêu chí"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                            </button>
+                          </div>
                         </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
-                        <input
-                          value={row.name}
-                          onChange={(e) =>
-                            setCriteria((prev) =>
-                              prev.map((r, i) => (i === idx ? { ...r, name: e.target.value } : r)),
-                            )
-                          }
-                          placeholder="Tên tiêu chí"
-                          className="sm:col-span-8 rounded-lg border border-outline-variant/40 bg-surface-container-lowest px-2.5 py-1.5"
-                        />
-                        <input
-                          type="number"
-                          step="0.05"
-                          min="0"
-                          max="1"
-                          value={row.weight}
-                          onChange={(e) =>
-                            setCriteria((prev) =>
-                              prev.map((r, i) =>
-                                i === idx ? { ...r, weight: Number(e.target.value) } : r,
-                              ),
-                            )
-                          }
-                          aria-label={`Trọng số tiêu chí ${idx + 1}`}
-                          className="sm:col-span-4 rounded-lg border border-outline-variant/40 bg-surface-container-lowest px-2.5 py-1.5 font-mono"
-                        />
-                      </div>
-
-                      <div>
                         <input
                           value={row.keywords}
                           onChange={(e) =>
@@ -725,102 +749,199 @@ export function ExpertQuestionsPage({ onNavigate }: ExpertQuestionsPageProps) {
                               ),
                             )
                           }
-                          placeholder="Từ khóa fallback (phân tách bằng dấu phẩy)"
-                          className="w-full rounded-lg border border-outline-variant/40 bg-surface-container-lowest px-2.5 py-1.5 font-mono"
+                          placeholder="Từ khóa bắt buộc (phân tách bằng dấu phẩy, vd: index, b-tree, scan)"
+                          className="w-full rounded-lg border border-[#D8E2D8] bg-[#F6F8F5] px-2.5 py-1.5 font-mono text-[11px]"
                         />
-                        {kwList.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1.5">
-                            {kwList.map((kw) => (
-                              <span
-                                key={kw}
-                                className="px-2 py-0.5 rounded bg-surface-container text-[10px] font-mono text-on-surface font-semibold"
-                              >
-                                {kw}
-                              </span>
-                            ))}
+                        <input
+                          value={row.socratic_hint}
+                          onChange={(e) =>
+                            setCriteria((prev) =>
+                              prev.map((r, i) =>
+                                i === idx ? { ...r, socratic_hint: e.target.value } : r,
+                              ),
+                            )
+                          }
+                          placeholder="Gợi ý Socratic khi học viên thiếu tiêu chí này (tùy chọn)"
+                          className="w-full rounded-lg border border-[#D8E2D8] bg-[#F6F8F5] px-2.5 py-1.5 text-[11px]"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Reference Explanation */}
+                <div>
+                  <label
+                    htmlFor="scr16-ref-exp"
+                    className="block text-xs font-bold text-[#14241B] mb-1"
+                  >
+                    Lời giải thích tham chiếu chuẩn (Reference Explanation)
+                  </label>
+                  <textarea
+                    id="scr16-ref-exp"
+                    rows={2}
+                    value={refExp}
+                    onChange={(e) => setRefExp(e.target.value)}
+                    placeholder="Giải thích chuẩn để AI Tutor phản hồi cho học viên..."
+                    className="w-full rounded-xl border border-[#D8E2D8] bg-[#F6F8F5] p-2.5 text-xs focus:bg-white focus:border-[#15803D] focus:outline-none"
+                  />
+                </div>
+
+                {/* Live Rubric Dry-Run Tool (Replaces decorative status card) */}
+                <div
+                  className="p-4 rounded-xl bg-[#F0FDF4]/70 border border-[#BBF7D0] space-y-3"
+                  data-testid="live-rubric-dry-run-panel"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-xs font-extrabold text-[#14532D]">
+                      Kiểm thử Bộ chấm Rubric Trực tiếp (Live Rubric Dry-Run)
+                    </h3>
+                    <button
+                      type="button"
+                      disabled={dryRunning || !sampleAnswer.trim() || !isWeightValid || !hasAllKeywords}
+                      onClick={() => void handleDryRunRubric()}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#15803D] hover:bg-[#166534] disabled:opacity-45 text-white text-xs font-bold cursor-pointer"
+                    >
+                      {dryRunning ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+                      ) : (
+                        <Play className="w-3.5 h-3.5" aria-hidden="true" />
+                      )}
+                      <span>Chạy thử Bộ chấm</span>
+                    </button>
+                  </div>
+
+                  <textarea
+                    rows={2}
+                    value={sampleAnswer}
+                    onChange={(e) => setSampleAnswer(e.target.value)}
+                    placeholder="Nhập thử câu trả lời mẫu của học viên để kiểm tra điểm số và từ khóa khớp..."
+                    className="w-full rounded-lg border border-[#BBF7D0] bg-white p-2.5 text-xs focus:border-[#15803D] focus:outline-none"
+                  />
+
+                  {dryRunResult && (
+                    <div className="p-3 rounded-lg bg-white border border-[#D8E2D8] space-y-2 text-xs">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-bold">
+                          Điểm chấm thử:{' '}
+                          <span
+                            className={`font-mono ${
+                              dryRunResult.passed ? 'text-[#15803D]' : 'text-[#9F1239]'
+                            }`}
+                          >
+                            {Math.round(dryRunResult.rubric_score * 100)}% (
+                            {dryRunResult.passed ? 'ĐẠT >= 75%' : 'CHƯA ĐẠT'})
+                          </span>
+                        </span>
+                        <span className="font-mono text-[11px] text-[#57534E]">
+                          Nguồn: {dryRunResult.grader_source}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#3F5247]">{dryRunResult.tutor_summary}</p>
+                      <div className="space-y-1">
+                        {dryRunResult.criteria_results.map((cr, idx) => (
+                          <div
+                            key={idx}
+                            className="p-2 rounded bg-[#F6F8F5] flex flex-wrap items-center justify-between gap-2 text-[11px]"
+                          >
+                            <span className="font-semibold text-[#14241B]">{cr.name}</span>
+                            <span className="font-mono">
+                              Điểm: {Math.round(cr.score * 100)}% | Khớp:{' '}
+                              {cr.matched_keywords.join(', ') || 'Không'} | Thiếu:{' '}
+                              {cr.missing_keywords.join(', ') || 'Không'}
+                            </span>
                           </div>
-                        )}
+                        ))}
                       </div>
                     </div>
-                  )
-                })}
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Deterministic Fallback Engine Status Card */}
-          <div className="bg-surface-container-lowest p-4 rounded-2xl shadow-sm border border-outline-variant/25 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-on-surface uppercase tracking-wide flex items-center gap-1.5">
-                <Terminal className="w-4 h-4 text-secondary" aria-hidden="true" />
-                <span>Bộ chấm Deterministic Fallback Engine</span>
+            {errorMsg && (
+              <div
+                role="alert"
+                className="p-3 rounded-xl bg-[#FFF1F2] border border-[#FDA4AF] text-xs font-bold text-[#9F1239] flex items-center gap-2"
+              >
+                <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
+            {statusMsg && (
+              <div className="p-3 rounded-xl bg-[#F0FDF4] border border-[#86EFAC] text-xs font-bold text-[#14532D] flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-[#15803D] shrink-0" aria-hidden="true" />
+                <span>{statusMsg}</span>
+              </div>
+            )}
+
+            {/* Save Footer */}
+            <div className="pt-3 border-t border-[#E7EFE7] flex flex-wrap items-center justify-between gap-3">
+              <span className="text-xs text-[#57534E]">
+                {isWeightValid && isMcqValid && hasAllKeywords
+                  ? 'Cấu trúc câu hỏi hợp lệ để xuất bản.'
+                  : 'Vui lòng điền đủ đề bài, phương án hoặc từ khóa Rubric (tổng trọng số = 1.0).'}
               </span>
-              <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-primary">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-                <span>Ready</span>
-              </span>
-            </div>
-            <div className="p-3 rounded-xl bg-surface-container font-mono text-[11px] space-y-1.5 text-on-surface">
-              <div className="flex justify-between text-on-surface-variant">
-                <span>Tokenizer Keyword Guardrail:</span>
-                <span className="text-primary font-bold">
-                  {taskType === 'mcq'
-                    ? `Option ${correctOptionKey} locked`
-                    : `${totalKeywordsCount} keywords active`}
+              <button
+                type="button"
+                disabled={
+                  submitting ||
+                  !prompt.trim() ||
+                  !isWeightValid ||
+                  !isMcqValid ||
+                  !hasAllKeywords
+                }
+                onClick={() => void handleSave()}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#15803D] hover:bg-[#166534] disabled:opacity-45 text-white text-xs font-bold cursor-pointer"
+              >
+                <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
+                <span>
+                  {submitting
+                    ? 'Đang lưu...'
+                    : editingId
+                      ? 'Cập nhật Câu hỏi & Rubric'
+                      : 'Lưu Câu hỏi & Rubric'}
                 </span>
-              </div>
-              <div className="w-full bg-surface-container-highest rounded-full h-1.5 overflow-hidden">
-                <div
-                  className={`h-1.5 rounded-full ${isWeightValid ? 'bg-primary' : 'bg-error'}`}
-                  style={{ width: isWeightValid ? '100%' : '50%' }}
-                />
-              </div>
+              </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Status & Error Alerts */}
-      {errorMsg && (
+      {/* Delete Confirmation Modal */}
+      {confirmDeleteId && (
         <div
-          role="alert"
-          className="p-3.5 rounded-xl bg-error-container/20 border border-error/40 text-xs font-bold text-error flex items-center gap-2"
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
         >
-          <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
-          <span>{errorMsg}</span>
+          <div className="bg-white max-w-md w-full rounded-2xl border border-[#D8E2D8] p-6 shadow-xl space-y-4">
+            <h3 className="text-sm font-extrabold text-[#14241B]">
+              Xác nhận gỡ câu hỏi khỏi ngân hàng đề
+            </h3>
+            <p className="text-xs text-[#57534E]">
+              Câu hỏi sẽ được đánh dấu ngừng hoạt động (soft-delete) để không ảnh hưởng lịch sử làm bài cũ của học viên.
+            </p>
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteId(null)}
+                className="px-4 py-2 rounded-lg bg-[#F6F8F5] border border-[#D8E2D8] text-xs font-semibold cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleConfirmDelete(confirmDeleteId)}
+                className="px-4 py-2 rounded-lg bg-[#9F1239] hover:bg-[#881337] text-xs font-bold text-white cursor-pointer"
+              >
+                Xác nhận xóa
+              </button>
+            </div>
+          </div>
         </div>
       )}
-      {statusMsg && (
-        <div className="p-3.5 rounded-xl bg-primary-container/30 border border-primary/30 text-xs font-bold text-on-primary-container flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-primary shrink-0" aria-hidden="true" />
-          <span>{statusMsg}</span>
-        </div>
-      )}
-
-      {/* 4. Sticky Bottom Action Footer Panel */}
-      <div className="w-full bg-surface-container-lowest rounded-2xl border border-surface-container-highest px-5 py-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-xs text-on-surface-variant">
-          <ShieldCheck className="w-4 h-4 text-primary" aria-hidden="true" />
-          <span>
-            Kiểm định cấu trúc:{' '}
-            <strong className={isWeightValid && isMcqValid ? 'text-primary' : 'text-error'}>
-              {isWeightValid && isMcqValid
-                ? 'Hợp lệ để lưu vào Ngân hàng Đề 5 Tầng'
-                : 'Vui lòng hoàn thiện đầy đủ trường dữ liệu & tổng trọng số = 1.0'}
-            </strong>
-          </span>
-        </div>
-
-        <button
-          type="button"
-          disabled={submitting || !prompt.trim() || !isWeightValid || !isMcqValid}
-          onClick={() => void handleSave()}
-          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-primary hover:bg-primary-dim disabled:opacity-45 text-on-primary text-xs font-bold transition-all shadow-sm cursor-pointer"
-        >
-          <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
-          <span>{submitting ? 'Đang lưu...' : 'Lưu Câu hỏi & Rubric'}</span>
-        </button>
-      </div>
     </section>
   )
 }

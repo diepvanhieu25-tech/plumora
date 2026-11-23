@@ -1,8 +1,14 @@
-"""Shared pure Policy Guardrail selector used identically by serving and Safety Evaluation Gate (C03)."""
+"""Shared pure Policy Guardrail selector delegating to plumora_rl.domain.PolicyGuardrailStrategy (C03)."""
 
 from __future__ import annotations
 
 import numpy as np
+from plumora_rl.domain import (
+    NODE_FEAT_DIM,
+    GraphObservation,
+    NodeFeatureIdx,
+    PolicyGuardrailStrategy,
+)
 
 
 def select_guarded_action(
@@ -12,41 +18,41 @@ def select_guarded_action(
     needs_review: np.ndarray,
     depth: np.ndarray,
     retention: np.ndarray,
+    code_score: np.ndarray | None = None,
+    has_code_challenge: np.ndarray | None = None,
 ) -> tuple[int, int, str, bool]:
-    """Select (node_idx, mode_idx, policy_source, guardrail_applied) with identical serving & Safety Gate rules.
-
-    Rules:
-    1. Due-review priority: if any node has needs_review=True (depth >= 0.50 & retention < 0.60),
-       immediately select Spaced_Review (mode 3) on the node with lowest retention.
-    2. Never select Spaced_Review (mode 3) when no node needs review.
-    3. Never select locked (eligible=False) nodes.
-    """
-    if bool(np.any(needs_review)):
-        masked_ret = np.where(needs_review, retention, np.inf)
-        target_v = int(np.argmin(masked_ret))
-        return target_v, 3, "gnn_ppo_masked", True
-
-    flat_logits = logits.reshape(-1)
-    raw_idx = int(np.argmax(flat_logits))
-    raw_v = raw_idx // 4
-    raw_m = raw_idx % 4
-
-    if bool(eligible[raw_v]) and float(depth[raw_v]) < 1.0 and raw_m != 3:
-        return raw_v, raw_m, "gnn_ppo", False
-
+    """Select (node_idx, mode_idx, policy_source, guardrail_applied) via PolicyGuardrailStrategy SSoT."""
     n_nodes = int(logits.shape[0])
-    mask = np.zeros((n_nodes, 4), dtype=bool)
-    for i in range(n_nodes):
-        if bool(eligible[i]) and float(depth[i]) < 1.0:
-            mask[i, 0:3] = True
-    if not np.any(mask):
-        for i in range(n_nodes):
-            if bool(eligible[i]):
-                mask[i, 0:3] = True
+    feats = np.zeros((n_nodes, NODE_FEAT_DIM), dtype=np.float32)
+    feats[:, NodeFeatureIdx.DEPTH_NORM] = depth.astype(np.float32, copy=False)
+    feats[:, NodeFeatureIdx.RETENTION] = retention.astype(np.float32, copy=False)
+    feats[:, NodeFeatureIdx.IS_ELIGIBLE] = eligible.astype(np.float32, copy=False)
+    feats[:, NodeFeatureIdx.NEEDS_REVIEW] = needs_review.astype(np.float32, copy=False)
+    if code_score is not None:
+        feats[:, NodeFeatureIdx.CODE_SCORE] = code_score.astype(np.float32, copy=False)
 
-    if not np.any(mask):
-        return 0, 0, "gnn_ppo_masked", True
+    decision = PolicyGuardrailStrategy.select_action(
+        logits,
+        feats,
+        has_code_challenge=has_code_challenge,
+    )
+    return (
+        decision.node_idx,
+        int(decision.mode),
+        decision.policy_source,
+        decision.guardrail_applied,
+    )
 
-    masked_logits = np.where(mask, logits, -1e9)
-    sel_idx = int(np.argmax(masked_logits.reshape(-1)))
-    return sel_idx // 4, sel_idx % 4, "gnn_ppo_masked", True
+
+def select_guarded_action_from_obs(
+    logits: np.ndarray,
+    obs: GraphObservation,
+) -> tuple[int, int, str, bool]:
+    """Select (node_idx, mode_idx, policy_source, guardrail_applied) directly from GraphObservation."""
+    decision = PolicyGuardrailStrategy.select_action(logits, obs)
+    return (
+        decision.node_idx,
+        int(decision.mode),
+        decision.policy_source,
+        decision.guardrail_applied,
+    )

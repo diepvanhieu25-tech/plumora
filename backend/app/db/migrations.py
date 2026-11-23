@@ -378,6 +378,194 @@ def _migration_0009(conn: Connection) -> None:
             )
 
 
+def _migration_0010(conn: Connection) -> None:
+    """Add per-schema outbox/consumed tables, drop cross-schema user FKs, and add v3 content/playbook columns."""
+    if conn.dialect.name == "sqlite":
+        existing_tables = {
+            row[0]
+            for row in conn.execute(
+                text("SELECT name FROM sqlite_master WHERE type='table';")
+            ).fetchall()
+        }
+        if "user_node_competency" in existing_tables:
+            cols = {
+                row[1]
+                for row in conn.execute(text("PRAGMA table_info(user_node_competency);")).fetchall()
+            }
+            if "playbook_completed_at" not in cols:
+                conn.execute(
+                    text("ALTER TABLE user_node_competency ADD COLUMN playbook_completed_at DATETIME;")
+                )
+        if "depth_questions" in existing_tables:
+            cols = {
+                row[1]
+                for row in conn.execute(text("PRAGMA table_info(depth_questions);")).fetchall()
+            }
+            if "is_active" not in cols:
+                conn.execute(
+                    text("ALTER TABLE depth_questions ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1;")
+                )
+            if "version" not in cols:
+                conn.execute(
+                    text("ALTER TABLE depth_questions ADD COLUMN version INTEGER NOT NULL DEFAULT 1;")
+                )
+            if "display_order" not in cols:
+                conn.execute(
+                    text("ALTER TABLE depth_questions ADD COLUMN display_order INTEGER NOT NULL DEFAULT 0;")
+                )
+        if "code_challenges" in existing_tables:
+            cols = {
+                row[1]
+                for row in conn.execute(text("PRAGMA table_info(code_challenges);")).fetchall()
+            }
+            if "setup_sql" not in cols:
+                conn.execute(text("ALTER TABLE code_challenges ADD COLUMN setup_sql TEXT;"))
+            if "is_active" not in cols:
+                conn.execute(
+                    text("ALTER TABLE code_challenges ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1;")
+                )
+            if "version" not in cols:
+                conn.execute(
+                    text("ALTER TABLE code_challenges ADD COLUMN version INTEGER NOT NULL DEFAULT 1;")
+                )
+            if "display_order" not in cols:
+                conn.execute(
+                    text("ALTER TABLE code_challenges ADD COLUMN display_order INTEGER NOT NULL DEFAULT 0;")
+                )
+        return
+
+    # PostgreSQL: 1. Create content_svc.outbox_events and assess_svc.consumed_events
+    conn.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS content_svc.outbox_events (
+                id UUID PRIMARY KEY,
+                event_id UUID UNIQUE NOT NULL,
+                event_type VARCHAR(64) NOT NULL,
+                stream_name VARCHAR(64) NOT NULL,
+                payload_json JSONB NOT NULL,
+                published_at TIMESTAMPTZ NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            """
+        )
+    )
+    conn.execute(
+        text(
+            "CREATE INDEX IF NOT EXISTS idx_content_outbox_unpublished_created "
+            "ON content_svc.outbox_events (published_at, created_at);"
+        )
+    )
+    conn.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS assess_svc.consumed_events (
+                event_id UUID PRIMARY KEY,
+                consumer_group VARCHAR(64) NOT NULL,
+                consumed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            """
+        )
+    )
+    conn.execute(
+        text(
+            "GRANT SELECT, INSERT, UPDATE, DELETE ON content_svc.outbox_events "
+            "TO content_svc_user, content_role;"
+        )
+    )
+    conn.execute(
+        text(
+            "GRANT SELECT, INSERT, UPDATE, DELETE ON assess_svc.consumed_events "
+            "TO assess_svc_user, assess_role;"
+        )
+    )
+
+    # PostgreSQL: 2. Drop cross-schema Foreign Keys pointing to auth_svc.users
+    for schema_name, tbl_name in (
+        ("assess_svc", "user_concept_mastery"),
+        ("assess_svc", "quiz_attempts"),
+        ("assess_svc", "user_node_competency"),
+        ("assess_svc", "assessment_sessions"),
+        ("assess_svc", "attempt_records"),
+        ("rec_ai_svc", "recommendation_logs"),
+    ):
+        fk_names = list(
+            conn.execute(
+                text(
+                    """
+                    SELECT tc.constraint_name
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.referential_constraints rc
+                      ON tc.constraint_name = rc.constraint_name
+                     AND tc.constraint_schema = rc.constraint_schema
+                    JOIN information_schema.table_constraints pk
+                      ON rc.unique_constraint_name = pk.constraint_name
+                     AND rc.unique_constraint_schema = pk.constraint_schema
+                    WHERE tc.constraint_type = 'FOREIGN KEY'
+                      AND tc.table_schema = :schema
+                      AND tc.table_name = :tbl
+                      AND pk.table_name = 'users'
+                    """
+                ),
+                {"schema": schema_name, "tbl": tbl_name},
+            ).scalars()
+        )
+        for fk_name in fk_names:
+            conn.execute(
+                text(f'ALTER TABLE {schema_name}.{tbl_name} DROP CONSTRAINT IF EXISTS "{fk_name}";')
+            )
+
+    # PostgreSQL: 3. Idempotent v3 column additions
+    conn.execute(
+        text(
+            "ALTER TABLE assess_svc.user_node_competency "
+            "ADD COLUMN IF NOT EXISTS playbook_completed_at TIMESTAMPTZ;"
+        )
+    )
+    conn.execute(
+        text(
+            "ALTER TABLE content_svc.depth_questions "
+            "ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;"
+        )
+    )
+    conn.execute(
+        text(
+            "ALTER TABLE content_svc.depth_questions "
+            "ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;"
+        )
+    )
+    conn.execute(
+        text(
+            "ALTER TABLE content_svc.depth_questions "
+            "ADD COLUMN IF NOT EXISTS display_order INTEGER NOT NULL DEFAULT 0;"
+        )
+    )
+    conn.execute(
+        text(
+            "ALTER TABLE content_svc.code_challenges "
+            "ADD COLUMN IF NOT EXISTS setup_sql TEXT;"
+        )
+    )
+    conn.execute(
+        text(
+            "ALTER TABLE content_svc.code_challenges "
+            "ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;"
+        )
+    )
+    conn.execute(
+        text(
+            "ALTER TABLE content_svc.code_challenges "
+            "ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;"
+        )
+    )
+    conn.execute(
+        text(
+            "ALTER TABLE content_svc.code_challenges "
+            "ADD COLUMN IF NOT EXISTS display_order INTEGER NOT NULL DEFAULT 0;"
+        )
+    )
+
+
 MIGRATIONS: list[tuple[str, Callable[[Connection], None]]] = [
     ("0001_initial_schema", _migration_0001),
     ("0002_add_quiz_attempt_state_version_and_unlocked", _migration_0002),
@@ -388,6 +576,7 @@ MIGRATIONS: list[tuple[str, Callable[[Connection], None]]] = [
     ("0007_strict_schema_isolation", _migration_0007),
     ("0008_cleanup_public_duplicates", _migration_0008),
     ("0009_single_active_model_index", _migration_0009),
+    ("0010_v3_per_schema_outbox_and_content_columns", _migration_0010),
 ]
 
 

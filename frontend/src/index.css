@@ -1,80 +1,101 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: #f8faf7;
-  --color-surface: #f8faf7;
-  --color-surface-bright: #f8faf7;
-  --color-surface-dim: #d4dcd7;
-  --color-surface-variant: #dde4e0;
+  /* Botanical Sprout & Sunlit Canopy — Unified Design Tokens (v3.0) */
+  --color-background: #f6f8f5;
+  --color-surface: #f6f8f5;
+  --color-surface-bright: #ffffff;
+  --color-surface-dim: #e2e8e2;
+  --color-surface-variant: #d8e2d8;
   --color-surface-container-lowest: #ffffff;
   --color-surface-container-low: #f1f5f1;
   --color-surface-container: #eaefeb;
-  --color-surface-container-high: #e4eae5;
-  --color-surface-container-highest: #dde4e0;
-  --color-on-background: #2d3431;
-  --color-on-surface: #2d3431;
-  --color-on-surface-variant: #59615d;
-  --color-outline: #757c79;
-  --color-outline-variant: #acb4af;
-  --color-primary: #006e31;
-  --color-primary-dim: #00612a;
-  --color-on-primary: #e9ffe7;
-  --color-primary-container: #95f8a7;
-  --color-on-primary-container: #005f29;
-  --color-primary-fixed: #95f8a7;
-  --color-primary-fixed-dim: #87e99a;
-  --color-on-primary-fixed: #004a1e;
-  --color-on-primary-fixed-variant: #006a2f;
-  --color-secondary: #006b62;
-  --color-secondary-dim: #005e56;
-  --color-on-secondary: #e2fff9;
-  --color-secondary-container: #89f5e7;
-  --color-on-secondary-container: #005c54;
-  --color-secondary-fixed: #89f5e7;
-  --color-secondary-fixed-dim: #7ae7d8;
-  --color-on-secondary-fixed: #004841;
-  --color-on-secondary-fixed-variant: #00675e;
-  --color-tertiary: #914d00;
-  --color-tertiary-dim: #804300;
-  --color-on-tertiary: #fff7f4;
-  --color-tertiary-container: #fe932c;
-  --color-tertiary-fixed: #fe932c;
-  --color-tertiary-fixed-dim: #ed871e;
-  --color-on-tertiary-container: #4a2500;
-  --color-on-tertiary-fixed: #240f00;
-  --color-on-tertiary-fixed-variant: #572c00;
-  --color-error: #a73b21;
-  --color-error-dim: #791903;
-  --color-error-container: #fd795a;
-  --color-on-error: #fff7f6;
-  --color-on-error-container: #6e1400;
-  --color-inverse-surface: #0c0f0e;
-  --color-inverse-on-surface: #9b9e9b;
-  --color-inverse-primary: #98fba9;
+  --color-surface-container-high: #e2e9e3;
+  --color-surface-container-highest: #d8e2d8;
+
+  --color-on-background: #14241b;
+  --color-on-surface: #14241b;
+  --color-on-surface-variant: #3f5247;
+  --color-outline: #57534e;
+  --color-outline-variant: #c6d1c6;
+
+  /* Primary: Deep Forest & Sprout Green */
+  --color-primary: #15803d;
+  --color-primary-dim: #166534;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #dcfce7;
+  --color-on-primary-container: #14532d;
+  --color-primary-fixed: #bbf7d0;
+  --color-primary-fixed-dim: #22c55e;
+  --color-on-primary-fixed: #14532d;
+  --color-on-primary-fixed-variant: #15803d;
+
+  /* Secondary: Sage Teal (Unlocked / Applied) */
+  --color-secondary: #0d9488;
+  --color-secondary-dim: #0f766e;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #ccfbf1;
+  --color-on-secondary-container: #134e4a;
+  --color-secondary-fixed: #99f6e4;
+  --color-secondary-fixed-dim: #5eead4;
+  --color-on-secondary-fixed: #134e4a;
+  --color-on-secondary-fixed-variant: #0f766e;
+
+  /* Tertiary: Sunlit Amber (AI Recommendation & Ebbinghaus Review) */
+  --color-tertiary: #d97706;
+  --color-tertiary-dim: #b45309;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #fef3c7;
+  --color-on-tertiary-container: #78350f;
+  --color-tertiary-fixed: #f59e0b;
+  --color-tertiary-fixed-dim: #d97706;
+  --color-on-tertiary-fixed: #78350f;
+  --color-on-tertiary-fixed-variant: #92400e;
+
+  /* Semantic Sunlit AI & Cross-Domain Shared Tokens */
+  --color-ai-sunlit-bg: #fffbeb;
+  --color-ai-sunlit-border: #d97706;
+  --color-ai-sunlit-text: #78350f;
+  --color-shared-bg: #eff6ff;
+  --color-shared-border: #93c5fd;
+  --color-shared-text: #1d4ed8;
+
+  /* Error: Botanical Rose */
+  --color-error: #9f1239;
+  --color-error-dim: #881337;
+  --color-error-container: #ffe4e6;
+  --color-on-error: #ffffff;
+  --color-on-error-container: #881337;
+
+  /* Inverse */
+  --color-inverse-surface: #0f172a;
+  --color-inverse-on-surface: #e2e8f0;
+  --color-inverse-primary: #86efac;
+
+  /* Typography */
+  --font-sans: "Plus Jakarta Sans", "Inter", system-ui, -apple-system, sans-serif;
   --font-headline: "Plus Jakarta Sans", "Inter", system-ui, -apple-system, sans-serif;
-  --font-label: "Public Sans", "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --font-label: "Plus Jakarta Sans", "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
 }
 
 :root {
-  --bg-canvas: #F6F8F5;
-  --bg-surface: #FFFFFF;
-  --bg-subtle: #F5F5F4;
-  --border-default: #D8E2D8;
-  --text-primary: #14241B;
-  --text-secondary: #3F5247;
-  --text-muted: #57534E;
-  --brand-primary: #15803D;
+  --bg-canvas: #f6f8f5;
+  --bg-surface: #ffffff;
+  --bg-subtle: #f5f5f4;
+  --border-default: #d8e2d8;
+  --text-primary: #14241b;
+  --text-secondary: #3f5247;
+  --text-muted: #57534e;
+  --brand-primary: #15803d;
   --brand-hover: #166534;
-  --ai-sunlit-bg: #FFFBEB;
-  --ai-sunlit-border: #D97706;
-  --ai-sunlit-text: #78350F;
-  --state-mastered: #16A34A;
-  --state-unlocked: #0D9488;
-  --state-locked: #57534E;
-  --state-error: #9F1239;
-
-  --font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+  --ai-sunlit-bg: #fffbeb;
+  --ai-sunlit-border: #d97706;
+  --ai-sunlit-text: #78350f;
+  --state-mastered: #16a34a;
+  --state-unlocked: #0d9488;
+  --state-locked: #57534e;
+  --state-error: #9f1239;
 }
 
 * {
@@ -90,69 +111,8 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-code, pre, .font-mono {
+code,
+pre,
+.font-mono {
   font-family: var(--font-mono);
-}
-
-.plumora-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 24px;
-}
-
-.plumora-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-default);
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 1px 2px rgba(20, 36, 27, 0.04);
-}
-
-.plumora-btn-primary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 10px 18px;
-  background-color: var(--brand-primary);
-  color: #FFFFFF;
-  font-weight: 600;
-  font-size: 14px;
-  border-radius: 8px;
-  border: 1px solid var(--brand-primary);
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-
-.plumora-btn-primary:hover:not(:disabled) {
-  background-color: var(--brand-hover);
-}
-
-.plumora-btn-primary:disabled {
-  background-color: #D6D3D1;
-  border-color: #D6D3D1;
-  color: #57534E;
-  cursor: not-allowed;
-}
-
-.plumora-btn-outline {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 40px;
-  padding: 8px 14px;
-  background-color: #FFFFFF;
-  color: var(--text-primary);
-  font-weight: 600;
-  font-size: 13px;
-  border-radius: 8px;
-  border: 1px solid var(--border-default);
-  cursor: pointer;
-}
-
-.plumora-btn-outline:hover:not(:disabled) {
-  background-color: #F0FDF4;
-  border-color: var(--brand-primary);
 }

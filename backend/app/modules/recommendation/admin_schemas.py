@@ -22,7 +22,7 @@ class ModelActionRequest(BaseModel):
 
 
 class ModelRegistryItemOut(BaseModel):
-    """Model registry entry."""
+    """Model registry entry exposing full Safety Gate eval_metrics and activation timestamp."""
 
     model_id: uuid.UUID
     version_tag: str
@@ -31,6 +31,8 @@ class ModelRegistryItemOut(BaseModel):
     gate_verdict: str
     is_active: bool
     created_at: str
+    activated_at: str | None = None
+    eval_metrics: dict[str, Any] = Field(default_factory=dict)
 
 
 class OnlineRlStatusResponse(BaseModel):
@@ -41,3 +43,12 @@ class OnlineRlStatusResponse(BaseModel):
     active_model: ModelRegistryItemOut | None
     models: list[ModelRegistryItemOut]
     benchmark_report: dict[str, Any] | None = None
+
+
+class PolicyInspectRequest(BaseModel):
+    """Admin-only Policy Inspector & What-If Time Simulation Clock request."""
+
+    domain_slug: str = Field(default="backend", min_length=1, max_length=64)
+    user_id: uuid.UUID | None = None
+    simulated_time_offset_days: float = Field(default=0.0, ge=0.0, le=365.0)
+    checkpoint_model_id: uuid.UUID | None = None

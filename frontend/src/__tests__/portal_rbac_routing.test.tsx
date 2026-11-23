@@ -2,39 +2,46 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { App } from '../App'
 import { Header } from '../components/common/Header'
-import { AuthPage } from '../pages/AuthPage'
+import { BackOfficeLoginPage } from '../pages/BackOfficeLoginPage'
+import { LearnerAuthPage } from '../pages/LearnerAuthPage'
 import { parseRoute } from '../router'
 
 describe('Portal Separation, URL Routing & RBAC Enforcement', () => {
-  it('parses learner, expert, and admin portal routes accurately', () => {
+  it('parses canonical learner and back-office routes accurately', () => {
+    expect(parseRoute('/backoffice/login')).toMatchObject({ portal: 'expert', isLoginPath: true })
     expect(parseRoute('/admin/login')).toMatchObject({ portal: 'admin', isLoginPath: true })
-    expect(parseRoute('/admin/model-registry')).toMatchObject({
+    expect(parseRoute('/backoffice/mlops/model-registry')).toMatchObject({
       portal: 'admin',
       view: 'admin_registry',
     })
-    expect(parseRoute('/expert/login')).toMatchObject({ portal: 'expert', isLoginPath: true })
-    expect(parseRoute('/expert/questions')).toMatchObject({
+    expect(parseRoute('/backoffice/studio/questions')).toMatchObject({
       portal: 'expert',
       view: 'expert_questions',
+    })
+    expect(parseRoute('/backoffice/cohort')).toMatchObject({
+      portal: 'expert',
+      view: 'cohort_analytics',
     })
     expect(parseRoute('/domains/frontend/roadmap')).toMatchObject({
       portal: 'learner',
       view: 'domain_roadmap',
       domainSlug: 'frontend',
     })
+    expect(parseRoute('/domains/frontend/concepts/fe-dom-events/depth-probe', '?mode=spaced_review')).toMatchObject({
+      portal: 'learner',
+      view: 'depth_probe',
+      domainSlug: 'frontend',
+      conceptSlug: 'fe-dom-events',
+      sessionMode: 'spaced_review',
+    })
   })
 
-  it('hides public registration tab on /admin/login and /expert/login', () => {
+  it('strictly separates LearnerAuthPage and BackOfficeLoginPage with zero demo buttons', () => {
     const noop = async () => {}
-    const { rerender } = render(
-      <AuthPage
-        portal="admin"
-        authMode="login"
-        setAuthMode={() => {}}
+    const { unmount } = render(
+      <BackOfficeLoginPage
         usernameInput=""
         setUsernameInput={() => {}}
-        displayNameInput=""
-        setDisplayNameInput={() => {}}
         passwordInput=""
         setPasswordInput={() => {}}
         authError={null}
@@ -44,10 +51,11 @@ describe('Portal Separation, URL Routing & RBAC Enforcement', () => {
     )
     expect(screen.queryByTestId('tab-register-btn')).toBeNull()
     expect(screen.getByTestId('staff-portal-notice')).toBeInTheDocument()
+    expect(screen.queryByText(/admin_demo/i)).toBeNull()
+    unmount()
 
-    rerender(
-      <AuthPage
-        portal="learner"
+    render(
+      <LearnerAuthPage
         authMode="login"
         setAuthMode={() => {}}
         usernameInput=""
@@ -62,10 +70,11 @@ describe('Portal Separation, URL Routing & RBAC Enforcement', () => {
       />,
     )
     expect(screen.getByTestId('tab-register-btn')).toBeInTheDocument()
+    expect(screen.queryByText(/learner_new/i)).toBeNull()
   })
 
-  it('renders 403 Forbidden page if Learner navigates to /admin/* or /expert/*', () => {
-    window.history.pushState({}, '', '/admin/online-rl')
+  it('renders 403 Forbidden page if Learner navigates to /backoffice/* or /admin/*', () => {
+    window.history.pushState({}, '', '/backoffice/mlops/online-rl')
     const { unmount } = render(
       <App
         initialUser={{
@@ -80,7 +89,7 @@ describe('Portal Separation, URL Routing & RBAC Enforcement', () => {
     expect(screen.getByTestId('forbidden-403-page')).toBeInTheDocument()
     unmount()
 
-    window.history.pushState({}, '', '/expert/domains')
+    window.history.pushState({}, '', '/backoffice/studio/domains')
     render(
       <App
         initialUser={{

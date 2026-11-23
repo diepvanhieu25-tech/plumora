@@ -23,6 +23,14 @@ def _register_and_login(client: TestClient) -> None:
     assert res.status_code == 201
 
 
+def _complete_playbook(client: TestClient, domain_slug: str = "backend", concept_slug: str = "net-internet") -> None:
+    pb = client.post(
+        f"/api/v2/domains/{domain_slug}/concepts/{concept_slug}/playbook/complete",
+        json={"submission_id": str(uuid.uuid4())},
+    )
+    assert pb.status_code == 200
+
+
 def test_pl3_grader_01_code_sandbox_happy_path_and_idempotency() -> None:
     """Valid Python solution passes all test cases and supports idempotent submission_id replay."""
     with TestClient(app) as client:
@@ -30,6 +38,7 @@ def test_pl3_grader_01_code_sandbox_happy_path_and_idempotency() -> None:
         # net-internet is Tier 1 root (unlocked) and has a code challenge
         res = client.get("/api/v2/domains/backend/roadmap")
         assert res.status_code == 200
+        _complete_playbook(client, "backend", "net-internet")
 
         challenge_res = client.get("/api/v2/concepts/net-internet/code-challenge")
         assert challenge_res.status_code == 200
@@ -69,6 +78,7 @@ def test_pl3_grader_01_infinite_loop_terminated_within_3200ms() -> None:
     """Infinite loop in user code is killed and returns 408 SANDBOX_TIMEOUT <= 3.2s (INV-SANDBOX-01)."""
     with TestClient(app) as client:
         _register_and_login(client)
+        _complete_playbook(client, "backend", "net-internet")
         ch = client.get("/api/v2/concepts/net-internet/code-challenge").json()
         t0 = time.monotonic()
         res = client.post(
@@ -90,6 +100,7 @@ def test_pl3_grader_01_network_and_filesystem_isolation() -> None:
     """Forbidden network/filesystem imports or calls are blocked with 422 SANDBOX_SECURITY_VIOLATION."""
     with TestClient(app) as client:
         _register_and_login(client)
+        _complete_playbook(client, "backend", "net-internet")
         ch = client.get("/api/v2/concepts/net-internet/code-challenge").json()
         res = client.post(
             "/api/v2/concepts/net-internet/code-sandbox/submit",

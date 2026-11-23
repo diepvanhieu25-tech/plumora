@@ -5,25 +5,37 @@ import { DepthProbePage } from '../pages/DepthProbePage'
 import { LessonPlaybookPage } from '../pages/LessonPlaybookPage'
 import { MultiDomainHubPage } from '../pages/MultiDomainHubPage'
 import { MultiDomainRoadmapPage } from '../pages/MultiDomainRoadmapPage'
+import type { AssessmentSessionMode } from '../router'
 import type { ActiveView, DomainRoadmapNode } from '../types'
 
 interface LearnerV2ShellProps {
   activeView: ActiveView
   routeDomainSlug?: string
   routeConceptSlug?: string
-  onNavigate: (view: ActiveView, params?: { domainSlug?: string; conceptSlug?: string }) => void
+  routeSessionMode?: AssessmentSessionMode
+  onNavigate: (
+    view: ActiveView,
+    params?: {
+      domainSlug?: string
+      conceptSlug?: string
+      sessionMode?: AssessmentSessionMode
+    },
+  ) => void
 }
 
 export function LearnerV2Shell({
   activeView,
   routeDomainSlug,
   routeConceptSlug,
+  routeSessionMode,
   onNavigate,
 }: LearnerV2ShellProps) {
   const [activeDomainSlug, setActiveDomainSlug] = useState<string>(routeDomainSlug || 'backend')
   const [activeConceptSlug, setActiveConceptSlug] = useState<string>(routeConceptSlug || 'net-internet')
   const [playbookNode, setPlaybookNode] = useState<DomainRoadmapNode | null>(null)
-  const [sessionMode, setSessionMode] = useState<'depth_probe' | 'spaced_review'>('depth_probe')
+  const [sessionMode, setSessionMode] = useState<AssessmentSessionMode>(
+    routeSessionMode || 'depth_probe',
+  )
 
   useEffect(() => {
     if (routeDomainSlug) setActiveDomainSlug(routeDomainSlug)
@@ -32,6 +44,10 @@ export function LearnerV2Shell({
   useEffect(() => {
     if (routeConceptSlug) setActiveConceptSlug(routeConceptSlug)
   }, [routeConceptSlug])
+
+  useEffect(() => {
+    if (routeSessionMode) setSessionMode(routeSessionMode)
+  }, [routeSessionMode])
 
   if (activeView === 'domains') {
     return (
@@ -76,7 +92,11 @@ export function LearnerV2Shell({
           setActiveDomainSlug(dSlug)
           setActiveConceptSlug(cSlug)
           setSessionMode('depth_probe')
-          onNavigate('depth_probe', { domainSlug: dSlug, conceptSlug: cSlug })
+          onNavigate('depth_probe', {
+            domainSlug: dSlug,
+            conceptSlug: cSlug,
+            sessionMode: 'depth_probe',
+          })
         }}
         onStartCodeSandbox={(dSlug, cSlug) => {
           setActiveDomainSlug(dSlug)
@@ -87,7 +107,11 @@ export function LearnerV2Shell({
           setActiveDomainSlug(dSlug)
           setActiveConceptSlug(cSlug)
           setSessionMode('spaced_review')
-          onNavigate('depth_probe', { domainSlug: dSlug, conceptSlug: cSlug })
+          onNavigate('depth_probe', {
+            domainSlug: dSlug,
+            conceptSlug: cSlug,
+            sessionMode: 'spaced_review',
+          })
         }}
       />
     )
@@ -98,12 +122,16 @@ export function LearnerV2Shell({
       <LessonPlaybookPage
         domainSlug={activeDomainSlug}
         conceptSlug={activeConceptSlug}
-        initialNode={playbookNode}
+        initialNode={playbookNode?.slug === activeConceptSlug ? playbookNode : null}
         onBackToRoadmap={() => onNavigate('domain_roadmap', { domainSlug: activeDomainSlug })}
         onStartDepthProbe={(cSlug) => {
           setActiveConceptSlug(cSlug)
           setSessionMode('depth_probe')
-          onNavigate('depth_probe', { domainSlug: activeDomainSlug, conceptSlug: cSlug })
+          onNavigate('depth_probe', {
+            domainSlug: activeDomainSlug,
+            conceptSlug: cSlug,
+            sessionMode: 'depth_probe',
+          })
         }}
         onStartCodeSandbox={(cSlug) => {
           setActiveConceptSlug(cSlug)

@@ -17,6 +17,11 @@ export interface DomainListItem {
   user_summary: DomainUserSummary
 }
 
+export interface PrerequisiteTitleRef {
+  slug: string
+  title: string
+}
+
 export interface DomainRoadmapNode {
   node_idx: number
   slug: string
@@ -24,6 +29,7 @@ export interface DomainRoadmapNode {
   tier: number
   is_shared: boolean
   prerequisites: string[]
+  prerequisite_titles?: PrerequisiteTitleRef[]
   lesson_markdown: string
   depth_level_norm: number
   depth_label: string
@@ -33,6 +39,10 @@ export interface DomainRoadmapNode {
   is_eligible: boolean
   needs_review: boolean
   code_practice_score: number
+  has_code_challenge?: boolean
+  playbook_completed?: boolean
+  last_practiced_at?: string | null
+  next_review_due_at?: string | null
 }
 
 export interface DomainRoadmapResponse {
@@ -40,6 +50,12 @@ export interface DomainRoadmapResponse {
   domain_title: string
   graph_version: number
   nodes: DomainRoadmapNode[]
+}
+
+export interface ConceptPlaybookDetailResponse {
+  domain_slug: string
+  domain_title: string
+  node: DomainRoadmapNode
 }
 
 export interface PlacementQuestionItem {
@@ -94,18 +110,32 @@ export interface UpdatedCompetencyOut {
   depth_label: string
   confidence: number
   stability_s: number
+  stability_s_before?: number | null
+  stability_s_after?: number | null
   retention_ebbinghaus: number
+  next_review_due_at?: string | null
+}
+
+export interface PlaybookCompleteResponse {
+  domain_slug: string
+  concept_slug: string
+  playbook_completed: boolean
+  idempotent_replay: boolean
+  updated_competency: UpdatedCompetencyOut
+}
+
+export interface TutorCriterionResult {
+  name: string
+  weight: number
+  score: number
+  matched_keywords: string[]
+  missing_keywords: string[]
+  socratic_hint?: string | null
 }
 
 export interface TutorFeedbackOut {
   summary: string
-  criteria_results: Array<{
-    name: string
-    weight: number
-    score: number
-    matched_keywords: string[]
-    missing_keywords: string[]
-  }>
+  criteria_results: TutorCriterionResult[]
 }
 
 export interface AssessmentSubmitResponse {
@@ -119,6 +149,12 @@ export interface AssessmentSubmitResponse {
   next_step_item: DepthStepItem | null
   updated_competency: UpdatedCompetencyOut
   tutor_feedback: TutorFeedbackOut | null
+}
+
+export interface AssessmentAbandonResponse {
+  session_id: string
+  session_status: 'insufficient_evidence' | 'ceiling_reached' | 'completed' | string
+  updated_competency: UpdatedCompetencyOut
 }
 
 export interface CodeChallengeOut {
@@ -144,6 +180,7 @@ export interface CodeSandboxSubmitResponse {
   test_results: Array<{
     name: string
     passed: boolean
+    is_hidden?: boolean
     actual?: unknown
     expected?: unknown
     error?: string

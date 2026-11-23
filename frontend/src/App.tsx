@@ -1,43 +1,32 @@
-import { useCallback, useEffect, useState } from 'react'
-import { apiGetMe, apiLogout, apiLogin, apiRegister } from './api'
-import { Header } from './components/common/Header'
+import { useEffect, useState } from 'react'
+import { apiGetMe, apiLogin, apiLogout, apiRegister } from './api'
 import { Toast } from './components/common/Toast'
-import { AuthPage } from './pages/AuthPage'
+import { useRouter } from './hooks/useRouter'
+import { BackOfficeLoginPage } from './pages/BackOfficeLoginPage'
 import { Forbidden403Page } from './pages/Forbidden403Page'
-import {
-  defaultPathForRole,
-  loginPathForPortal,
-  parseRoute,
-  pathForView,
-} from './router'
-import { AdminShell } from './shells/AdminShell'
-import { ExpertShell } from './shells/ExpertShell'
-import { LearnerV2Shell } from './shells/LearnerV2Shell'
+import { LearnerAuthPage } from './pages/LearnerAuthPage'
+import { defaultPathForRole, loginPathForPortal } from './router'
+import { BackOfficeAppShell } from './shells/BackOfficeAppShell'
+import { LearnerAppShell } from './shells/LearnerAppShell'
 import { defaultViewForRole } from './types'
-import type { ActiveView, LearnerUser, PortalKind, ToastNotification, ToastType } from './types'
+import type { ActiveView, LearnerUser, ToastNotification, ToastType } from './types'
+import type { BackOfficeView } from './types/expert'
 
 interface AppProps {
   initialUser?: LearnerUser | null
   initialView?: ActiveView
 }
 
-function getInitialPathname(): string {
-  if (typeof window === 'undefined') return '/'
-  return window.location.pathname || '/'
+function mapBackOfficeViewToActiveView(view: BackOfficeView): ActiveView {
+  if (view === 'expert_cohort') return 'cohort_analytics'
+  return view
 }
 
 export function App({ initialUser = null, initialView }: AppProps = {}) {
-  const initialParsed = parseRoute(getInitialPathname())
+  const { route, navigate, pushPath } = useRouter()
   const [user, setUser] = useState<LearnerUser | null>(initialUser)
-  const [portal, setPortal] = useState<PortalKind>(initialParsed.portal)
-  const [activeView, setActiveView] = useState<ActiveView>(
-    initialView ?? (initialUser ? defaultViewForRole(initialUser.role) : initialParsed.view),
-  )
-  const [routeDomainSlug, setRouteDomainSlug] = useState<string | undefined>(initialParsed.domainSlug)
-  const [routeConceptSlug, setRouteConceptSlug] = useState<string | undefined>(initialParsed.conceptSlug)
-
   const [authMode, setAuthMode] = useState<'login' | 'register'>(
-    initialParsed.isRegisterPath ? 'register' : 'login',
+    route.isRegisterPath ? 'register' : 'login',
   )
   const [usernameInput, setUsernameInput] = useState('')
   const [displayNameInput, setDisplayNameInput] = useState('')
@@ -50,80 +39,25 @@ export function App({ initialUser = null, initialView }: AppProps = {}) {
     setToast({ message, type })
   }
 
-  const pushPath = useCallback((nextPath: string) => {
-    if (typeof window !== 'undefined' && window.location.pathname !== nextPath) {
-      window.history.pushState({}, '', nextPath)
-    }
-  }, [])
-
-  const navigateToView = useCallback(
-    (view: ActiveView, params?: { domainSlug?: string; conceptSlug?: string }) => {
-      setActiveView(view)
-      if (params?.domainSlug) setRouteDomainSlug(params.domainSlug)
-      if (params?.conceptSlug) setRouteConceptSlug(params.conceptSlug)
-      const nextPath = pathForView(view, {
-        domainSlug: params?.domainSlug ?? routeDomainSlug,
-        conceptSlug: params?.conceptSlug ?? routeConceptSlug,
-      })
-      const parsed = parseRoute(nextPath)
-      setPortal(parsed.portal)
-      pushPath(nextPath)
-    },
-    [pushPath, routeConceptSlug, routeDomainSlug],
-  )
-
-  const handleSwitchPortal = useCallback(
-    (nextPortal: PortalKind) => {
-      setPortal(nextPortal)
-      setAuthError(null)
-      if (nextPortal !== 'learner') {
-        setAuthMode('login')
-      }
-      pushPath(loginPathForPortal(nextPortal))
-    },
-    [pushPath],
-  )
-
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const onPopState = () => {
-      const parsed = parseRoute(window.location.pathname)
-      setPortal(parsed.portal)
-      setActiveView(parsed.view)
-      setRouteDomainSlug(parsed.domainSlug)
-      setRouteConceptSlug(parsed.conceptSlug)
-    }
-    window.addEventListener('popstate', onPopState)
-    return () => window.removeEventListener('popstate', onPopState)
-  }, [])
-
-  useEffect(() => {
+    if (initialUser) return
     let mounted = true
     ;(async () => {
       const me = await apiGetMe()
-      if (mounted && me) {
-        setUser(me)
-        if (!initialView) {
-          const parsed = parseRoute(getInitialPathname())
-          const role = me.role ?? 'learner'
-          if (parsed.isLoginPath || parsed.isRegisterPath || getInitialPathname() === '/') {
-            const targetView = defaultViewForRole(role)
-            setActiveView(targetView)
-            setPortal(role)
-            pushPath(defaultPathForRole(role))
-          } else {
-            setPortal(parsed.portal)
-            setActiveView(parsed.view)
-            setRouteDomainSlug(parsed.domainSlug)
-            setRouteConceptSlug(parsed.conceptSlug)
-          }
-        }
+      if (!mounted || !me) return
+      setUser(me)
+      const role = me.role ?? 'learner'
+      if (route.isLoginPath || route.isRegisterPath || window.location.pathname === '/') {
+        pushPath(defaultPathForRole(role))
       }
     })()
     return () => {
       mounted = false
     }
-  }, [initialView, pushPath])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialUser])
+
+  const isBackOfficeRoute = route.portal === 'admin' || route.portal === 'expert'
 
   async function handleAuthSubmit(e: React.FormEvent): Promise<void> {
     e.preventDefault()
@@ -131,8 +65,12 @@ export function App({ initialUser = null, initialView }: AppProps = {}) {
     setIsLoading(true)
     try {
       const authRes =
-        authMode === 'login' || portal !== 'learner'
-          ? await apiLogin(usernameInput.trim(), passwordInput, portal)
+        authMode === 'login' || isBackOfficeRoute
+          ? await apiLogin(
+              usernameInput.trim(),
+              passwordInput,
+              isBackOfficeRoute ? route.portal : 'learner',
+            )
           : await apiRegister(
               usernameInput.trim(),
               displayNameInput.trim() || usernameInput.trim(),
@@ -140,9 +78,6 @@ export function App({ initialUser = null, initialView }: AppProps = {}) {
             )
       const role = authRes.user.role ?? 'learner'
       setUser(authRes.user)
-      setPortal(role)
-      const targetView = defaultViewForRole(role)
-      setActiveView(targetView)
       pushPath(defaultPathForRole(role))
       showToast(`Chào mừng ${authRes.user.display_name}!`, 'success')
     } catch (err) {
@@ -153,52 +88,64 @@ export function App({ initialUser = null, initialView }: AppProps = {}) {
   }
 
   async function handleLogout(): Promise<void> {
-    const currentPortal = portal
+    const wasBackOffice = isBackOfficeRoute || user?.role === 'admin' || user?.role === 'expert'
     await apiLogout()
     setUser(null)
-    setActiveView('domains')
     setUsernameInput('')
     setDisplayNameInput('')
     setPasswordInput('')
     setAuthError(null)
     setAuthMode('login')
-    pushPath(currentPortal === 'learner' ? '/' : loginPathForPortal(currentPortal))
+    pushPath(wasBackOffice ? loginPathForPortal('admin') : loginPathForPortal('learner'))
     showToast('Đã đăng xuất an toàn.', 'info')
   }
 
+  // 1. UNAUTHENTICATED: Strict Dual-Portal Login Separation
   if (!user) {
+    if (isBackOfficeRoute) {
+      return (
+        <>
+          <Toast toast={toast} onClose={() => setToast(null)} />
+          <BackOfficeLoginPage
+            usernameInput={usernameInput}
+            setUsernameInput={setUsernameInput}
+            passwordInput={passwordInput}
+            setPasswordInput={setPasswordInput}
+            authError={authError}
+            isLoading={isLoading}
+            onSubmit={handleAuthSubmit}
+            portalHint={route.portal === 'expert' ? 'expert' : 'admin'}
+          />
+        </>
+      )
+    }
+
     return (
-      <div className="min-h-screen bg-[#F8FAF7] text-[#14241B] font-sans antialiased flex flex-col justify-between overflow-x-hidden w-full">
-        <Header
-          user={null}
-          portal={portal}
-          activeView={activeView}
-          onNavigate={navigateToView}
-          onLogout={handleLogout}
-        />
-
+      <div className="min-h-screen bg-background text-on-surface font-sans antialiased flex flex-col justify-between overflow-x-hidden w-full">
         <Toast toast={toast} onClose={() => setToast(null)} />
-
-        <AuthPage
-          portal={portal}
-          onSwitchPortal={handleSwitchPortal}
-          authMode={authMode}
-          setAuthMode={setAuthMode}
-          usernameInput={usernameInput}
-          setUsernameInput={setUsernameInput}
-          displayNameInput={displayNameInput}
-          setDisplayNameInput={setDisplayNameInput}
-          passwordInput={passwordInput}
-          setPasswordInput={setPasswordInput}
-          authError={authError}
-          isLoading={isLoading}
-          onSubmit={handleAuthSubmit}
-        />
-
-        <footer className="w-full bg-white border-t border-[#D8E2D8] py-3 px-6 text-xs text-[#57534E] font-mono">
+        <div className="flex-1 flex items-center justify-center px-4 py-6">
+          <LearnerAuthPage
+            authMode={authMode}
+            setAuthMode={setAuthMode}
+            usernameInput={usernameInput}
+            setUsernameInput={setUsernameInput}
+            displayNameInput={displayNameInput}
+            setDisplayNameInput={setDisplayNameInput}
+            passwordInput={passwordInput}
+            setPasswordInput={setPasswordInput}
+            authError={authError}
+            isLoading={isLoading}
+            onSubmit={handleAuthSubmit}
+          />
+        </div>
+        <footer className="w-full bg-white border-t border-outline-variant/50 py-3.5 px-6 text-xs text-outline">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-            <span>Plumora Adaptive Learning Platform v2.0.0</span>
-            <span>Xác thực Bảo mật Phiên HTTP-Only Cookie</span>
+            <span className="font-semibold text-on-surface">
+              Plumora — Nền tảng Học tập Thích ứng Cá nhân hóa
+            </span>
+            <span className="text-[11px] text-on-surface-variant">
+              Lộ trình Chuyên môn • Đánh giá 5 Tầng • Thực hành Trực tiếp
+            </span>
           </div>
         </footer>
       </div>
@@ -206,56 +153,68 @@ export function App({ initialUser = null, initialView }: AppProps = {}) {
   }
 
   const role = user.role ?? 'learner'
-  const isForbidden =
-    (portal === 'admin' && role !== 'admin') ||
-    (portal === 'expert' && role !== 'expert' && role !== 'admin') ||
-    (portal === 'learner' && role !== 'learner')
+  const effectiveView = initialView ?? route.view
 
-  return (
-    <div className="min-h-screen bg-[#F8FAF7] text-[#14241B] font-sans antialiased flex flex-col justify-between overflow-x-hidden w-full">
-      <Header
-        user={user}
-        portal={role}
-        activeView={activeView}
-        onNavigate={navigateToView}
-        onLogout={handleLogout}
-      />
+  // 2. AUTHENTICATED ON BACK-OFFICE ROUTE
+  if (isBackOfficeRoute) {
+    const isForbidden =
+      role === 'learner' || (route.portal === 'admin' && role !== 'admin')
 
-      <Toast toast={toast} onClose={() => setToast(null)} />
-
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {isForbidden ? (
+    if (isForbidden) {
+      return (
+        <div className="min-h-screen bg-background text-on-surface flex items-center justify-center px-4">
           <Forbidden403Page
             userRole={role}
-            attemptedPortal={portal}
-            onReturnToPortal={() => navigateToView(defaultViewForRole(role))}
+            attemptedPortal={route.portal}
+            onReturnToPortal={() => navigate(defaultViewForRole(role))}
           />
-        ) : (
-          <>
-            <LearnerV2Shell
-              activeView={activeView}
-              routeDomainSlug={routeDomainSlug}
-              routeConceptSlug={routeConceptSlug}
-              onNavigate={navigateToView}
-            />
-            <ExpertShell activeView={activeView} userRole={role} onNavigate={navigateToView} />
-            <AdminShell activeView={activeView} userRole={role} onNavigate={navigateToView} />
-          </>
-        )}
-      </main>
-
-      <footer className="w-full bg-white border-t border-[#D8E2D8] py-3.5 px-6 text-xs text-[#57534E]">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#15803D]"></span>
-            <span className="font-medium">Plumora — Nền tảng Học tập Thích ứng Cá nhân hóa</span>
-          </div>
-          <div className="flex items-center gap-4 text-[#78716C] text-[11px]">
-            <span>Lộ trình Đa ngành • Thực hành Trực tiếp • Ôn tập Thông minh</span>
-          </div>
         </div>
-      </footer>
-    </div>
+      )
+    }
+
+    return (
+      <>
+        <Toast toast={toast} onClose={() => setToast(null)} />
+        <BackOfficeAppShell
+          user={user}
+          activeView={effectiveView}
+          initialDomainSlug={route.domainSlug}
+          initialConceptSlug={route.conceptSlug}
+          onNavigate={(boView, params) =>
+            navigate(mapBackOfficeViewToActiveView(boView), params)
+          }
+          onLogout={handleLogout}
+        />
+      </>
+    )
+  }
+
+  // 3. AUTHENTICATED ON WEB CLIENT ROUTE
+  if (role === 'admin' || role === 'expert') {
+    return (
+      <div className="min-h-screen bg-background text-on-surface flex items-center justify-center px-4">
+        <Forbidden403Page
+          userRole={role}
+          attemptedPortal="learner"
+          onReturnToPortal={() => navigate(defaultViewForRole(role))}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <Toast toast={toast} onClose={() => setToast(null)} />
+      <LearnerAppShell
+        user={user}
+        activeView={effectiveView}
+        domainSlug={route.domainSlug}
+        conceptSlug={route.conceptSlug}
+        sessionMode={route.sessionMode}
+        onNavigate={navigate}
+        onLogout={handleLogout}
+      />
+    </>
   )
 }
 

@@ -11,21 +11,26 @@ from fastapi import FastAPI
 
 from app.db.models import SessionLocal
 from app.modules.assessment.router_v2 import router as assessment_v2_router
-from app.modules.events.outbox import relay_pending_outbox_events
+from app.modules.events.outbox import (
+    consume_domain_events_stream_once,
+    relay_pending_outbox_events,
+)
+
+logger = logging.getLogger(__name__)
 
 
-def _relay_once_sync() -> None:
+def _relay_and_consume_once_sync() -> None:
     with SessionLocal() as db:
         relay_pending_outbox_events(db)
+        consume_domain_events_stream_once(db, consumer_group="assess_cg")
 
 
 async def _assess_outbox_relay_loop() -> None:
-    log = logging.getLogger(__name__)
     while True:
         try:
-            await asyncio.to_thread(_relay_once_sync)
+            await asyncio.to_thread(_relay_and_consume_once_sync)
         except Exception as exc:  # noqa: BLE001
-            log.debug("Assessment outbox relay iteration skipped: %s", exc)
+            logger.warning("Assessment outbox/domain-events worker iteration failed: %s", exc)
         await asyncio.sleep(0.2)
 
 

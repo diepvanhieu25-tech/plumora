@@ -1,15 +1,51 @@
-"""LLM Rubric Grader Adapter + Deterministic Fallback + Circuit Breaker (PL3-TUTOR-01)."""
+"""LLM Rubric Grader Adapter + Upgraded Deterministic Fallback + Circuit Breaker (PL3-TUTOR-01)."""
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import time
 import urllib.error
 import urllib.request
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
+
+_NEGATION_PREFIXES: tuple[str, ...] = (
+    "không cần",
+    "khong can",
+    "bỏ qua",
+    "bo qua",
+    "tắt",
+    "tat ",
+    "vô dụng",
+    "vo dung",
+    "không dùng",
+    "khong dung",
+    "don't need",
+    "do not need",
+    "skip ",
+    "disable ",
+    "ignore ",
+)
+
+_BILINGUAL_SYNONYMS: dict[str, tuple[str, ...]] = {
+    "index": ("chỉ mục", "chi muc", "b-tree", "btree"),
+    "cache": ("bộ nhớ đệm", "bo nho dem", "caching", "redis"),
+    "transaction": ("giao dịch", "giao dich", "acid", "rollback", "commit"),
+    "idempotent": ("lũy đẳng", "luy dang", "idempotency", "chống lặp"),
+    "timeout": ("hết thời gian", "quá thời gian", "ngắt kết nối"),
+    "retry": ("thử lại", "thu lai", "backoff"),
+    "lock": ("khóa", "khoa", "deadlock", "mutex", "for update"),
+    "latency": ("độ trễ", "do tre", "p95", "chậm"),
+    "throughput": ("thông lượng", "thong luong", "rps", "qps"),
+    "stateless": ("không trạng thái", "khong trang thai", "jwt"),
+    "stateful": ("có trạng thái", "co trang thai", "session"),
+    "security": ("bảo mật", "bao mat", "xss", "csrf", "sqli"),
+    "memory": ("bộ nhớ", "bo nho", "ram", "oom"),
+    "container": ("docker", "cô lập", "co lap", "namespace", "cgroup"),
+}
 
 
 @dataclass(frozen=True)
@@ -19,6 +55,7 @@ class RubricCriterion:
     name: str
     weight: float
     required_keywords: list[str]
+    socratic_hint: str | None = None
 
 
 @dataclass(frozen=True)
@@ -45,8 +82,27 @@ class RubricGraderPort(ABC):
         """Return (rubric_score, tutor_summary, criteria_results, grader_source)."""
 
 
+def _keyword_matches_without_negation(normalized_text: str, kw: str) -> bool:
+    """Check if kw (or a bilingual synonym) appears in normalized_text without immediate negation."""
+    candidates = [kw.lower()]
+    for base, syns in _BILINGUAL_SYNONYMS.items():
+        if base in kw.lower():
+            candidates.extend(syns)
+
+    for term in candidates:
+        escaped = re.escape(term)
+        pattern = re.compile(rf"(?<!\w){escaped}(?!\w)" if term.isalnum() else escaped)
+        for match in pattern.finditer(normalized_text):
+            window_start = max(0, match.start() - 24)
+            preceding = normalized_text[window_start : match.start()].strip()
+            if any(preceding.endswith(neg.strip()) or neg in preceding for neg in _NEGATION_PREFIXES):
+                continue
+            return True
+    return False
+
+
 class DeterministicRubricGrader(RubricGraderPort):
-    """Offline-safe deterministic Rubric grader using keyword coverage & explanation structure."""
+    """Offline-safe deterministic Rubric grader with bilingual synonyms, negation check & Socratic hints."""
 
     def grade(
         self,
@@ -54,42 +110,70 @@ class DeterministicRubricGrader(RubricGraderPort):
         written_explanation: str,
         criteria: list[RubricCriterion],
         reference_explanation: str,
+        *,
+        hide_missing_keywords: bool = False,
     ) -> tuple[float, str, list[dict[str, Any]], str]:
-        normalized = written_explanation.lower()
+        _ = prompt
+        normalized = written_explanation.lower().strip()
+        words = [w for w in re.split(r"\s+", normalized) if w]
+        has_explanation_structure = len(words) >= 6 and len(normalized) >= 28
+
         total_score = 0.0
         criteria_results: list[dict[str, Any]] = []
         missing_names: list[str] = []
+        socratic_hints: list[str] = []
 
         for c in criteria:
             kws = [k.lower() for k in c.required_keywords]
-            matched = [k for k in kws if k in normalized]
+            matched = [k for k in kws if _keyword_matches_without_negation(normalized, k)]
+            missing = [k for k in kws if k not in matched]
             ratio = len(matched) / max(1, len(kws))
+
             if ratio >= 0.5:
-                s_j = 1.0
-            elif ratio > 0.0 or len(normalized.strip()) >= 40:
-                s_j = 0.5 if len(matched) > 0 else 0.0
+                s_j = 1.0 if has_explanation_structure else 0.5
+            elif ratio > 0.0:
+                s_j = 0.5
             else:
                 s_j = 0.0
 
             if s_j < 1.0:
                 missing_names.append(c.name)
+                if c.socratic_hint:
+                    socratic_hints.append(c.socratic_hint)
 
             total_score += c.weight * s_j
-            criteria_results.append(
-                {
-                    "name": c.name,
-                    "weight": c.weight,
-                    "score": s_j,
-                    "matched_keywords": matched,
-                    "missing_keywords": [k for k in kws if k not in matched],
-                }
-            )
+            item: dict[str, Any] = {
+                "name": c.name,
+                "weight": c.weight,
+                "score": s_j,
+                "matched_keywords": matched,
+            }
+            if hide_missing_keywords and s_j < 1.0:
+                item["socratic_hint"] = (
+                    c.socratic_hint
+                    or f"Hãy phân tích sâu hơn về khía cạnh '{c.name}' bằng câu giải thích hoàn chỉnh."
+                )
+            else:
+                item["missing_keywords"] = missing
+                if c.socratic_hint:
+                    item["socratic_hint"] = c.socratic_hint
+            criteria_results.append(item)
 
         rubric_score = round(min(1.0, max(0.0, total_score)), 4)
         if rubric_score >= 0.75:
             tutor_summary = (
                 f"Bài giải thích đạt {int(rubric_score * 100)}% theo biểu điểm Rubric. "
                 f"Gợi ý chuẩn: {reference_explanation}"
+            )
+        elif hide_missing_keywords:
+            hint_text = (
+                " ".join(socratic_hints[:2])
+                if socratic_hints
+                else f"Hãy xem lại các khía cạnh: {', '.join(missing_names) or 'cơ chế cốt lõi'} và giải thích rõ nguyên nhân – hệ quả."
+            )
+            tutor_summary = (
+                f"Bài giải thích mới đạt {int(rubric_score * 100)}%. "
+                f"Gợi mở Socratic cho lượt thử lại: {hint_text}"
             )
         else:
             missing_str = ", ".join(missing_names) if missing_names else "chi tiết kỹ thuật cốt lõi"
@@ -113,7 +197,10 @@ class LlmRubricGraderAdapter(RubricGraderPort):
         written_explanation: str,
         criteria: list[RubricCriterion],
         reference_explanation: str,
+        *,
+        hide_missing_keywords: bool = False,
     ) -> tuple[float, str, list[dict[str, Any]], str]:
+        _ = hide_missing_keywords
         api_url = os.environ.get("PLUMORA_LLM_API_URL", "").strip()
         api_key = os.environ.get("PLUMORA_LLM_API_KEY", "").strip()
         if not api_url or not api_key:
@@ -211,6 +298,8 @@ class CircuitBreakerRubricService:
         written_explanation: str,
         criteria: list[RubricCriterion],
         reference_explanation: str,
+        *,
+        hide_missing_keywords: bool = False,
     ) -> RubricGradeResult:
         now = time.monotonic()
         circuit_open = (
@@ -219,7 +308,10 @@ class CircuitBreakerRubricService:
         if not circuit_open:
             try:
                 score, summary, crit_res, source = self.primary.grade(
-                    prompt, written_explanation, criteria, reference_explanation
+                    prompt,
+                    written_explanation,
+                    criteria,
+                    reference_explanation,
                 )
                 self._failures = 0
                 self._opened_at = None
@@ -234,9 +326,21 @@ class CircuitBreakerRubricService:
                 if self._failures >= self.failure_threshold:
                     self._opened_at = now
 
-        score, summary, crit_res, source = self.fallback.grade(
-            prompt, written_explanation, criteria, reference_explanation
-        )
+        if isinstance(self.fallback, DeterministicRubricGrader):
+            score, summary, crit_res, source = self.fallback.grade(
+                prompt,
+                written_explanation,
+                criteria,
+                reference_explanation,
+                hide_missing_keywords=hide_missing_keywords,
+            )
+        else:
+            score, summary, crit_res, source = self.fallback.grade(
+                prompt,
+                written_explanation,
+                criteria,
+                reference_explanation,
+            )
         return RubricGradeResult(
             rubric_score=score,
             grader_source=source,

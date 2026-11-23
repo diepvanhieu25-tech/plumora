@@ -18,6 +18,7 @@ from app.db.models import (
     UserConceptMasteryModel,
     UserModel,
 )
+from app.db.redis_pool import get_redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -73,22 +74,12 @@ def _redis_key(user_id: uuid.UUID) -> str:
     return f"plumora:state:{user_id}"
 
 
-_REDIS_POOLS: dict[str, redis.ConnectionPool] = {}
-
-
 def _open_redis_client(redis_url_override: str | None = None) -> redis.Redis:
-    url = redis_url_override or settings.redis_url
-    pool = _REDIS_POOLS.get(url)
-    if pool is None:
-        pool = redis.ConnectionPool.from_url(
-            url,
-            max_connections=64,
-            socket_connect_timeout=0.2,
-            socket_timeout=0.2,
-            decode_responses=True,
-        )
-        _REDIS_POOLS[url] = pool
-    return redis.Redis(connection_pool=pool)
+    return get_redis_client(
+        redis_url_override or settings.redis_url,
+        decode_responses=True,
+        socket_timeout=0.2,
+    )
 
 
 def write_through_state_cache(

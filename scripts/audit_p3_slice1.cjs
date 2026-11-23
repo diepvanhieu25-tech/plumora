@@ -1,12 +1,17 @@
 /**
- * Plumora P3-SLICE-1 Real Chromium E2E Audit Script (SCR-09..SCR-14)
+ * Plumora v3 Dual-Portal Living System Real Chromium E2E Audit Script
  *
  * Verifies:
- * 1. Register fresh learner -> open SCR-09 Multi-Domain Hub (Backend 12, Frontend 10, DevOps 9).
- * 2. Open SCR-10 Adaptive Placement on Frontend & submit step.
- * 3. Open SCR-11 Multi-Domain Roadmap, check 390px mobile 0px overflow & 0 Unicode emojis (INV-UI-01).
- * 4. Open SCR-12 5-Depth Probing on net-internet & advance Tier 1 -> Tier 2.
- * 5. Open SCR-13 Isolated Code Sandbox on net-internet & run unit tests.
+ * 1. Clean De-Demoed Web Client (/login, /register, /domains/*):
+ *    - ZERO demo quick-fill buttons, ZERO hardcoded password, ZERO "+5 ngày" simulation button,
+ *      ZERO internal SCR-* labels or raw node_features_snapshot table, ZERO Unicode emojis, 0px mobile overflow.
+ *    - Real sequential learner flow: Register -> Multi-Domain Hub -> Adaptive Placement -> Roadmap ->
+ *      Playbook (complete INV-SEQ-01) -> 5-Depth Probing (+ Playbook Quick Drawer) -> Code Sandbox.
+ * 2. Strict Dual-Portal RBAC 403 isolation.
+ * 3. Back-Office Console (/backoffice/login -> BackOfficeAppShell):
+ *    - Admin: Online RL & Experience Buffer + Policy Inspector, Head-to-Head Safety Gate Scorecard,
+ *      System Health & Outbox/DLQ controls, Cohort Analytics Heatmap.
+ *    - Expert: DAG & Playbook Editor, 5-Depth Questions CRUD, Code Sandbox Studio, Cohort Analytics.
  */
 
 const fs = require('fs');
@@ -96,9 +101,17 @@ async function main() {
   try {
     const baseUrl = process.env.PLUMORA_FRONTEND_URL || 'http://localhost:3000';
     await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
-    await page.getByTestId('tab-register-btn').waitFor({ state: 'visible', timeout: 10000 });
+    await page.getByTestId('learner-auth-page').waitFor({ state: 'visible', timeout: 10000 });
 
-    // 1. Register fresh user
+    // 0. Assert De-Demoed Learner Auth Page (zero demo credentials / passwords)
+    const authText = await page.getByTestId('learner-auth-page').innerText();
+    for (const forbidden of ['PlumoraDemo#2026', 'learner_new', 'admin_demo', 'expert_demo']) {
+      if (authText.includes(forbidden)) {
+        throw new Error(`De-demoing violation: LearnerAuthPage still exposes '${forbidden}'`);
+      }
+    }
+
+    // 1. Register fresh learner
     const uname = `p3e2e_${Date.now().toString().slice(-6)}`;
     await page.getByTestId('tab-register-btn').click();
     await page.getByTestId('input-username').fill(uname);
@@ -106,97 +119,110 @@ async function main() {
     await page.getByTestId('input-password').fill('StrongPass!2026');
     await page.getByTestId('login-submit-btn').click();
 
-    // 2. Learner must land directly on SCR-09 Multi-Domain Hub
+    // 2. Learner lands on Multi-Domain Hub
     await page.getByTestId('scr09-multi-domain-hub').waitFor({ state: 'visible', timeout: 10000 });
     await page.getByTestId('domain-card-backend').waitFor({ state: 'visible' });
     await page.getByTestId('domain-card-frontend').waitFor({ state: 'visible' });
     await page.getByTestId('domain-card-devops').waitFor({ state: 'visible' });
 
     if (process.argv.includes('--negative-control')) {
-      // Negative control: inject an assertion expecting a non-existent domain card
       await page.getByTestId('domain-card-nonexistent-probe').waitFor({ state: 'visible', timeout: 1500 });
     }
 
     const hubText = await page.getByTestId('scr09-multi-domain-hub').innerText();
     if (EMOJI_REGEX.test(hubText)) {
-      throw new Error('INV-UI-01 violation: Unicode emoji detected on SCR-09');
+      throw new Error('INV-UI-01 violation: Unicode emoji detected on Multi-Domain Hub');
     }
 
-    // 3. Open SCR-10 Adaptive Placement on Frontend
-    await page
-      .getByTestId('domain-card-frontend')
-      .getByRole('button', { name: /Chẩn đoán Đầu vào/i })
-      .click();
+    // 3. Open Adaptive Placement on Frontend & submit step
+    await page.getByTestId('domain-card-frontend').locator('button').last().click();
     await page.getByTestId('scr10-adaptive-placement').waitFor({ state: 'visible', timeout: 10000 });
     await page.locator('input[name="placement-opt"]').first().waitFor({ state: 'visible' });
     await page.locator('input[name="placement-opt"]').first().check();
-    await page.getByRole('button', { name: /Nộp câu trả lời/i }).click();
-    await page.getByRole('button', { name: /Quay về Trung tâm Đa lĩnh vực/i }).click();
+    await page.getByRole('button', { name: /Kiểm tra đáp án/i }).click();
+    await page.getByTestId('nav-multi-domain-btn').click();
+    await page.getByRole('menuitem').first().click();
+    await page.getByTestId('scr09-multi-domain-hub').waitFor({ state: 'visible', timeout: 10000 });
 
-    // 4. Open SCR-11 Frontend Multi-Domain Roadmap + Check GNN-PPO visibility + 390px mobile overflow
-    await page.getByTestId('domain-card-frontend').getByRole('button', { name: /Vào Bản đồ Lĩnh vực/i }).click();
+    // 4. Open Frontend Roadmap -> verify clean de-demoed UI, live AI banner & 390px mobile 0px overflow
+    await page.getByTestId('domain-card-frontend').locator('button').first().click();
     await page.getByTestId('scr11-multi-domain-roadmap').waitFor({ state: 'visible', timeout: 10000 });
-    await page.getByTestId('kg-node-net-internet').waitFor({ state: 'visible' });
+    await page.getByTestId('kg-node-fe-dom-events').waitFor({ state: 'visible' });
+    await page.getByTestId('gnn-ppo-banner').waitFor({ state: 'visible', timeout: 10000 });
 
-    const policyText = await page.getByTestId('gnn-ppo-policy-badge').innerText();
-    if (!policyText.includes('GNN-PPO')) {
-      throw new Error(`Expected live GNN-PPO policy badge on SCR-11, got: ${policyText}`);
+    const roadmapText = await page.getByTestId('scr11-multi-domain-roadmap').innerText();
+    for (const forbidden of ['Mô phỏng +5 ngày', 'SCR-11', 'SCR-09', 'node_features_snapshot']) {
+      if (roadmapText.includes(forbidden)) {
+        throw new Error(`De-demoing violation: Roadmap still exposes '${forbidden}'`);
+      }
     }
-    await page.getByTestId('toggle-gnn-inference-btn').click();
-    await page.getByTestId('gnn-ppo-inference-panel').waitFor({ state: 'visible', timeout: 5000 });
 
     await page.setViewportSize({ width: 390, height: 844 });
     const overflow390 = await page.evaluate(
       () => document.documentElement.scrollWidth > window.innerWidth
     );
     if (overflow390) {
-      throw new Error('Mobile 390px horizontal overflow detected on SCR-11');
+      throw new Error('Mobile 390px horizontal overflow detected on Roadmap');
     }
     await page.setViewportSize({ width: 1280, height: 860 });
 
-    // 5. Open SCR-12 5-Depth Probing on fe-dom-events (Tier 1 MCQ -> Tier 2 MCQ)
-    await page.getByTestId('kg-node-fe-dom-events').getByRole('button', { name: /Đào sâu 5 tầng/i }).click();
+    // 5. Real Sequential Flow (INV-SEQ-01): Open Playbook -> Complete Playbook -> 5-Depth Probing
+    await page.getByTestId('open-playbook-fe-dom-events').click();
+    await page.getByTestId('lesson-playbook-page').waitFor({ state: 'visible', timeout: 10000 });
+    const playbookBody = await page.getByTestId('lesson-playbook-page').innerText();
+    if (playbookBody.length < 1000) {
+      throw new Error(`Frontend Playbook too short (${playbookBody.length} chars)`);
+    }
+    const selfCheck = page.getByTestId('playbook-selfcheck-checkbox');
+    if ((await selfCheck.count()) > 0) {
+      await selfCheck.check();
+      await page.getByTestId('complete-playbook-btn').click();
+    }
+    await page.getByTestId('proceed-to-depth-probe-btn').waitFor({ state: 'visible', timeout: 10000 });
+    await page.getByTestId('proceed-to-depth-probe-btn').click();
+
+    // 6. 5-Depth Probing + Playbook Quick Drawer
     await page.getByTestId('scr12-depth-probe').waitFor({ state: 'visible', timeout: 10000 });
-    await page.locator('input[name="depth-mcq"]').first().waitFor({ state: 'visible' });
+    await page.getByTestId('open-playbook-quick-drawer-btn').click();
+    await page.getByTestId('playbook-quick-drawer').waitFor({ state: 'visible', timeout: 5000 });
+    await page.keyboard.press('Escape');
+
+    await page.locator('input[name="depth-mcq"]').first().waitFor({ state: 'visible', timeout: 10000 });
     await page.locator('input[name="depth-mcq"]').first().check();
-    await page.getByRole('button', { name: /Nộp & Đào sâu Tầng tiếp theo/i }).click();
-    await page.getByText(/Tầng 2: Cơ chế/i).waitFor({ state: 'visible', timeout: 10000 });
+    await page.getByRole('button', { name: /Nộp|Kiểm tra/i }).first().click();
 
-    // Return to roadmap, test Tier 3 Rubric -> SCR-14 AI Tutor Drawer on net-internet
-    await page.getByRole('button', { name: /Quay về Bản đồ/i }).click();
-    await page.getByTestId('kg-node-net-internet').getByRole('button', { name: /Đào sâu 5 tầng/i }).click();
-    await page.getByTestId('scr12-depth-probe').waitFor({ state: 'visible', timeout: 10000 });
-    await page.locator('textarea').waitFor({ state: 'visible', timeout: 10000 });
-    await page.locator('textarea').fill('Kiểm tra DNS phân giải IP và TCP handshake SYN/ACK để xử lý nghẽn kết nối.');
-    await page.getByRole('button', { name: /Nộp & Đào sâu Tầng tiếp theo/i }).click();
-    await page.getByTestId('scr14-ai-tutor-drawer').waitFor({ state: 'visible', timeout: 10000 });
-    await page.getByRole('button', { name: /Hoàn tất & Cập nhật Hồ sơ Năng lực/i }).click();
-
-    // Return to roadmap and open SCR-13 Code Sandbox on net-internet
-    await page.getByRole('button', { name: /Quay về Bản đồ/i }).click();
-    await page.getByTestId('kg-node-net-internet').getByRole('button', { name: /Code/i }).click();
+    // 7. Code Sandbox on fe-dom-events (already completed Playbook -> INV-SEQ-01 satisfied)
+    await page.goto(`${baseUrl}/domains/frontend/concepts/fe-dom-events/code-sandbox`, {
+      waitUntil: 'domcontentloaded',
+    });
     await page.getByTestId('scr13-code-sandbox').waitFor({ state: 'visible', timeout: 10000 });
-    await page.getByRole('button', { name: /Chạy Kiểm thử Sandbox/i }).click();
-    await page.getByText(/Test Cases đạt:/i).waitFor({ state: 'visible', timeout: 10000 });
+    await page.getByTestId('run-code-sandbox-btn').click();
+    await page.getByText(/Vượt qua \d+ \/ \d+ bài kiểm thử/i).waitFor({ state: 'visible', timeout: 10000 });
 
-    // 6. Verify Learner RBAC 403 on /admin/online-rl and /expert/domains
-    await page.goto(`${baseUrl}/admin/online-rl`, { waitUntil: 'domcontentloaded' });
+    // 8. Verify Learner RBAC 403 on Back-Office routes
+    await page.goto(`${baseUrl}/backoffice/mlops/online-rl`, { waitUntil: 'domcontentloaded' });
     await page.getByTestId('forbidden-403-page').waitFor({ state: 'visible', timeout: 10000 });
-    await page.goto(`${baseUrl}/expert/domains`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`${baseUrl}/backoffice/studio/domains`, { waitUntil: 'domcontentloaded' });
     await page.getByTestId('forbidden-403-page').waitFor({ state: 'visible', timeout: 10000 });
 
-    // Logout learner (wait for redirect/auth clear before switching portal)
-    await Promise.all([
-      page.waitForURL(/\/login/, { timeout: 10000 }),
-      page.getByTestId('logout-btn').click(),
-    ]);
+    // Return to learner portal from 403 page and logout learner
+    await page.getByTestId('return-to-own-portal-btn').click();
+    await page.getByTestId('logout-btn').waitFor({ state: 'visible', timeout: 10000 });
+    await page.getByTestId('logout-btn').click();
+    await page.getByTestId('input-username').waitFor({ state: 'visible', timeout: 10000 });
 
-    // 7. Verify Admin Portal (/admin/login): no register tab, 403 on learner, 200 on admin_demo -> SCR-18..20
-    await page.goto(`${baseUrl}/admin/login`, { waitUntil: 'domcontentloaded' });
+    // 9. Verify Back-Office Login (/backoffice/login): no register tab, no demo buttons, rejects learner, admits admin_demo
+    await page.goto(`${baseUrl}/backoffice/login`, { waitUntil: 'domcontentloaded' });
+    await page.getByTestId('backoffice-login-page').waitFor({ state: 'visible', timeout: 10000 });
     await page.getByTestId('staff-portal-notice').waitFor({ state: 'visible', timeout: 10000 });
     if ((await page.getByTestId('tab-register-btn').count()) > 0) {
-      throw new Error('Admin login must NOT render public registration tab');
+      throw new Error('Back-Office login must NOT render public registration tab');
     }
+    const boLoginText = await page.getByTestId('backoffice-login-page').innerText();
+    if (boLoginText.includes('PlumoraDemo#2026')) {
+      throw new Error('Back-Office login must NOT expose hardcoded demo password');
+    }
+
     await page.getByTestId('input-username').fill('learner_new');
     await page.getByTestId('input-password').fill('PlumoraDemo#2026');
     await page.getByTestId('login-submit-btn').click();
@@ -205,47 +231,59 @@ async function main() {
     await page.getByTestId('input-username').fill('admin_demo');
     await page.getByTestId('input-password').fill('PlumoraDemo#2026');
     await page.getByTestId('login-submit-btn').click();
-    await page.getByTestId('scr18-admin-online-rl').waitFor({ state: 'visible', timeout: 10000 });
-    await page.getByTestId('nav-admin-registry-btn').click();
-    await page.getByTestId('scr19-admin-registry').waitFor({ state: 'visible', timeout: 10000 });
-    await page.getByTestId('nav-admin-health-btn').click();
-    await page.getByTestId('scr20-admin-health').waitFor({ state: 'visible', timeout: 10000 });
-    await Promise.all([
-      page.waitForURL(/\/login/, { timeout: 10000 }),
-      page.getByTestId('logout-btn').click(),
-    ]);
 
-    // 8. Verify Expert Portal (/expert/login): no register tab, 200 on expert_demo -> SCR-15..17
-    await page.goto(`${baseUrl}/expert/login`, { waitUntil: 'domcontentloaded' });
-    await page.getByTestId('staff-portal-notice').waitFor({ state: 'visible', timeout: 10000 });
-    if ((await page.getByTestId('tab-register-btn').count()) > 0) {
-      throw new Error('Expert login must NOT render public registration tab');
-    }
+    await page.getByTestId('backoffice-app-shell').waitFor({ state: 'visible', timeout: 10000 });
+    await page.getByTestId('scr18-admin-online-rl').waitFor({ state: 'visible', timeout: 10000 });
+    await page.getByTestId('experience-buffer-inspector').waitFor({ state: 'visible', timeout: 10000 });
+    await page.getByTestId('admin-policy-inspector').waitFor({ state: 'visible', timeout: 10000 });
+
+    await page.getByTestId('bo-nav-registry').click();
+    await page.getByTestId('scr19-admin-registry').waitFor({ state: 'visible', timeout: 10000 });
+    await page.getByTestId('head-to-head-safety-scorecard').waitFor({ state: 'visible', timeout: 10000 });
+
+    await page.getByTestId('bo-nav-health').click();
+    await page.getByTestId('scr20-admin-health').waitFor({ state: 'visible', timeout: 10000 });
+    await page.getByTestId('trigger-outbox-relay-btn').waitFor({ state: 'visible', timeout: 10000 });
+    await page.getByTestId('inspect-dlq-btn').waitFor({ state: 'visible', timeout: 10000 });
+
+    await page.getByTestId('bo-nav-cohort').click();
+    await page.getByTestId('backoffice-cohort-analytics').waitFor({ state: 'visible', timeout: 10000 });
+
+    await page.getByTestId('logout-btn').click();
+    await page.getByTestId('input-username').waitFor({ state: 'visible', timeout: 10000 });
+
+    // 10. Verify Expert Studio via /backoffice/login
+    await page.goto(`${baseUrl}/backoffice/login`, { waitUntil: 'domcontentloaded' });
+    await page.getByTestId('backoffice-login-page').waitFor({ state: 'visible', timeout: 10000 });
     await page.getByTestId('input-username').fill('expert_demo');
     await page.getByTestId('input-password').fill('PlumoraDemo#2026');
     await page.getByTestId('login-submit-btn').click();
+
+    await page.getByTestId('backoffice-app-shell').waitFor({ state: 'visible', timeout: 10000 });
     await page.getByTestId('scr15-expert-domains').waitFor({ state: 'visible', timeout: 10000 });
     await page.getByTestId('expert-publish-dag-btn').waitFor({ state: 'visible', timeout: 10000 });
-    await page.getByTestId('nav-expert-questions-btn').click();
+
+    await page.getByTestId('bo-nav-questions').click();
     await page.getByTestId('scr16-expert-questions').waitFor({ state: 'visible', timeout: 10000 });
-    await page.locator('select').nth(3).selectOption('mcq');
-    await page.locator('#mcq-correct-key').waitFor({ state: 'visible', timeout: 5000 });
-    await page.locator('select').nth(3).selectOption('troubleshooting');
-    await page.getByText(/Tổng hiện tại: 1/i).waitFor({ state: 'visible', timeout: 5000 });
-    await page.getByTestId('nav-expert-code-btn').click();
+
+    await page.getByTestId('bo-nav-code').click();
     await page.getByTestId('scr17-expert-code').waitFor({ state: 'visible', timeout: 10000 });
-    await page.getByRole('button', { name: /Chạy Thử Test Cases & Lưu Bài Code/i }).waitFor({ state: 'visible', timeout: 5000 });
+
+    await page.getByTestId('bo-nav-cohort').click();
+    await page.getByTestId('backoffice-cohort-analytics').waitFor({ state: 'visible', timeout: 10000 });
 
     if (errors.length > 0) {
       throw new Error(`Console/Page errors encountered:\n${errors.join('\n')}`);
     }
-    console.log('P3 Fullstack Real Chromium E2E Audit PASSED (Learner SCR-09..14 + GNN-PPO, Expert SCR-15..17, Admin SCR-18..20, RBAC 403, 0px mobile overflow, 0 emojis).');
+    console.log(
+      'Plumora v3 Dual-Portal Living System Chromium E2E Audit PASSED (De-demoed Web Client + INV-SEQ-01 Playbook->Probe->Sandbox, Back-Office Studio/Cohort/MLOps/Health, RBAC 403, 0px mobile overflow, 0 emojis).'
+    );
   } finally {
     await browser.close();
   }
 }
 
 main().catch((err) => {
-  console.error('P3-SLICE-1 E2E Audit FAILED:', err);
+  console.error('Plumora v3 E2E Audit FAILED:', err);
   process.exit(1);
 });

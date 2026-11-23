@@ -1,33 +1,35 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   AlertTriangle,
   CheckCircle2,
-  Clock,
   Code2,
-  Cpu,
-  FileQuestion,
-  FolderLock,
-  GitBranch,
+  Database,
   Loader2,
   Lock,
   Plus,
-  RotateCcw,
-  Shield,
+  RefreshCw,
   ShieldCheck,
-  Terminal,
   Trash2,
-  UserCheck,
-  WifiOff,
+  XCircle,
 } from 'lucide-react'
 import {
-  apiExpertCreateCodeChallenge,
-  apiGetDomainRoadmap,
+  apiExpertGetDomainGraph,
+  apiExpertListCodeChallenges,
+  apiExpertPublishCodeChallenge,
   apiGetDomains,
 } from '../api'
-import type { ActiveView, DomainListItem, DomainRoadmapNode } from '../types'
+import { useOptionalBackOfficeStudio } from '../shells/BackOfficeStudioContext'
+import type {
+  BackOfficeView,
+  CodeLanguage,
+  ExpertCodeChallengeItem,
+  ExpertGraphNodeItem,
+  SandboxTestResultItem,
+} from '../types/expert'
+import type { DomainListItem } from '../types/learnerV2'
 
-interface ExpertCodeChallengesPageProps {
-  onNavigate: (view: ActiveView) => void
+export interface ExpertCodeChallengesPageProps {
+  onNavigate?: (view: BackOfficeView, params?: { domainSlug?: string; conceptSlug?: string }) => void
 }
 
 interface TestCaseRow {
@@ -37,67 +39,175 @@ interface TestCaseRow {
   is_hidden: boolean
 }
 
-const DEFAULT_STARTER_CODE = 'def solve(x):\n    return x\n'
-const DEFAULT_SOLUTION_CODE = 'def solve(x):\n    return x * 2\n'
+function defaultStarterForLanguage(lang: CodeLanguage): string {
+  if (lang === 'sql') return 'SELECT id, name FROM items;'
+  if (lang === 'javascript') return 'function solve(x) {\n  return x;\n}\n'
+  return 'def solve(x):\n    return x\n'
+}
 
-export function ExpertCodeChallengesPage({ onNavigate }: ExpertCodeChallengesPageProps) {
-  const [domains, setDomains] = useState<DomainListItem[]>([])
-  const [selectedDomain, setSelectedDomain] = useState('backend')
-  const [concepts, setConcepts] = useState<DomainRoadmapNode[]>([])
-  const [conceptSlug, setConceptSlug] = useState('net-internet')
+function defaultSolutionForLanguage(lang: CodeLanguage): string {
+  if (lang === 'sql') return 'SELECT id, name FROM items ORDER BY id ASC;'
+  if (lang === 'javascript') return 'function solve(x) {\n  return x * 2;\n}\n'
+  return 'def solve(x):\n    return x * 2\n'
+}
+
+function extractTestResultsFromError(err: unknown): SandboxTestResultItem[] {
+  if (err && typeof err === 'object' && 'detail' in err) {
+    const detail = (err as { detail?: { test_results?: unknown } }).detail
+    if (Array.isArray(detail?.test_results)) {
+      return detail.test_results as SandboxTestResultItem[]
+    }
+  }
+  return []
+}
+
+export function ExpertCodeChallengesPage({ onNavigate }: ExpertCodeChallengesPageProps = {}) {
+  void onNavigate
+  const studio = useOptionalBackOfficeStudio()
+  const [localDomains, setLocalDomains] = useState<DomainListItem[]>([])
+  const [localDomain, setLocalDomain] = useState('backend')
+  const [localConcept, setLocalConcept] = useState('net-internet')
+
+  const domains = studio ? studio.domains : localDomains
+  const selectedDomain = studio ? studio.selectedDomainSlug : localDomain
+  const setSelectedDomain = studio ? studio.setSelectedDomainSlug : setLocalDomain
+  const conceptSlug = studio ? studio.selectedConceptSlug : localConcept
+  const setConceptSlug = studio ? studio.setSelectedConceptSlug : setLocalConcept
+
+  const [concepts, setConcepts] = useState<ExpertGraphNodeItem[]>([])
+  const [existingChallenges, setExistingChallenges] = useState<ExpertCodeChallengeItem[]>([])
+  const [selectedChallengeId, setSelectedChallengeId] = useState<string | null>(null)
+  const [loadingChallenges, setLoadingChallenges] = useState(false)
+
+  // Form state
   const [title, setTitle] = useState('')
+  const [language, setLanguage] = useState<CodeLanguage>('python')
+  const [timeoutMs, setTimeoutMs] = useState(3000)
+  const [memoryLimitMb, setMemoryLimitMb] = useState(128)
   const [prompt, setPrompt] = useState('')
+  const [setupSql, setSetupSql] = useState('')
   const [activeEditorTab, setActiveEditorTab] = useState<'starter' | 'solution'>('starter')
-  const [starterCode, setStarterCode] = useState(DEFAULT_STARTER_CODE)
-  const [solutionCode, setSolutionCode] = useState(DEFAULT_SOLUTION_CODE)
+  const [starterCode, setStarterCode] = useState(defaultStarterForLanguage('python'))
+  const [solutionCode, setSolutionCode] = useState(defaultSolutionForLanguage('python'))
   const [testCases, setTestCases] = useState<TestCaseRow[]>([
-    { name: 'Double 5', call: 'solve(5)', expected: '10', is_hidden: false },
+    { name: 'Test 1', call: 'solve(5)', expected: '10', is_hidden: false },
   ])
-  const [loadingDomains, setLoadingDomains] = useState(true)
+
   const [submitting, setSubmitting] = useState(false)
   const [statusMsg, setStatusMsg] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [verificationResults, setVerificationResults] = useState<SandboxTestResultItem[]>([])
+  const [verificationMeta, setVerificationMeta] = useState<{
+    runtimeMs: number
+    memoryKb: number
+    starterFailed: boolean
+  } | null>(null)
 
   useEffect(() => {
+    if (studio) return
     void (async () => {
-      setLoadingDomains(true)
       try {
         const res = await apiGetDomains()
-        setDomains(res.domains)
-        if (res.domains.length > 0) setSelectedDomain(res.domains[0].slug)
-      } catch (err) {
-        setErrorMsg(err instanceof Error ? err.message : 'Không thể tải danh sách lĩnh vực')
-      } finally {
-        setLoadingDomains(false)
+        setLocalDomains(res.domains)
+        if (res.domains.length > 0) setLocalDomain(res.domains[0].slug)
+      } catch {
+        // handled cleanly
       }
     })()
-  }, [])
+  }, [studio])
 
   useEffect(() => {
     if (!selectedDomain) return
     void (async () => {
       try {
-        const rm = await apiGetDomainRoadmap(selectedDomain, 0)
-        setConcepts(rm.nodes)
-        if (rm.nodes.length > 0) setConceptSlug(rm.nodes[0].slug)
-      } catch (err) {
+        const graph = await apiExpertGetDomainGraph(selectedDomain)
+        setConcepts(graph.nodes)
+        if (graph.nodes.length > 0 && !graph.nodes.some((n) => n.slug === conceptSlug)) {
+          setConceptSlug(graph.nodes[0].slug)
+        }
+      } catch {
         setConcepts([])
-        setErrorMsg(err instanceof Error ? err.message : 'Không thể tải danh sách khái niệm')
       }
     })()
-  }, [selectedDomain])
+  }, [selectedDomain, conceptSlug, setConceptSlug])
 
-  function handleAddTestCase() {
-    setTestCases((prev) => [
-      ...prev,
-      { name: `Test ${prev.length + 1}`, call: 'solve(0)', expected: '0', is_hidden: true },
+  const hydrateFromChallenge = useCallback((ch: ExpertCodeChallengeItem) => {
+    setSelectedChallengeId(ch.id)
+    setTitle(ch.title)
+    setLanguage(ch.language)
+    setTimeoutMs(ch.timeout_ms)
+    setMemoryLimitMb(ch.memory_limit_mb)
+    setPrompt(ch.prompt)
+    setSetupSql(ch.setup_sql ?? '')
+    setStarterCode(ch.buggy_starter_code)
+    setSolutionCode(ch.solution_code)
+    setTestCases(
+      ch.test_cases.length > 0
+        ? ch.test_cases.map((tc) => ({
+            name: tc.name,
+            call: tc.call,
+            expected:
+              typeof tc.expected === 'string' ? tc.expected : JSON.stringify(tc.expected),
+            is_hidden: Boolean(tc.is_hidden),
+          }))
+        : [{ name: 'Test 1', call: 'solve(5)', expected: '10', is_hidden: false }],
+    )
+    setVerificationResults([])
+    setVerificationMeta(null)
+    setStatusMsg(null)
+    setErrorMsg(null)
+  }, [])
+
+  const resetToNewChallenge = useCallback((lang: CodeLanguage = 'python') => {
+    setSelectedChallengeId(null)
+    setTitle('')
+    setLanguage(lang)
+    setTimeoutMs(3000)
+    setMemoryLimitMb(128)
+    setPrompt('')
+    setSetupSql('')
+    setStarterCode(defaultStarterForLanguage(lang))
+    setSolutionCode(defaultSolutionForLanguage(lang))
+    setTestCases([
+      {
+        name: 'Test 1',
+        call: lang === 'sql' ? 'query' : 'solve(5)',
+        expected: lang === 'sql' ? '[]' : '10',
+        is_hidden: false,
+      },
     ])
-  }
+    setVerificationResults([])
+    setVerificationMeta(null)
+    setStatusMsg(null)
+    setErrorMsg(null)
+  }, [])
 
-  function handleRemoveTestCase(idx: number) {
-    if (testCases.length <= 1) return
-    setTestCases((prev) => prev.filter((_, i) => i !== idx))
-  }
+  const loadChallenges = useCallback(
+    async (slug: string) => {
+      if (!slug) return
+      setLoadingChallenges(true)
+      setErrorMsg(null)
+      try {
+        const res = await apiExpertListCodeChallenges(slug)
+        setExistingChallenges(res.challenges)
+        if (res.challenges.length > 0) {
+          hydrateFromChallenge(res.challenges[0])
+        } else {
+          resetToNewChallenge('python')
+        }
+      } catch (err) {
+        setExistingChallenges([])
+        setErrorMsg(err instanceof Error ? err.message : 'Không thể tải bài tập Code Sandbox')
+      } finally {
+        setLoadingChallenges(false)
+      }
+    },
+    [hydrateFromChallenge, resetToNewChallenge],
+  )
+
+  useEffect(() => {
+    void loadChallenges(conceptSlug)
+  }, [conceptSlug, loadChallenges])
 
   function parseExpected(raw: string): unknown {
     try {
@@ -107,15 +217,17 @@ export function ExpertCodeChallengesPage({ onNavigate }: ExpertCodeChallengesPag
     }
   }
 
-  async function handleSave() {
+  async function handlePublish() {
     setErrorMsg(null)
     setStatusMsg(null)
+    setVerificationResults([])
+    setVerificationMeta(null)
     setSubmitting(true)
     try {
-      const res = await apiExpertCreateCodeChallenge(conceptSlug.trim(), {
-        title: title.trim() || 'Bài tập Thực hành Code',
-        language: 'python',
-        prompt: prompt.trim() || 'Hoàn thiện hàm solve(x).',
+      const res = await apiExpertPublishCodeChallenge(conceptSlug, {
+        title: title.trim() || `Bài tập thực hành ${conceptSlug}`,
+        language,
+        prompt: prompt.trim() || 'Hoàn thiện mã nguồn vượt qua toàn bộ kiểm thử.',
         buggy_starter_code: starterCode,
         solution_code: solutionCode,
         test_cases: testCases.map((tc) => ({
@@ -124,130 +236,78 @@ export function ExpertCodeChallengesPage({ onNavigate }: ExpertCodeChallengesPag
           expected: parseExpected(tc.expected),
           is_hidden: tc.is_hidden,
         })),
-        timeout_ms: 3000,
-        memory_limit_mb: 128,
+        timeout_ms: Math.min(3000, Math.max(200, timeoutMs)),
+        memory_limit_mb: Math.min(128, Math.max(32, memoryLimitMb)),
+        setup_sql: language === 'sql' ? setupSql.trim() || null : null,
       })
-      setStatusMsg(`Solution Code đã pass 100% Test Cases trên Sandbox (ID: ${res.item_id}).`)
+      setVerificationResults(res.validation_run.test_results || [])
+      setVerificationMeta({
+        runtimeMs: res.validation_run.runtime_ms,
+        memoryKb: res.validation_run.memory_kb,
+        starterFailed: res.validation_run.starter_failed_at_least_one,
+      })
+      setStatusMsg(
+        `Kiểm chứng kép thành công (v${res.version}): Solution pass 100%, Starter code fail đúng yêu cầu (${res.validation_run.runtime_ms}ms).`,
+      )
+      const refreshed = await apiExpertListCodeChallenges(conceptSlug)
+      setExistingChallenges(refreshed.challenges)
+      setSelectedChallengeId(res.item_id)
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Lỗi kiểm thử bài tập Code')
+      setErrorMsg(err instanceof Error ? err.message : 'Lỗi kiểm chứng bài tập Code Sandbox')
+      setVerificationResults(extractTestResultsFromError(err))
     } finally {
       setSubmitting(false)
     }
   }
 
-  const publicCount = testCases.filter((t) => !t.is_hidden).length
-  const hiddenCount = testCases.filter((t) => t.is_hidden).length
   const activeCode = activeEditorTab === 'starter' ? starterCode : solutionCode
-  const lineCount = Math.max(13, activeCode.split('\n').length)
+  const lineCount = Math.max(10, activeCode.split('\n').length)
 
   return (
     <section
-      className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 pb-8 space-y-5 text-on-surface"
+      className="w-full space-y-5 text-[#14241B]"
       data-testid="scr17-expert-code"
     >
-      {/* 1. Top Navigation & Metadata Context Bar */}
-      <div className="w-full bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/25 p-5 space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <nav
-            aria-label="Breadcrumb"
-            className="flex items-center gap-2 text-xs font-label text-on-surface-variant flex-wrap"
-          >
-            <span>Chuyên gia</span>
-            <span className="text-outline-variant">/</span>
-            <span>Ngân hàng Bài tập Thực hành (SCR-17)</span>
-            <span className="text-outline-variant">/</span>
-            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-surface-container font-mono text-[11px] font-semibold text-on-surface">
-              <span>{conceptSlug}</span>
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary" />
-              <span className="text-on-surface-variant font-label text-[10px]">
-                {selectedDomain}
-              </span>
-            </div>
-          </nav>
-
-          {/* Studio Navigation & Status */}
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <div className="flex items-center gap-1.5 text-xs font-label px-2.5 py-1 rounded bg-tertiary-fixed/20 text-tertiary">
-              <span className="w-1.5 h-1.5 rounded-full bg-tertiary animate-ping" />
-              <span className="font-semibold">Bản nháp Studio</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => onNavigate('expert_domains')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface-container-low hover:bg-surface-container text-on-surface transition-colors cursor-pointer"
-            >
-              <GitBranch className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
-              <span>1. Đồ thị DAG</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigate('expert_questions')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface-container-low hover:bg-surface-container text-on-surface transition-colors cursor-pointer"
-            >
-              <FileQuestion className="w-3.5 h-3.5 text-secondary" aria-hidden="true" />
-              <span>2. Đề 5 Tầng &amp; Rubric</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Title Header & Runtime Row */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pt-1">
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <span className="px-2.5 py-1 rounded bg-surface-container-high font-mono text-xs font-bold text-primary">
-              #SBX-{conceptSlug.toUpperCase()}
-            </span>
-            <h1 className="text-xl sm:text-2xl font-headline font-bold text-on-surface tracking-tight">
-              {title.trim() || 'Thiết kế Bài tập Code Sandbox & Kiểm thử Tự động'}
-            </h1>
-          </div>
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-container-low border border-outline-variant/25 text-xs font-label self-start lg:self-auto">
-            <Terminal className="w-4 h-4 text-secondary" aria-hidden="true" />
-            <span className="text-on-surface-variant">Runtime:</span>
-            <span className="font-mono font-semibold text-on-surface">Python 3.12 Worker</span>
-          </div>
-        </div>
-
-        {/* INV-SANDBOX-01 Security & Isolation Policy Strip */}
-        <div className="w-full p-3 rounded-xl bg-surface-container-low flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2 text-primary font-semibold font-label">
-            <ShieldCheck className="w-4 h-4" aria-hidden="true" />
-            <span className="tracking-wide">INV-SANDBOX-01 ENFORCED</span>
-            <span className="text-outline-variant font-normal hidden md:inline">|</span>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap font-mono text-[11px]">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-container-lowest shadow-2xs text-on-surface">
-              <WifiOff className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
-              <span>network_mode: none</span>
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-container-lowest shadow-2xs text-on-surface">
-              <FolderLock className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
-              <span>ReadOnly RootFS: tmpfs /tmp</span>
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-container-lowest shadow-2xs text-on-surface">
-              <UserCheck className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
-              <span>UID: 10001 (sandbox-runner)</span>
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-container-lowest shadow-2xs text-on-surface">
-              <Clock className="w-3.5 h-3.5 text-tertiary" aria-hidden="true" />
-              <span>Max Timeout: 3000ms</span>
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-container-lowest shadow-2xs text-on-surface">
-              <Cpu className="w-3.5 h-3.5 text-secondary" aria-hidden="true" />
-              <span>Max RAM: 128MB</span>
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary-container/40 text-on-primary-container font-semibold">
-              <Shield className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
-              <span>AST &amp; RLIMIT Enforced</span>
-            </span>
-          </div>
-        </div>
-
-        {/* Metadata & Prompt Inputs */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+      {/* Top Bar */}
+      <div className="bg-white rounded-2xl border border-[#D8E2D8] p-5 shadow-xs space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
+            <h1 className="text-xl font-extrabold text-[#14241B] tracking-tight">
+              Thiết kế Bài tập Code Sandbox &amp; Kiểm chứng Kép
+            </h1>
+            <p className="text-xs text-[#3F5247] mt-0.5">
+              Nạp bài tập hiện có từ CSDL, hỗ trợ Python / SQL / JavaScript và kiểm chứng đồng thời cả mã chuẩn lẫn mã khởi đầu lỗi.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => resetToNewChallenge(language)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#F0FDF4] border border-[#BBF7D0] text-[#14532D] text-xs font-bold cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Tạo bản mới</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => void loadChallenges(conceptSlug)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#F6F8F5] border border-[#D8E2D8] text-xs font-semibold cursor-pointer"
+            >
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${loadingChallenges ? 'animate-spin' : ''}`}
+                aria-hidden="true"
+              />
+              <span>Làm mới</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Selectors: Domain, Concept, Language, Timeout, RAM */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+          <div className="lg:col-span-1">
             <label
               htmlFor="scr17-domain-select"
-              className="block text-xs font-bold text-on-surface-variant mb-1"
+              className="block text-[11px] font-bold text-[#57534E] mb-1"
             >
               Lĩnh vực
             </label>
@@ -255,7 +315,7 @@ export function ExpertCodeChallengesPage({ onNavigate }: ExpertCodeChallengesPag
               id="scr17-domain-select"
               value={selectedDomain}
               onChange={(e) => setSelectedDomain(e.target.value)}
-              className="w-full rounded-xl border border-outline-variant/40 bg-surface-container-low px-3 py-2 text-xs font-bold text-on-surface focus:outline-none focus:border-primary"
+              className="w-full rounded-lg border border-[#D8E2D8] bg-[#F6F8F5] px-2.5 py-2 text-xs font-bold"
             >
               {domains.map((d) => (
                 <option key={d.slug} value={d.slug}>
@@ -264,10 +324,11 @@ export function ExpertCodeChallengesPage({ onNavigate }: ExpertCodeChallengesPag
               ))}
             </select>
           </div>
-          <div>
+
+          <div className="lg:col-span-2">
             <label
               htmlFor="scr17-concept-select"
-              className="block text-xs font-bold text-on-surface-variant mb-1"
+              className="block text-[11px] font-bold text-[#57534E] mb-1"
             >
               Khái niệm (Node)
             </label>
@@ -275,7 +336,7 @@ export function ExpertCodeChallengesPage({ onNavigate }: ExpertCodeChallengesPag
               id="scr17-concept-select"
               value={conceptSlug}
               onChange={(e) => setConceptSlug(e.target.value)}
-              className="w-full rounded-xl border border-outline-variant/40 bg-surface-container-low px-3 py-2 text-xs font-mono font-bold text-on-surface focus:outline-none focus:border-primary"
+              className="w-full rounded-lg border border-[#D8E2D8] bg-[#F6F8F5] px-2.5 py-2 text-xs font-mono font-bold"
             >
               {concepts.map((c) => (
                 <option key={c.slug} value={c.slug}>
@@ -284,107 +345,174 @@ export function ExpertCodeChallengesPage({ onNavigate }: ExpertCodeChallengesPag
               ))}
             </select>
           </div>
+
           <div>
             <label
-              htmlFor="scr17-title-input"
-              className="block text-xs font-bold text-on-surface-variant mb-1"
+              htmlFor="scr17-language-select"
+              className="block text-[11px] font-bold text-[#57534E] mb-1"
             >
+              Ngôn ngữ thực thi
+            </label>
+            <select
+              id="scr17-language-select"
+              value={language}
+              onChange={(e) => setLanguage(e.target.value as CodeLanguage)}
+              className="w-full rounded-lg border border-[#D8E2D8] bg-[#F6F8F5] px-2.5 py-2 text-xs font-mono font-bold"
+            >
+              <option value="python">Python 3.12</option>
+              <option value="sql">SQL (SQLite)</option>
+              <option value="javascript">JavaScript (Node)</option>
+            </select>
+          </div>
+
+          <div>
+            <label
+              htmlFor="scr17-timeout-input"
+              className="block text-[11px] font-bold text-[#57534E] mb-1"
+            >
+              Timeout (200–3000ms)
+            </label>
+            <input
+              id="scr17-timeout-input"
+              type="number"
+              min={200}
+              max={3000}
+              step={100}
+              value={timeoutMs}
+              onChange={(e) => setTimeoutMs(Number(e.target.value))}
+              className="w-full rounded-lg border border-[#D8E2D8] bg-[#F6F8F5] px-2.5 py-2 text-xs font-mono"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="scr17-memory-input"
+              className="block text-[11px] font-bold text-[#57534E] mb-1"
+            >
+              RAM tối đa (32–128MB)
+            </label>
+            <input
+              id="scr17-memory-input"
+              type="number"
+              min={32}
+              max={128}
+              step={16}
+              value={memoryLimitMb}
+              onChange={(e) => setMemoryLimitMb(Number(e.target.value))}
+              className="w-full rounded-lg border border-[#D8E2D8] bg-[#F6F8F5] px-2.5 py-2 text-xs font-mono"
+            />
+          </div>
+        </div>
+
+        {/* Existing Versions Strip */}
+        {existingChallenges.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#E7EFE7] text-xs">
+            <span className="font-bold text-[#57534E]">Phiên bản trong CSDL:</span>
+            {existingChallenges.map((ch) => (
+              <button
+                key={ch.id}
+                type="button"
+                onClick={() => hydrateFromChallenge(ch)}
+                className={`px-2.5 py-1 rounded-lg border font-mono text-[11px] cursor-pointer ${
+                  selectedChallengeId === ch.id
+                    ? 'bg-[#DCFCE7] border-[#15803D] text-[#14532D] font-bold'
+                    : 'bg-[#F6F8F5] border-[#D8E2D8] text-[#3F5247]'
+                }`}
+              >
+                v{ch.version} • {ch.language} {ch.is_active ? '(Active)' : '(Archived)'}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="scr17-title-input" className="block text-xs font-bold text-[#14241B] mb-1">
               Tiêu đề bài tập
             </label>
             <input
               id="scr17-title-input"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="vd: Chống Race Condition & N+1 Query"
-              className="w-full rounded-xl border border-outline-variant/40 bg-surface-container-low px-3 py-2 text-xs text-on-surface focus:bg-surface-container-lowest focus:outline-none focus:border-primary"
+              placeholder="vd: Tối ưu truy vấn tránh N+1 Query"
+              className="w-full rounded-lg border border-[#D8E2D8] bg-[#F6F8F5] px-3 py-2 text-xs focus:bg-white focus:border-[#15803D] focus:outline-none"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="scr17-prompt-textarea"
+              className="block text-xs font-bold text-[#14241B] mb-1"
+            >
+              Đề bài &amp; Yêu cầu Refactoring
+            </label>
+            <input
+              id="scr17-prompt-textarea"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="Mô tả lỗi cần sửa và điều kiện nghiệm thu..."
+              className="w-full rounded-lg border border-[#D8E2D8] bg-[#F6F8F5] px-3 py-2 text-xs focus:bg-white focus:border-[#15803D] focus:outline-none"
             />
           </div>
         </div>
 
-        <div>
-          <label
-            htmlFor="scr17-prompt-textarea"
-            className="block text-xs font-bold text-on-surface-variant mb-1"
-          >
-            Đề bài &amp; Yêu cầu Refactoring
-          </label>
-          <textarea
-            id="scr17-prompt-textarea"
-            rows={2}
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Mô tả yêu cầu bài tập Code Review & Refactoring..."
-            className="w-full rounded-xl border border-outline-variant/40 bg-surface-container-low p-3 text-xs text-on-surface focus:bg-surface-container-lowest focus:border-primary focus:outline-none"
-          />
-        </div>
+        {/* SQL Setup Schema Editor (only when language === 'sql') */}
+        {language === 'sql' && (
+          <div className="space-y-1.5" data-testid="setup-sql-editor">
+            <label
+              htmlFor="scr17-setup-sql"
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#14241B]"
+            >
+              <Database className="w-3.5 h-3.5 text-[#0D9488]" aria-hidden="true" />
+              <span>Schema &amp; Dữ liệu Khởi tạo SQL (setup_sql)</span>
+            </label>
+            <textarea
+              id="scr17-setup-sql"
+              rows={4}
+              value={setupSql}
+              onChange={(e) => setSetupSql(e.target.value)}
+              placeholder="CREATE TABLE items (id INT, name TEXT); INSERT INTO items VALUES (1, 'A');"
+              spellCheck={false}
+              className="w-full rounded-xl border border-[#D8E2D8] bg-[#0F172A] text-emerald-300 p-3 font-mono text-xs focus:outline-none"
+            />
+          </div>
+        )}
       </div>
 
-      {/* 2. Two-Column Code Challenge Studio */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column (6 cols): Dual Editor Panel */}
-        <div className="lg:col-span-6 flex flex-col rounded-2xl bg-surface-container-lowest shadow-sm border border-outline-variant/25 overflow-hidden">
-          {/* Editor Tabs */}
-          <div className="flex items-center justify-between bg-surface-container-low px-4 pt-3 gap-2 overflow-x-auto">
+      {/* Main Two-Column Editor & Test Suite */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        {/* Left: Starter / Solution Code Editor */}
+        <div className="lg:col-span-6 bg-white rounded-2xl border border-[#D8E2D8] overflow-hidden shadow-xs">
+          <div className="flex items-center justify-between bg-[#F6F8F5] px-4 pt-3 border-b border-[#D8E2D8]">
             <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={() => setActiveEditorTab('starter')}
-                className={`px-4 py-2 text-xs font-label rounded-t-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+                className={`px-3.5 py-2 text-xs rounded-t-lg font-bold inline-flex items-center gap-1.5 cursor-pointer ${
                   activeEditorTab === 'starter'
-                    ? 'font-bold bg-[#0F172A] text-amber-400 shadow-2xs'
-                    : 'font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+                    ? 'bg-[#0F172A] text-amber-400'
+                    : 'text-[#57534E] hover:text-[#14241B]'
                 }`}
               >
                 <Code2 className="w-3.5 h-3.5" aria-hidden="true" />
-                <span>Buggy Starter Code (Mã nguồn lỗi)</span>
+                <span>Buggy Starter Code (Phải Fail &ge; 1 test)</span>
               </button>
               <button
                 type="button"
                 onClick={() => setActiveEditorTab('solution')}
-                className={`px-4 py-2 text-xs font-label rounded-t-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+                className={`px-3.5 py-2 text-xs rounded-t-lg font-bold inline-flex items-center gap-1.5 cursor-pointer ${
                   activeEditorTab === 'solution'
-                    ? 'font-bold bg-[#0F172A] text-emerald-400 shadow-2xs'
-                    : 'font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+                    ? 'bg-[#0F172A] text-emerald-400'
+                    : 'text-[#57534E] hover:text-[#14241B]'
                 }`}
               >
                 <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
-                <span>Reference Solution (Mã chuẩn)</span>
+                <span>Reference Solution (Phải Pass 100%)</span>
               </button>
             </div>
-            <span className="text-[11px] font-mono text-on-surface-variant pb-2 pr-2 hidden sm:inline">
-              {conceptSlug}.py
-            </span>
           </div>
 
-          {/* Editor Sub-Toolbar */}
-          <div className="bg-[#1E293B] px-4 py-2 flex items-center justify-between text-xs font-label text-slate-300">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1.5 font-mono text-[11px] text-slate-300">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
-                <span>Python 3.12</span>
-              </div>
-              <span className="text-slate-600">|</span>
-              <span className="text-slate-400 font-mono text-[11px]">UTF-8 &bull; 4 spaces</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                if (activeEditorTab === 'starter') setStarterCode(DEFAULT_STARTER_CODE)
-                else setSolutionCode(DEFAULT_SOLUTION_CODE)
-              }}
-              className="px-2.5 py-1 rounded bg-slate-700/60 hover:bg-slate-700 text-slate-200 transition-colors flex items-center gap-1 text-[11px] cursor-pointer"
-            >
-              <RotateCcw className="w-3 h-3" aria-hidden="true" />
-              <span>Khôi phục mẫu</span>
-            </button>
-          </div>
-
-          {/* Code Block Container with Line Numbers */}
           <div className="bg-[#0F172A] p-4 flex font-mono text-xs leading-6">
-            <div
-              className="select-none text-slate-600 text-right pr-3 border-r border-slate-800 space-y-0"
-              aria-hidden="true"
-            >
+            <div className="select-none text-slate-500 text-right pr-3 border-r border-slate-800" aria-hidden="true">
               {Array.from({ length: lineCount }, (_, i) => (
                 <div key={i}>{String(i + 1).padStart(2, '0')}</div>
               ))}
@@ -392,7 +520,7 @@ export function ExpertCodeChallengesPage({ onNavigate }: ExpertCodeChallengesPag
             {activeEditorTab === 'starter' ? (
               <textarea
                 aria-label="Buggy Starter Code"
-                rows={13}
+                rows={12}
                 value={starterCode}
                 onChange={(e) => setStarterCode(e.target.value)}
                 spellCheck={false}
@@ -401,7 +529,7 @@ export function ExpertCodeChallengesPage({ onNavigate }: ExpertCodeChallengesPag
             ) : (
               <textarea
                 aria-label="Reference Solution Code"
-                rows={13}
+                rows={12}
                 value={solutionCode}
                 onChange={(e) => setSolutionCode(e.target.value)}
                 spellCheck={false}
@@ -409,158 +537,117 @@ export function ExpertCodeChallengesPage({ onNavigate }: ExpertCodeChallengesPag
               />
             )}
           </div>
-
-          {/* Technical Annotation Footer */}
-          <div className="p-3.5 bg-surface-container flex items-center gap-2 text-xs text-on-surface-variant font-label">
-            <ShieldCheck className="w-4 h-4 text-primary shrink-0" aria-hidden="true" />
-            <span>
-              <strong>Mã chuẩn Reference:</strong> Bắt buộc pass 100% Test Cases trên Worker cô lập
-              trước khi bài tập được lưu vào CSDL.
-            </span>
-          </div>
         </div>
 
-        {/* Right Column (6 cols): Automated Test Suite & Dry-Run Execution Panel */}
-        <div className="lg:col-span-6 flex flex-col gap-4">
-          {/* Header & Add Test Case Row */}
-          <div className="p-5 rounded-2xl bg-surface-container-lowest shadow-sm border border-outline-variant/25 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-headline font-bold text-on-surface">
-                  Bộ Kiểm thử Tự động (Automated Test Suite)
-                </h2>
-                <span className="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container text-[11px] font-bold">
-                  {testCases.length} Tests
-                </span>
-              </div>
-              <p className="text-xs text-on-surface-variant font-label">
-                {publicCount} Công khai (Public Guide), {hiddenCount} Ẩn (Hidden Anti-Hardcode).
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleAddTestCase}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold font-label transition-colors self-start sm:self-auto shadow-2xs cursor-pointer"
-            >
-              <Plus className="w-4 h-4 text-primary" aria-hidden="true" />
-              <span>Thêm Test Case mới</span>
-            </button>
-          </div>
-
-          {/* Test Case Cards List */}
-          <div className="flex flex-col gap-3">
-            {testCases.map((tc, idx) => (
-              <div
-                key={idx}
-                className="p-4 rounded-xl bg-surface-container-lowest shadow-sm border border-outline-variant/25 flex flex-col gap-2.5"
+        {/* Right: Test Cases & Dual Sandbox Verification Table */}
+        <div className="lg:col-span-6 space-y-4">
+          <div className="bg-white rounded-2xl border border-[#D8E2D8] p-5 shadow-xs space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-extrabold text-[#14241B]">
+                Bộ Kiểm thử Tự động ({testCases.length} Test Cases)
+              </h2>
+              <button
+                type="button"
+                onClick={() =>
+                  setTestCases((prev) => [
+                    ...prev,
+                    {
+                      name: `Test ${prev.length + 1}`,
+                      call: language === 'sql' ? 'query' : 'solve(0)',
+                      expected: language === 'sql' ? '[]' : '0',
+                      is_hidden: true,
+                    },
+                  ])
+                }
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#F6F8F5] border border-[#D8E2D8] text-xs font-bold text-[#15803D] cursor-pointer"
               >
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    {tc.is_hidden ? (
-                      <Lock className="w-4 h-4 text-tertiary" aria-hidden="true" />
-                    ) : (
-                      <CheckCircle2 className="w-4 h-4 text-primary" aria-hidden="true" />
-                    )}
-                    <span className="font-mono font-bold text-xs text-on-surface">
-                      Test #{idx + 1}: {tc.name || `test_${idx + 1}`}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`px-2 py-0.5 rounded font-label text-[10px] font-bold ${
-                        tc.is_hidden
-                          ? 'bg-tertiary-fixed/30 text-tertiary'
-                          : 'bg-primary-container/60 text-on-primary-container'
-                      }`}
-                    >
-                      {tc.is_hidden ? 'Ẩn (Hidden Anti-Hardcode)' : 'Công khai (Public)'}
+                <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>Thêm Test Case</span>
+              </button>
+            </div>
+
+            <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+              {testCases.map((tc, idx) => (
+                <div
+                  key={idx}
+                  className="p-3 rounded-xl bg-[#F6F8F5] border border-[#D8E2D8] space-y-2 text-xs"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono font-bold inline-flex items-center gap-1.5">
+                      {tc.is_hidden ? (
+                        <Lock className="w-3.5 h-3.5 text-[#D97706]" aria-hidden="true" />
+                      ) : (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-[#15803D]" aria-hidden="true" />
+                      )}
+                      Test #{idx + 1}
                     </span>
                     <button
                       type="button"
-                      onClick={() => handleRemoveTestCase(idx)}
                       disabled={testCases.length <= 1}
+                      onClick={() => setTestCases((prev) => prev.filter((_, i) => i !== idx))}
+                      className="p-1 text-[#9F1239] disabled:opacity-30 cursor-pointer"
                       aria-label="Xóa test case"
-                      className="p-1 text-on-surface-variant hover:text-error disabled:opacity-35 cursor-pointer"
                     >
-                      <Trash2 className="w-4 h-4" aria-hidden="true" />
+                      <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
                     </button>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center text-xs">
-                  <input
-                    value={tc.name}
-                    onChange={(e) =>
-                      setTestCases((prev) =>
-                        prev.map((r, i) => (i === idx ? { ...r, name: e.target.value } : r)),
-                      )
-                    }
-                    placeholder="Tên test case"
-                    className="sm:col-span-3 rounded-lg border border-outline-variant/40 bg-surface-container-low px-2.5 py-1.5"
-                  />
-                  <input
-                    value={tc.call}
-                    onChange={(e) =>
-                      setTestCases((prev) =>
-                        prev.map((r, i) => (i === idx ? { ...r, call: e.target.value } : r)),
-                      )
-                    }
-                    placeholder="solve(5)"
-                    className="sm:col-span-4 rounded-lg border border-outline-variant/40 bg-surface-container-low px-2.5 py-1.5 font-mono"
-                  />
-                  <input
-                    value={tc.expected}
-                    onChange={(e) =>
-                      setTestCases((prev) =>
-                        prev.map((r, i) => (i === idx ? { ...r, expected: e.target.value } : r)),
-                      )
-                    }
-                    placeholder="Expected JSON"
-                    className="sm:col-span-3 rounded-lg border border-outline-variant/40 bg-surface-container-low px-2.5 py-1.5 font-mono"
-                  />
-                  <label className="sm:col-span-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-on-surface cursor-pointer">
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                     <input
-                      type="checkbox"
-                      checked={tc.is_hidden}
+                      value={tc.name}
                       onChange={(e) =>
                         setTestCases((prev) =>
-                          prev.map((r, i) =>
-                            i === idx ? { ...r, is_hidden: e.target.checked } : r,
-                          ),
+                          prev.map((r, i) => (i === idx ? { ...r, name: e.target.value } : r)),
                         )
                       }
-                      className="accent-primary"
+                      placeholder="Tên test"
+                      className="sm:col-span-3 rounded-lg border border-[#D8E2D8] bg-white px-2 py-1.5"
                     />
-                    <span>Test ẩn</span>
-                  </label>
+                    <input
+                      value={tc.call}
+                      onChange={(e) =>
+                        setTestCases((prev) =>
+                          prev.map((r, i) => (i === idx ? { ...r, call: e.target.value } : r)),
+                        )
+                      }
+                      placeholder="Lời gọi hàm"
+                      className="sm:col-span-4 rounded-lg border border-[#D8E2D8] bg-white px-2 py-1.5 font-mono"
+                    />
+                    <input
+                      value={tc.expected}
+                      onChange={(e) =>
+                        setTestCases((prev) =>
+                          prev.map((r, i) => (i === idx ? { ...r, expected: e.target.value } : r)),
+                        )
+                      }
+                      placeholder="Expected JSON"
+                      className="sm:col-span-3 rounded-lg border border-[#D8E2D8] bg-white px-2 py-1.5 font-mono"
+                    />
+                    <label className="sm:col-span-2 inline-flex items-center gap-1 text-[11px] font-semibold cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={tc.is_hidden}
+                        onChange={(e) =>
+                          setTestCases((prev) =>
+                            prev.map((r, i) =>
+                              i === idx ? { ...r, is_hidden: e.target.checked } : r,
+                            ),
+                          )
+                        }
+                        className="accent-[#15803D]"
+                      />
+                      <span>Ẩn</span>
+                    </label>
+                  </div>
                 </div>
-
-                <div className="p-2 rounded-lg bg-surface-container-low font-mono text-[11px] text-on-surface">
-                  <span className="text-secondary font-bold">assert</span> {tc.call} =={' '}
-                  {tc.expected}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Dry-Run Verification Status Banner */}
-          <div className="p-4 rounded-xl bg-primary-container/25 border border-primary/25 shadow-2xs flex flex-col gap-2">
-            <div className="flex items-center gap-2 text-on-primary-container font-headline font-bold text-xs">
-              <ShieldCheck className="w-4 h-4 text-primary" aria-hidden="true" />
-              <span>Quy trình Kiểm chứng Dry-Run Test Engine</span>
+              ))}
             </div>
-            <p className="text-xs text-on-surface leading-relaxed">
-              Khi bấm lưu, hệ thống tự động thực thi{' '}
-              <strong className="text-primary">Reference Solution</strong> với toàn bộ{' '}
-              {testCases.length} Test Cases trên Sandbox Worker cô lập. Chỉ những bài tập có mã giải
-              đạt 100% mới được phép xuất bản.
-            </p>
           </div>
 
           {errorMsg && (
             <div
               role="alert"
-              className="p-3.5 rounded-xl bg-error-container/20 border border-error/40 text-xs font-bold text-error flex items-center gap-2"
+              className="p-3.5 rounded-xl bg-[#FFF1F2] border border-[#FDA4AF] text-xs font-bold text-[#9F1239] flex items-center gap-2"
             >
               <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
               <span>{errorMsg}</span>
@@ -568,23 +655,74 @@ export function ExpertCodeChallengesPage({ onNavigate }: ExpertCodeChallengesPag
           )}
 
           {statusMsg && (
-            <div className="p-3.5 rounded-xl bg-primary-container/35 border border-primary/35 text-xs font-bold text-on-primary-container flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-primary shrink-0" aria-hidden="true" />
+            <div className="p-3.5 rounded-xl bg-[#F0FDF4] border border-[#86EFAC] text-xs font-bold text-[#14532D] flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-[#15803D] shrink-0" aria-hidden="true" />
               <span>{statusMsg}</span>
             </div>
           )}
 
-          {/* Bottom Action Bar */}
-          <div className="p-4 rounded-2xl bg-surface-container-lowest shadow-sm border border-outline-variant/25 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2 text-xs font-label text-on-surface-variant">
-              <Terminal className="w-4 h-4 text-primary" aria-hidden="true" />
-              <span>Sandbox Dry-Run: Sẵn sàng ({testCases.length} test cases)</span>
+          {/* Per-Test-Case Dual Sandbox Verification Table */}
+          {verificationResults.length > 0 && (
+            <div
+              className="bg-white rounded-2xl border border-[#D8E2D8] p-4 shadow-xs space-y-2.5"
+              data-testid="dual-sandbox-verification-table"
+            >
+              <div className="flex items-center justify-between text-xs font-bold">
+                <span className="inline-flex items-center gap-1.5 text-[#14241B]">
+                  <ShieldCheck className="w-4 h-4 text-[#15803D]" aria-hidden="true" />
+                  <span>Chi tiết Kiểm chứng Sandbox ({verificationResults.length} test cases)</span>
+                </span>
+                {verificationMeta && (
+                  <span className="font-mono text-[11px] text-[#57534E]">
+                    {verificationMeta.runtimeMs}ms • {verificationMeta.memoryKb}KB
+                  </span>
+                )}
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-[11px] font-mono">
+                  <thead>
+                    <tr className="bg-[#F6F8F5] text-[#57534E]">
+                      <th className="py-1.5 px-2">Test Case</th>
+                      <th className="py-1.5 px-2">Trạng thái</th>
+                      <th className="py-1.5 px-2">Actual / Error</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E7EFE7]">
+                    {verificationResults.map((tr, i) => (
+                      <tr key={i}>
+                        <td className="py-1.5 px-2 font-bold">{tr.name}</td>
+                        <td className="py-1.5 px-2">
+                          {tr.passed ? (
+                            <span className="inline-flex items-center gap-1 text-[#15803D] font-bold">
+                              <CheckCircle2 className="w-3 h-3" aria-hidden="true" /> PASS
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[#9F1239] font-bold">
+                              <XCircle className="w-3 h-3" aria-hidden="true" /> FAIL
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-1.5 px-2 text-[#57534E] truncate max-w-[200px]">
+                          {tr.error ? tr.error : JSON.stringify(tr.actual)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
+          )}
+
+          {/* Publish Action Bar */}
+          <div className="bg-white rounded-2xl border border-[#D8E2D8] p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
+            <span className="text-xs text-[#57534E]">
+              Kiểm chứng kép: Solution Pass 100% &amp; Starter Code Fail &ge; 1 test.
+            </span>
             <button
               type="button"
-              disabled={submitting || loadingDomains || !conceptSlug}
-              onClick={() => void handleSave()}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary hover:bg-primary-dim disabled:opacity-50 text-on-primary text-xs font-label font-bold transition-all shadow-sm cursor-pointer"
+              disabled={submitting || !conceptSlug}
+              onClick={() => void handlePublish()}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#15803D] hover:bg-[#166534] disabled:opacity-45 text-white text-xs font-bold cursor-pointer"
             >
               {submitting ? (
                 <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
@@ -592,9 +730,7 @@ export function ExpertCodeChallengesPage({ onNavigate }: ExpertCodeChallengesPag
                 <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
               )}
               <span>
-                {submitting
-                  ? 'Đang chạy thử Solution Code trên Sandbox Worker...'
-                  : 'Chạy Thử Test Cases & Lưu Bài Code'}
+                {submitting ? 'Đang chạy Kiểm chứng Kép...' : 'Chạy Kiểm chứng Kép & Xuất bản'}
               </span>
             </button>
           </div>

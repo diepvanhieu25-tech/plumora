@@ -126,7 +126,6 @@ class UserConceptMasteryModel(Base):
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
         primary_key=True,
     )
     concept_action_id: Mapped[int] = mapped_column(
@@ -155,7 +154,6 @@ class QuizAttemptModel(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -195,7 +193,6 @@ class RecommendationLogModel(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -278,6 +275,9 @@ class DepthQuestionModel(Base):
     )
     correct_option_key: Mapped[str | None] = mapped_column(String(1), nullable=True)
     is_placement_eligible: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    display_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
 class GradingRubricModel(Base):
@@ -317,6 +317,10 @@ class CodeChallengeModel(Base):
     )
     timeout_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=3000)
     memory_limit_mb: Mapped[int] = mapped_column(Integer, nullable=False, default=128)
+    setup_sql: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    display_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
 class UserNodeCompetencyModel(Base):
@@ -332,7 +336,6 @@ class UserNodeCompetencyModel(Base):
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
         primary_key=True,
     )
     concept_slug: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -348,6 +351,11 @@ class UserNodeCompetencyModel(Base):
     last_practiced_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
+    )
+    playbook_completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=None,
     )
     code_practice_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     updated_at: Mapped[datetime] = mapped_column(
@@ -365,7 +373,6 @@ class AssessmentSessionModel(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -405,7 +412,6 @@ class AttemptRecordModel(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
