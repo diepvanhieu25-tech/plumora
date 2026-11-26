@@ -154,6 +154,7 @@ docker compose ps
   ```bash
   curl -s http://localhost:3000/api/v1/health
   ```
+- **Chấm tự luận LLM ngoài (Tùy chọn):** Sao chép `.env.example` sang `.env` và điền `PLUMORA_LLM_API_KEY` (hỗ trợ chuẩn OpenAI-compatible như Google AI Studio `gemini-3.8-flash`, timeout mặc định `PLUMORA_LLM_TIMEOUT_S=8.0`); nếu để trống key, `CircuitBreakerRubricService` tự động dùng `DeterministicRubricGrader` offline.
 
 ---
 

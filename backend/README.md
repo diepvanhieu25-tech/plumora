@@ -38,3 +38,14 @@ uv run mypy app services tests
 # Chạy toàn bộ bộ kiểm thử đơn vị, hành vi & 5 Architectural Fitness Functions
 uv run pytest
 ```
+
+---
+
+## 3. Cấu hình Chấm Tự luận LLM Ngoài (Tùy chọn)
+
+`LlmRubricGraderAdapter` và `CircuitBreakerRubricService` trong `app/modules/assessment/rubric_grader.py` hỗ trợ bất kỳ endpoint OpenAI-compatible nào thông qua tệp `.env` ở gốc repo:
+
+- `PLUMORA_LLM_API_URL`: Endpoint Chat Completions (ví dụ `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`).
+- `PLUMORA_LLM_API_KEY`: API key cá nhân (nếu để trống, hệ thống tự động chạy `DeterministicRubricGrader` offline không tốn phí).
+- `PLUMORA_LLM_MODEL`: Tên model (mặc định Docker Compose là `gemini-3.8-flash`).
+- `PLUMORA_LLM_TIMEOUT_S`: Timeout gọi LLM trước khi `CircuitBreaker` chuyển về fallback (mặc định `8.0` giây).
