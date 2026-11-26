@@ -5,22 +5,27 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import redis
-from sqlalchemy import select
+from plumora_rl.domain import EbbinghausMemoryModel
+from sqlalchemy import func, select, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db.models import (
     AssessmentSessionModel,
+    AttemptRecordModel,
     CodeChallengeModel,
+    ConceptModel,
     DbSession,
     DepthQuestionModel,
     DomainConceptMapModel,
     DomainModel,
     GradingRubricModel,
+    UserConceptMasteryModel,
     UserModel,
     UserNodeCompetencyModel,
 )
@@ -132,7 +137,11 @@ class SqlContentCatalogAdapter:
             self._db.scalars(
                 select(DepthQuestionModel)
                 .where(DepthQuestionModel.concept_slug.in_(slugs))
-                .order_by(DepthQuestionModel.depth_tier, DepthQuestionModel.display_order)
+                .order_by(
+                    DepthQuestionModel.depth_tier,
+                    DepthQuestionModel.version.desc(),
+                    DepthQuestionModel.display_order,
+                )
             ).all()
             if slugs
             else []
@@ -224,7 +233,11 @@ class SqlContentCatalogAdapter:
         db_qs = self._db.scalars(
             select(DepthQuestionModel)
             .where(DepthQuestionModel.concept_slug == concept_slug)
-            .order_by(DepthQuestionModel.depth_tier, DepthQuestionModel.display_order)
+            .order_by(
+                DepthQuestionModel.depth_tier,
+                DepthQuestionModel.version.desc(),
+                DepthQuestionModel.display_order,
+            )
         ).all()
         q_ids = [q.id for q in db_qs]
         db_rubrics = (
@@ -241,7 +254,7 @@ class SqlContentCatalogAdapter:
                 CodeChallengeModel.concept_slug == concept_slug,
                 CodeChallengeModel.is_active.is_(True),
             )
-            .order_by(CodeChallengeModel.display_order)
+            .order_by(CodeChallengeModel.version.desc(), CodeChallengeModel.display_order)
         ).first()
 
         q_dtos = tuple(
@@ -408,10 +421,43 @@ class SqlCompetencyReaderAdapter:
                 .limit(100)
             ).all()
         )
-        user_row = self._db.get(UserModel, user_id)
-        state_version = int(user_row.state_version) if user_row is not None else max(1, len(rows))
-        comp_dtos = tuple(
-            UserNodeCompetencyDTO(
+        attempt_cnt = int(
+            self._db.scalar(
+                select(func.count())
+                .select_from(AttemptRecordModel)
+                .where(AttemptRecordModel.user_id == user_id)
+            )
+            or 0
+        )
+        max_updated_us = max(
+            (int(r.updated_at.timestamp() * 1_000_000) for r in rows if r.updated_at is not None),
+            default=0,
+        )
+        base_ver = 1 + len(rows) + attempt_cnt + max_updated_us
+        bind = self._db.get_bind()
+        is_pg = bind is not None and bind.dialect.name == "postgresql"
+
+        has_users_tbl = True
+        if is_pg:
+            has_users_tbl = bool(
+                self._db.execute(text("SELECT to_regclass('users') IS NOT NULL")).scalar()
+            )
+        if has_users_tbl:
+            try:
+                with self._db.begin_nested():
+                    user_row = self._db.get(UserModel, user_id)
+                    state_version = (
+                        max(base_ver, int(user_row.state_version))
+                        if user_row is not None
+                        else base_ver
+                    )
+            except SQLAlchemyError:
+                state_version = base_ver
+        else:
+            state_version = base_ver
+
+        merged: dict[str, UserNodeCompetencyDTO] = {
+            r.concept_slug: UserNodeCompetencyDTO(
                 concept_slug=r.concept_slug,
                 depth_level_norm=float(r.depth_level_norm),
                 peak_depth_level_norm=float(r.peak_depth_level_norm),
@@ -423,12 +469,83 @@ class SqlCompetencyReaderAdapter:
                 code_practice_score=float(r.code_practice_score),
             )
             for r in rows
-        )
+        }
+
+        has_legacy_join = True
+        if is_pg:
+            has_legacy_join = bool(
+                self._db.execute(
+                    text(
+                        "SELECT to_regclass('user_concept_mastery') IS NOT NULL "
+                        "AND to_regclass('concepts') IS NOT NULL"
+                    )
+                ).scalar()
+            )
+        if has_legacy_join:
+            try:
+                with self._db.begin_nested():
+                    mvp_rows = self._db.execute(
+                        select(UserConceptMasteryModel, ConceptModel.slug)
+                        .join(
+                            ConceptModel,
+                            ConceptModel.action_id == UserConceptMasteryModel.concept_action_id,
+                        )
+                        .where(UserConceptMasteryModel.user_id == user_id)
+                    ).all()
+                for mastery_row, c_slug in mvp_rows:
+                    score = float(mastery_row.mastery_score)
+                    if score <= 0.0:
+                        continue
+                    lbl = (
+                        "Mastery"
+                        if score >= 1.0
+                        else (
+                            "Deep Understanding"
+                            if score >= 0.75
+                            else ("Applied" if score >= 0.50 else "Surface")
+                        )
+                    )
+                    existing = merged.get(c_slug)
+                    if existing is None:
+                        merged[c_slug] = UserNodeCompetencyDTO(
+                            concept_slug=c_slug,
+                            depth_level_norm=score,
+                            peak_depth_level_norm=score,
+                            depth_label=lbl,
+                            confidence=0.85 if score >= 0.75 else 0.65,
+                            stability_s=EbbinghausMemoryModel.INITIAL_STABILITY_DAYS,
+                            last_practiced_at=mastery_row.updated_at or datetime.now(UTC),
+                            playbook_completed_at=mastery_row.updated_at or datetime.now(UTC),
+                            code_practice_score=0.0,
+                        )
+                    elif score > existing.depth_level_norm:
+                        merged[c_slug] = UserNodeCompetencyDTO(
+                            concept_slug=c_slug,
+                            depth_level_norm=score,
+                            peak_depth_level_norm=max(existing.peak_depth_level_norm, score),
+                            depth_label=lbl,
+                            confidence=max(existing.confidence, 0.85 if score >= 0.75 else 0.65),
+                            stability_s=existing.stability_s,
+                            last_practiced_at=(
+                                existing.last_practiced_at
+                                or mastery_row.updated_at
+                                or datetime.now(UTC)
+                            ),
+                            playbook_completed_at=(
+                                existing.playbook_completed_at
+                                or mastery_row.updated_at
+                                or datetime.now(UTC)
+                            ),
+                            code_practice_score=existing.code_practice_score,
+                        )
+            except SQLAlchemyError:
+                pass
+
         return UserCompetencySnapshotDTO(
             user_id=user_id,
             state_version=state_version,
             completed_placement_domains=completed_placements,
-            competencies=comp_dtos,
+            competencies=tuple(merged.values()),
         )
 
 

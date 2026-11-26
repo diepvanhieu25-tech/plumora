@@ -46,6 +46,8 @@ export async function apiLogout(): Promise<void> {
       headers: buildHeaders(),
       credentials: 'include',
     })
+  } catch {
+    // Best-effort server logout; always clear client session even if network is offline
   } finally {
     setAuthToken(null)
   }

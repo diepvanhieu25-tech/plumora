@@ -1,4 +1,4 @@
-"""FastAPI router for /api/v2 assessment, placement, playbook, code sandbox & recommendations."""
+"""FastAPI router for /api/v2 assessment, placement, playbook, code sandbox & internal APIs."""
 
 from __future__ import annotations
 
@@ -6,10 +6,13 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
 from app.db.models import (
     AssessmentSessionModel,
+    AttemptRecordModel,
     DbSession,
     OutboxEventModel,
     UserModel,
@@ -44,8 +47,34 @@ from app.modules.assessment.service_v2 import (
 )
 from app.modules.auth import extract_current_user
 from app.modules.auth.security import require_internal_service
+from app.modules.events.outbox import relay_pending_outbox_events
 
 router = APIRouter(prefix="/api/v2", tags=["assessment_v2"])
+
+
+class InternalCohortRequest(BaseModel):
+    concept_slugs: list[str] = Field(default_factory=list, max_length=200)
+
+
+def compute_authoritative_state_version(
+    db: Session,
+    user_id: uuid.UUID,
+    rows: list[UserNodeCompetencyModel],
+) -> int:
+    """Compute strictly monotonic state_version from competency timestamps and attempt count (REM-03)."""
+    attempt_cnt = int(
+        db.scalar(
+            select(func.count())
+            .select_from(AttemptRecordModel)
+            .where(AttemptRecordModel.user_id == user_id)
+        )
+        or 0
+    )
+    max_updated_us = max(
+        (int(r.updated_at.timestamp() * 1_000_000) for r in rows if r.updated_at is not None),
+        default=0,
+    )
+    return 1 + len(rows) + attempt_cnt + max_updated_us
 
 
 def _require_user(request: Request, db: DbSession) -> UserModel:
@@ -185,10 +214,12 @@ def post_code_sandbox_submit(
 
 @router.get("/internal/users/{user_id}/competencies", dependencies=[Depends(require_internal_service)])
 def get_user_competencies_internal(user_id: uuid.UUID, db: DbSession) -> dict[str, Any]:
-    """Internal endpoint returning user competencies, state_version & completed placements."""
-    rows = db.scalars(
-        select(UserNodeCompetencyModel).where(UserNodeCompetencyModel.user_id == user_id)
-    ).all()
+    """Internal endpoint returning user competencies, monotonic state_version & completed placements."""
+    rows = list(
+        db.scalars(
+            select(UserNodeCompetencyModel).where(UserNodeCompetencyModel.user_id == user_id)
+        ).all()
+    )
     completed_placements = list(
         db.scalars(
             select(AssessmentSessionModel.domain_slug)
@@ -201,7 +232,7 @@ def get_user_competencies_internal(user_id: uuid.UUID, db: DbSession) -> dict[st
             .limit(100)
         ).all()
     )
-    state_ver = max(1, len(rows))
+    state_ver = compute_authoritative_state_version(db, user_id, rows)
     return {
         "user_id": str(user_id),
         "state_version": state_ver,
@@ -225,9 +256,49 @@ def get_user_competencies_internal(user_id: uuid.UUID, db: DbSession) -> dict[st
     }
 
 
+@router.post("/internal/analytics/cohort", dependencies=[Depends(require_internal_service)])
+def post_cohort_analytics_internal(
+    payload: InternalCohortRequest,
+    db: DbSession,
+) -> dict[str, Any]:
+    """Internal endpoint providing competency & bottleneck session rows for Back-Office Cohort Analytics."""
+    slugs = [s.strip() for s in payload.concept_slugs if s.strip()]
+    if not slugs:
+        return {"competencies": [], "sessions": []}
+    comp_rows = db.scalars(
+        select(UserNodeCompetencyModel).where(UserNodeCompetencyModel.concept_slug.in_(slugs))
+    ).all()
+    session_rows = db.scalars(
+        select(AssessmentSessionModel).where(
+            AssessmentSessionModel.concept_slug.in_(slugs),
+            AssessmentSessionModel.status.in_(["ceiling_reached", "insufficient_evidence"]),
+        )
+    ).all()
+    return {
+        "competencies": [
+            {
+                "user_id": str(c.user_id),
+                "concept_slug": c.concept_slug,
+                "depth_level_norm": float(c.depth_level_norm),
+                "stability_s": float(c.stability_s),
+                "last_practiced_at": c.last_practiced_at.isoformat() if c.last_practiced_at else None,
+            }
+            for c in comp_rows
+        ],
+        "sessions": [
+            {
+                "concept_slug": s.concept_slug,
+                "current_depth_tier": int(s.current_depth_tier),
+                "status": s.status,
+            }
+            for s in session_rows
+        ],
+    }
+
+
 @router.get("/internal/outbox/pending-count", dependencies=[Depends(require_internal_service)])
-def get_outbox_pending_count_internal(db: DbSession) -> dict[str, int]:
-    """Internal endpoint returning pending outbox event count for system health."""
+def get_outbox_pending_count_internal(db: DbSession) -> dict[str, Any]:
+    """Internal endpoint returning pending outbox event count & breakdown by event_type."""
     cnt = int(
         db.scalar(
             select(func.count())
@@ -236,7 +307,22 @@ def get_outbox_pending_count_internal(db: DbSession) -> dict[str, int]:
         )
         or 0
     )
-    return {"pending_count": cnt}
+    ev_rows = db.execute(
+        select(OutboxEventModel.event_type, func.count())
+        .where(OutboxEventModel.published_at.is_(None))
+        .group_by(OutboxEventModel.event_type)
+    ).all()
+    return {
+        "pending_count": cnt,
+        "by_event_type": {str(ev_t): int(c) for ev_t, c in ev_rows},
+    }
+
+
+@router.post("/internal/outbox/relay", dependencies=[Depends(require_internal_service)])
+def post_outbox_relay_internal(db: DbSession) -> dict[str, int]:
+    """Internal endpoint triggering immediate outbox relay on assess_svc."""
+    relayed = relay_pending_outbox_events(db)
+    return {"relayed": relayed}
 
 
 @router.post(

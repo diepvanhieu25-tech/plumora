@@ -18,6 +18,8 @@ from torch.distributions import Categorical
 from plumora_rl.domain import (
     NODE_FEAT_DIM,
     NUM_MODES,
+    LearningMode,
+    NodeFeatureIdx,
     PolicyGuardrailStrategy,
 )
 from plumora_rl.multidomain_sim import (
@@ -81,16 +83,24 @@ class GnnActorCritic(nn.Module):
         adj_in: torch.Tensor,
         adj_out: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Forward pass for an arbitrary-size graph (N, 8) -> logits (N, 4), value ()."""
+        """Forward pass for unbatched (N, 8) -> ((N, 4), ()) or batched (B, N, 8) -> ((B, N, 4), (B,))."""
         h = F.gelu(self.input_proj(node_features))
         for layer in self.layers:
             h = layer(h, adj_in, adj_out)
-        g = h.mean(dim=0)  # (hidden_dim,)
-        g_expanded = g.unsqueeze(0).expand(h.shape[0], -1)
-        actor_in = torch.cat([h, g_expanded], dim=-1)  # (N, 2*hidden_dim)
-        logits = self.actor_head(actor_in)  # (N, 4)
-        value = self.critic_head(g).squeeze(-1)  # ()
-        return logits, value
+        if h.dim() == 2:
+            g = h.mean(dim=0)  # (hidden_dim,)
+            g_expanded = g.unsqueeze(0).expand(h.shape[0], -1)
+            actor_in = torch.cat([h, g_expanded], dim=-1)  # (N, 2*hidden_dim)
+            logits = self.actor_head(actor_in)  # (N, 4)
+            value = self.critic_head(g).squeeze(-1)  # ()
+            return logits, value
+
+        g_b = h.mean(dim=1, keepdim=True)  # (B, 1, hidden_dim)
+        g_b_exp = g_b.expand(-1, h.shape[1], -1)
+        actor_in_b = torch.cat([h, g_b_exp], dim=-1)  # (B, N, 2*hidden_dim)
+        logits_b = self.actor_head(actor_in_b)  # (B, N, 4)
+        value_b = self.critic_head(g_b.squeeze(1)).squeeze(-1)  # (B,)
+        return logits_b, value_b
 
 
 def export_gnn_ppo_checkpoint(
@@ -122,6 +132,16 @@ def _build_valid_mask(obs: dict[str, np.ndarray]) -> torch.Tensor:
     """Build non-redundant eligible mask for rollout exploration via shared PolicyGuardrailStrategy."""
     feats = obs["node_features"]
     mask = PolicyGuardrailStrategy.compute_valid_action_mask(feats)
+    needs_rev = feats[:, NodeFeatureIdx.NEEDS_REVIEW] > 0.5
+    if bool(np.any(needs_rev)):
+        # Focus review strictly on decayed nodes when retention < 0.60
+        non_rev = ~needs_rev
+        mask[non_rev, :] = False
+        mask[needs_rev, : LearningMode.SPACED_REVIEW] = False
+        mask[needs_rev, LearningMode.SPACED_REVIEW] = True
+    elif np.any(mask[:, : LearningMode.SPACED_REVIEW]):
+        # Disallow premature SPACED_REVIEW when no node needs review
+        mask[:, LearningMode.SPACED_REVIEW] = False
     if not np.any(mask):
         mask[:, 1] = True
     return torch.from_numpy(mask)
@@ -130,12 +150,14 @@ def _build_valid_mask(obs: dict[str, np.ndarray]) -> torch.Tensor:
 def train_gnn_ppo_on_seed(
     seed: int,
     total_episodes: int = 180,
-    lr: float = 2.5e-3,
-    gamma: float = 0.99,
+    *,
+    total_timesteps: int | None = None,
+    lr: float = 2.0e-3,
+    gamma: float = 0.995,
     gae_lambda: float = 0.95,
     clip_eps: float = 0.2,
 ) -> tuple[GnnActorCritic, list[float]]:
-    """Train GnnActorCritic with PPO-Clip + structural auxiliary loss across backend, frontend, devops."""
+    """Train GnnActorCritic with batched PPO-Clip + non-saturating NLL validity loss across 3 domains."""
     torch.manual_seed(seed)
     np.random.seed(seed)
 
@@ -144,10 +166,15 @@ def train_gnn_ppo_on_seed(
     env = MultiDomainStudentSimulatorEnv(domain_slug=None, seed=seed, max_steps=60)
 
     episode_rewards: list[float] = []
+    env_steps_used = 0
+    ep = 0
 
-    for ep in range(total_episodes):
+    while (total_timesteps is not None and env_steps_used < total_timesteps) or (
+        total_timesteps is None and ep < total_episodes
+    ):
         domain_slug = TRAIN_DOMAINS[ep % len(TRAIN_DOMAINS)]
         obs, _ = env.reset(seed=seed + ep, options={"domain_slug": domain_slug})
+        ep += 1
         done = False
         ep_reward = 0.0
 
@@ -177,7 +204,10 @@ def train_gnn_ppo_on_seed(
             v_idx = act_idx // NUM_MODES
             m_idx = act_idx % NUM_MODES
             next_obs, reward, terminated, truncated, _ = env.step((v_idx, m_idx))
+            env_steps_used += 1
             done = terminated or truncated
+            if total_timesteps is not None and env_steps_used >= total_timesteps:
+                done = True
             ep_reward += reward
 
             traj_x.append(x_t)
@@ -208,33 +238,39 @@ def train_gnn_ppo_on_seed(
         returns = advantages + np.array(traj_val, dtype=np.float32)
         adv_norm = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
-        # 3 PPO epochs over episode (with unmasked penalty on invalid logits so unmasked also stays <5% invalid)
-        for _ in range(3):
-            total_loss = torch.tensor(0.0)
-            for t in range(T):
-                logits, val = model(traj_x[t], traj_in[t], traj_out[t])
-                flat_logits = logits.reshape(-1)
-                masked_logits = flat_logits.masked_fill(~traj_mask[t], -1e9)
-                dist = Categorical(logits=masked_logits)
-                act_t = torch.tensor(traj_act[t])
-                new_logp = dist.log_prob(act_t)  # type: ignore[no-untyped-call]
-                entropy = dist.entropy()  # type: ignore[no-untyped-call]
-                ratio = torch.exp(new_logp - traj_logp[t])
-                adv_t = torch.tensor(float(adv_norm[t]))
-                surr1 = ratio * adv_t
-                surr2 = torch.clamp(ratio, 1.0 - clip_eps, 1.0 + clip_eps) * adv_t
-                policy_loss = -torch.min(surr1, surr2)
-                value_loss = F.mse_loss(val, torch.tensor(float(returns[t])))
-                # Auxiliary DAG eligibility loss so unmasked inference avoids locked/redundant nodes
-                probs_unmasked = F.softmax(flat_logits, dim=-1)
-                invalid_mass = probs_unmasked[~traj_mask[t]].sum()
-                total_loss = (
-                    total_loss
-                    + (policy_loss + 0.5 * value_loss - 0.02 * entropy + 3.0 * invalid_mass) / T
-                )
+        # Batched tensor PPO epochs over episode (same N within single-domain episode)
+        bx = torch.stack(traj_x, dim=0)  # (T, N, 8)
+        b_in = torch.stack(traj_in, dim=0)  # (T, N, N)
+        b_out = torch.stack(traj_out, dim=0)  # (T, N, N)
+        b_mask = torch.stack(traj_mask, dim=0)  # (T, N*4)
+        b_act = torch.tensor(traj_act, dtype=torch.long)  # (T,)
+        b_old_logp = torch.tensor(traj_logp, dtype=torch.float32)  # (T,)
+        b_adv = torch.tensor(adv_norm, dtype=torch.float32)  # (T,)
+        b_ret = torch.tensor(returns, dtype=torch.float32)  # (T,)
 
+        for _ in range(4):
+            logits_b, val_b = model(bx, b_in, b_out)
+            flat_logits_b = logits_b.reshape(T, -1)
+            masked_logits_b = flat_logits_b.masked_fill(~b_mask, -1e9)
+            dist_b = Categorical(logits=masked_logits_b)
+            new_logp_b = dist_b.log_prob(b_act)  # type: ignore[no-untyped-call]
+            entropy_b = dist_b.entropy()  # type: ignore[no-untyped-call]
+            ratio_b = torch.exp(new_logp_b - b_old_logp)
+            surr1 = ratio_b * b_adv
+            surr2 = torch.clamp(ratio_b, 1.0 - clip_eps, 1.0 + clip_eps) * b_adv
+            policy_loss = -torch.min(surr1, surr2).mean()
+            value_loss = F.mse_loss(val_b, b_ret)
+
+            # Non-saturating NLL validity loss so unmasked argmax learns DAG + ZPD + INV-SEQ-01/02/03 (<5% invalid)
+            probs_unmasked = F.softmax(flat_logits_b, dim=-1)
+            valid_prob_mass = (probs_unmasked * b_mask.float()).sum(dim=-1)
+            validity_nll_loss = -torch.log(valid_prob_mass.clamp(min=1e-6)).mean()
+
+            total_loss = (
+                policy_loss + 0.5 * value_loss - 0.015 * entropy_b.mean() + 2.5 * validity_nll_loss
+            )
             optimizer.zero_grad()
-            total_loss.backward()  # type: ignore[no-untyped-call]
+            total_loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
             optimizer.step()
 

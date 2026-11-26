@@ -31,7 +31,7 @@ from plumora_rl.domain import (
     PolicyGuardrailStrategy,
 )
 from plumora_rl.inference import ActorTransition, NumpyGnnPredictor
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select, text, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -49,9 +49,15 @@ from app.modules.contracts.adapters import (
 )
 from app.modules.events.internal_client import (
     assessment_service_url,
-    fetch_outbox_pending_count_internal,
+    content_service_url,
+    fetch_all_outbox_pending_internal,
+    trigger_remote_outbox_relays_internal,
 )
-from app.modules.events.outbox import run_outbox_relay_and_consume_once
+from app.modules.events.outbox import (
+    consume_competency_stream_once,
+    consume_domain_events_stream_once,
+    run_outbox_relay_and_consume_once,
+)
 from app.modules.recommendation.admin_schemas import (
     MicroBatchTrainRequest,
     ModelRegistryItemOut,
@@ -80,17 +86,25 @@ DOMAIN_STREAM_NAME = "plumora:stream:domain_events"
 
 
 def _ensure_prod_model_seeded(db: Session) -> ModelRegistryModel | None:
-    existing = db.scalars(
-        select(ModelRegistryModel).order_by(ModelRegistryModel.created_at)
-    ).first()
-    if existing is not None:
-        return existing
-
     sha = (
         hashlib.sha256(BASE_CKPT_PATH.read_bytes()).hexdigest()
         if BASE_CKPT_PATH.exists()
         else "0" * 64
     )
+    base_row = db.scalars(
+        select(ModelRegistryModel).where(ModelRegistryModel.version_tag == "gnn_ppo_v2_base")
+    ).first()
+    if base_row is not None:
+        if BASE_CKPT_PATH.exists() and base_row.checkpoint_sha256 != sha:
+            base_row.checkpoint_sha256 = sha
+            db.commit()
+            if base_row.is_active:
+                publish_active_model_pointer(str(base_row.checkpoint_path), sha)
+        return base_row
+
+    any_active = db.scalars(
+        select(ModelRegistryModel.id).where(ModelRegistryModel.is_active.is_(True)).limit(1)
+    ).first()
     prod = ModelRegistryModel(
         id=uuid.uuid4(),
         version_tag="gnn_ppo_v2_base",
@@ -98,7 +112,7 @@ def _ensure_prod_model_seeded(db: Session) -> ModelRegistryModel | None:
         checkpoint_sha256=sha,
         kl_divergence=0.0,
         gate_verdict="PASSED",
-        is_active=True,
+        is_active=any_active is None,
         eval_metrics_json={
             "invalid_action_rate_unmasked": 0.0,
             "masked_violation_rate": 0.0,
@@ -277,6 +291,7 @@ def inspect_policy_for_admin(
         simulated_time_offset_days=payload.simulated_time_offset_days,
     )
 
+    _ensure_prod_model_seeded(db)
     ckpt: NumpyGnnPredictor | None = None
     version_tag = "gnn_ppo_v2_base"
     if payload.checkpoint_model_id is not None:
@@ -299,13 +314,22 @@ def inspect_policy_for_admin(
             .limit(1)
         ).first()
         if active_row is not None:
-            version_tag = active_row.version_tag
             ckpt = load_verified_gnn_checkpoint(
                 checkpoint_path_override=active_row.checkpoint_path,
                 expected_sha256_override=active_row.checkpoint_sha256,
             )
+            if ckpt is not None:
+                version_tag = active_row.version_tag
         if ckpt is None:
             ckpt = load_verified_gnn_checkpoint()
+            if ckpt is not None:
+                matched_row = db.scalars(
+                    select(ModelRegistryModel)
+                    .where(ModelRegistryModel.checkpoint_sha256 == ckpt.sha256)
+                    .order_by(ModelRegistryModel.version_tag != "gnn_ppo_v2_base")
+                    .limit(1)
+                ).first()
+                version_tag = matched_row.version_tag if matched_row is not None else "gnn_ppo_v2_base"
 
     if ckpt is None:
         raise HTTPException(
@@ -495,14 +519,14 @@ def _rollout_policy_eval_on_topologies(
                 if sel_m == LearningMode.LEARN_NEW:
                     depth[sel_v] = max(float(depth[sel_v]), 0.50)
                 elif sel_m == LearningMode.DEEP_PROBE:
-                    target = 1.0 if depth[sel_v] >= 0.75 else 0.75
+                    target = 1.0 if (depth[sel_v] >= 0.75 or code_score[sel_v] >= 1.0) else 0.75
                     depth[sel_v] = max(float(depth[sel_v]), target)
                     stability[sel_v] = EbbinghausMemoryModel.update_stability(
                         float(stability[sel_v]), score, passed=True
                     )
                 elif sel_m == LearningMode.CODE_PRACTICE:
                     code_score[sel_v] = 1.0
-                    target = 1.0 if depth[sel_v] >= 0.75 else 0.75
+                    target = 1.0 if depth[sel_v] >= 0.75 else max(float(depth[sel_v]), 0.50)
                     depth[sel_v] = max(float(depth[sel_v]), target)
                     stability[sel_v] = EbbinghausMemoryModel.update_stability(
                         float(stability[sel_v]), score, passed=True
@@ -1001,6 +1025,19 @@ def _verify_checkpoint_artifact(checkpoint_path_str: str, expected_sha256: str) 
     return resolved
 
 
+MODEL_REGISTRY_ADVISORY_LOCK_ID = 7_586_672_001
+
+
+def _acquire_model_registry_lock(db: Session) -> None:
+    """Serialize multi-worker model activation and rollback mutations via PostgreSQL advisory lock."""
+    bind = db.get_bind()
+    if bind is not None and bind.dialect.name == "postgresql":
+        db.execute(
+            text("SELECT pg_advisory_xact_lock(:lock_id)"),
+            {"lock_id": MODEL_REGISTRY_ADVISORY_LOCK_ID},
+        )
+
+
 def activate_candidate_model(
     db: Session,
     model_id: uuid.UUID,
@@ -1009,6 +1046,8 @@ def activate_candidate_model(
 ) -> dict[str, Any]:
     """Activate a PASSED candidate model, verify SHA-256, and sync Redis active pointer."""
     t0 = time.monotonic()
+    _ensure_prod_model_seeded(db)
+    _acquire_model_registry_lock(db)
     cand = db.get(ModelRegistryModel, model_id)
     if cand is None:
         raise HTTPException(
@@ -1028,10 +1067,13 @@ def activate_candidate_model(
     prev = db.scalars(
         select(ModelRegistryModel).where(ModelRegistryModel.is_active.is_(True)).with_for_update()
     ).first()
-    prev_id = str(prev.id) if prev else None
-    if prev is not None:
-        prev.is_active = False
-        db.flush()
+    prev_id = str(prev.id) if (prev and prev.id != cand.id) else None
+    db.execute(
+        update(ModelRegistryModel)
+        .where(ModelRegistryModel.is_active.is_(True), ModelRegistryModel.id != cand.id)
+        .values(is_active=False)
+    )
+    db.flush()
 
     cand.is_active = True
     cand.activated_at = datetime.now(UTC)
@@ -1062,6 +1104,7 @@ def rollback_active_model(
     """1-Click Rollback (< 2000ms) to the actual previously active PASSED checkpoint."""
     t0 = time.monotonic()
     _ensure_prod_model_seeded(db)
+    _acquire_model_registry_lock(db)
     curr = db.scalars(
         select(ModelRegistryModel).where(ModelRegistryModel.is_active.is_(True)).with_for_update()
     ).first()
@@ -1077,23 +1120,35 @@ def rollback_active_model(
                     and candidate_prev.gate_verdict == "PASSED"
                     and candidate_prev.id != curr.id
                 ):
-                    target = candidate_prev
+                    try:
+                        _verify_checkpoint_artifact(
+                            candidate_prev.checkpoint_path,
+                            candidate_prev.checkpoint_sha256,
+                        )
+                        target = candidate_prev
+                    except HTTPException:
+                        target = None
             except ValueError:
                 target = None
 
     if target is None:
         stmt = (
             select(ModelRegistryModel)
-            .where(
-                ModelRegistryModel.gate_verdict == "PASSED",
-                ModelRegistryModel.activated_at.is_not(None),
+            .where(ModelRegistryModel.gate_verdict == "PASSED")
+            .order_by(
+                ModelRegistryModel.activated_at.is_(None),
+                ModelRegistryModel.activated_at.desc(),
+                ModelRegistryModel.created_at.asc(),
             )
-            .order_by(ModelRegistryModel.activated_at.desc())
         )
         for m in db.scalars(stmt).all():
             if curr is None or m.id != curr.id:
-                target = m
-                break
+                try:
+                    _verify_checkpoint_artifact(m.checkpoint_path, m.checkpoint_sha256)
+                    target = m
+                    break
+                except HTTPException:
+                    continue
 
     if target is None:
         raise HTTPException(
@@ -1103,12 +1158,14 @@ def rollback_active_model(
                 "message": "No previously active safe rollback target found.",
             },
         )
-    _verify_checkpoint_artifact(target.checkpoint_path, target.checkpoint_sha256)
 
     prev_id = str(curr.id) if curr else None
-    if curr is not None:
-        curr.is_active = False
-        db.flush()
+    db.execute(
+        update(ModelRegistryModel)
+        .where(ModelRegistryModel.is_active.is_(True), ModelRegistryModel.id != target.id)
+        .values(is_active=False)
+    )
+    db.flush()
     target.is_active = True
     target.activated_at = datetime.now(UTC)
     target.eval_metrics_json = {
@@ -1131,7 +1188,17 @@ def rollback_active_model(
 
 
 def trigger_manual_outbox_relay(db: Session) -> dict[str, Any]:
-    """Admin-triggered immediate outbox relay + Redis Streams consume."""
+    """Admin-triggered immediate outbox relay across assessment+content & Redis Streams consume."""
+    if assessment_service_url() or content_service_url():
+        remote_relayed = trigger_remote_outbox_relays_internal()
+        comp_stats = consume_competency_stream_once(db)
+        dom_stats = consume_domain_events_stream_once(db, consumer_group="rec_ai_domain_cg")
+        return {
+            "status": "ok",
+            "relayed": remote_relayed,
+            **comp_stats,
+            "domain_events_consumed": dom_stats["consumed"],
+        }
     stats = run_outbox_relay_and_consume_once(db)
     return {
         "status": "ok",
@@ -1191,9 +1258,12 @@ def get_system_health_status(db: Session) -> dict[str, Any]:
         "CompetencyUpdatedEvent": 0,
         "DomainGraphUpdatedEvent": 0,
     }
-    if assessment_service_url():
-        ext_pending = fetch_outbox_pending_count_internal()
-        pending_outbox = ext_pending if ext_pending is not None else -1
+    if assessment_service_url() or content_service_url():
+        ext_outbox = fetch_all_outbox_pending_internal()
+        if ext_outbox is not None:
+            pending_outbox, outbox_by_event_type = ext_outbox
+        else:
+            pending_outbox = -1
     else:
         try:
             pending_outbox = int(
@@ -1213,8 +1283,11 @@ def get_system_health_status(db: Session) -> dict[str, Any]:
                 outbox_by_event_type[str(ev_type)] = int(cnt)
         except SQLAlchemyError:
             db.rollback()
-            ext_pending = fetch_outbox_pending_count_internal()
-            pending_outbox = ext_pending if ext_pending is not None else -1
+            ext_outbox = fetch_all_outbox_pending_internal()
+            if ext_outbox is not None:
+                pending_outbox, outbox_by_event_type = ext_outbox
+            else:
+                pending_outbox = -1
 
     bind = db.get_bind()
     db_dialect = str(bind.dialect.name) if bind is not None else "unknown"
@@ -1222,26 +1295,29 @@ def get_system_health_status(db: Session) -> dict[str, Any]:
     if db_dialect == "postgresql":
         rows = db.execute(
             text(
-                "SELECT schema_name FROM information_schema.schemata "
-                "WHERE schema_name IN ('auth_svc', 'content_svc', 'assess_svc', 'rec_ai_svc')"
+                "SELECT nspname FROM pg_catalog.pg_namespace "
+                "WHERE nspname IN ('auth_svc', 'content_svc', 'assess_svc', 'rec_ai_svc')"
             )
         ).scalars().all()
         public_app_tables = db.execute(
             text(
-                "SELECT count(*) FROM information_schema.tables "
-                "WHERE table_schema = 'public' AND table_name IN ('users', 'domains', 'concepts', 'assessment_sessions', 'model_registry')"
+                "SELECT count(*) FROM pg_catalog.pg_class c "
+                "JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace "
+                "WHERE n.nspname = 'public' AND c.relkind = 'r' "
+                "AND c.relname IN ('users', 'domains', 'concepts', 'assessment_sessions', 'model_registry')"
             )
         ).scalar()
         svc_roles = db.execute(
             text(
-                "SELECT count(*) FROM pg_roles "
+                "SELECT count(*) FROM pg_catalog.pg_roles "
                 "WHERE rolname IN ('auth_svc_user', 'content_svc_user', 'assess_svc_user', 'rec_ai_svc_user')"
             )
         ).scalar()
         priv_ok = db.execute(
             text(
                 "SELECT NOT has_schema_privilege('assess_svc_user', 'content_svc', 'USAGE') "
-                "AND NOT has_schema_privilege('rec_ai_svc_user', 'assess_svc', 'USAGE')"
+                "AND NOT has_schema_privilege('rec_ai_svc_user', 'assess_svc', 'USAGE') "
+                "AND NOT has_schema_privilege('content_svc_user', 'auth_svc', 'USAGE')"
             )
         ).scalar()
         schemas_isolated = (

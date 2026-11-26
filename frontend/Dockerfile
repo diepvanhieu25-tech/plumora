@@ -8,13 +8,20 @@ RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
-# ── Stage 2: Minimal Production Nginx Runner ──
+# ── Stage 2: Minimal Non-Root Production Nginx Runner ──
 FROM nginx:1.27-alpine AS runner
 
-COPY --from=builder /app/dist /usr/share/nginx/html
-COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
-ENV API_UPSTREAM_URL=http://backend:8000
+# Configure Nginx for unprivileged non-root execution with repeatable /etc/nginx/templates rendering
+RUN sed -i -e '/^user /d' -e 's,/var/run/nginx.pid,/tmp/nginx.pid,' -e 's,/run/nginx.pid,/tmp/nginx.pid,' /etc/nginx/nginx.conf && \
+    rm -f /etc/nginx/conf.d/default.conf && \
+    mkdir -p /etc/nginx/templates /var/cache/nginx /var/log/nginx /etc/nginx/conf.d && \
+    chown -R nginx:nginx /var/cache/nginx /var/log/nginx /etc/nginx/conf.d /etc/nginx/templates /usr/share/nginx/html
 
-EXPOSE 80
+COPY --from=builder --chown=nginx:nginx /app/dist /usr/share/nginx/html
+COPY --chown=nginx:nginx frontend/nginx.conf /etc/nginx/templates/default.conf.template
 
-CMD ["/bin/sh", "-c", "envsubst '${API_UPSTREAM_URL}' < /etc/nginx/conf.d/default.conf > /tmp/default.conf && mv /tmp/default.conf /etc/nginx/conf.d/default.conf && exec nginx -g 'daemon off;'"]
+ENV API_UPSTREAM_URL=http://api-gateway:8000 \
+    NGINX_ENVSUBST_FILTER=API_UPSTREAM_URL
+
+USER nginx
+EXPOSE 8080

@@ -22,7 +22,6 @@ from app.db.models import (
 )
 from app.modules.auth import (
     DEMO_PASSWORD,
-    apply_preset_to_user_in_tx,
     hash_password,
 )
 
@@ -106,7 +105,7 @@ def init_db_and_seed() -> None:
         db.flush()
 
         demo_hash = hash_password(DEMO_PASSWORD)
-        for username, display_name, preset_key in SEED_USERS:
+        for username, display_name, _preset_key in SEED_USERS:
             user = db.scalar(select(UserModel).where(UserModel.username == username))
             if user is None:
                 user = UserModel(
@@ -119,7 +118,6 @@ def init_db_and_seed() -> None:
                 )
                 db.add(user)
                 db.flush()
-                apply_preset_to_user_in_tx(db, user, preset_key)
 
         for staff_username, staff_display, staff_role in (
             ("expert_demo", "Chuyên gia Nội dung & KG", "expert"),

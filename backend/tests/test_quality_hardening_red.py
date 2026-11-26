@@ -36,11 +36,12 @@ def test_f2_quiz_answer_distribution_balanced() -> None:
 
 
 def test_f3_production_refuses_to_start_without_valid_secret(
-    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """F3/H3: In production, resolve_jwt_secret must refuse to start without a valid secret >= 32 chars."""
     from app.config import resolve_jwt_secret
 
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.delenv("JWT_SECRET_KEY", raising=False)
 

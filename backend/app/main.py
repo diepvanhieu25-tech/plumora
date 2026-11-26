@@ -14,11 +14,12 @@ import redis
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.config import settings
-from app.db.models import SessionLocal
+from app.db.models import SessionLocal, engine
+from app.db.redis_pool import get_redis_client
 from app.modules.assessment.router_v2 import router as assessment_v2_router
 from app.modules.auth import router as auth_router
 from app.modules.content import init_db_and_seed
@@ -95,28 +96,36 @@ async def security_headers_middleware(
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; frame-ancestors 'self'; object-src 'none'"
-    )
+    if request.url.path in ("/docs", "/docs/oauth2-redirect", "/redoc"):
+        # TODO(security): Self-host Swagger UI bundle to eliminate cdn.jsdelivr.net & unsafe-inline on /docs.
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "img-src 'self' data: https://fastapi.tiangolo.com; "
+            "frame-ancestors 'self'; object-src 'none'"
+        )
+    else:
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; frame-ancestors 'self'; object-src 'none'"
+        )
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     response.headers["Cache-Control"] = "no-store"
     return response
 
 
 def _check_postgres() -> str:
-    """Verify live PostgreSQL SSoT connection."""
-    engine = create_engine(settings.database_url, pool_pre_ping=True)
+    """Verify live PostgreSQL SSoT connection via shared engine pool."""
     with engine.connect() as conn:
         conn.execute(text("SELECT 1"))
-    engine.dispose()
     return "up"
 
 
 def _check_redis() -> str:
-    """Verify live Redis State Cache connection."""
-    client: redis.Redis = redis.Redis.from_url(
+    """Verify live Redis State Cache connection via shared pool."""
+    client: redis.Redis = get_redis_client(
         settings.redis_url,
-        socket_connect_timeout=0.5,
+        decode_responses=True,
         socket_timeout=0.5,
     )
     try:
@@ -125,8 +134,6 @@ def _check_redis() -> str:
         return "down"
     except redis.RedisError:
         return "down"
-    finally:
-        client.close()
 
 
 def _resolve_repo_path(raw_path: str) -> Path:

@@ -187,7 +187,7 @@ PYTHONPATH=src uv run python -m plumora_rl.train
 Toàn bộ báo cáo kết quả Giai đoạn 3 được đối chiếu trực tiếp với [evaluation_phase3_report.json](../../rl/artifacts/evaluation_phase3_report.json) và [manifest_phase3.json](../../rl/artifacts/manifest_phase3.json). Checkpoint `GNN-PPO` tại `rl/artifacts/gnn_ppo_v2_base.zip` có thể được kiểm tra mã băm bằng:
 ```bash
 sha256sum rl/artifacts/gnn_ppo_v2_base.zip
-# Kết quả mong đợi: 9977d5f606427d0eb25970b1ce8cf23fa0232e2d7ff0fe392e80d2413d534201
+# Kết quả hiện hành (v3.1.0): bf55d8098b717c6814ace00633796bf99306c9ad45631f281eb0102213e9ad6f
 ```
 
 ---
@@ -221,8 +221,8 @@ sha256sum artifacts/gnn_ppo_v2_base.zip
 # Kết quả lịch sử: 9977d5f606427d0eb25970b1ce8cf23fa0232e2d7ff0fe392e80d2413d534201
 ```
 
-### 10.4. Kết Quả Tái Chạy Đối Sánh Công Bằng Cùng `Policy Guardrail` (`2026-11-20`, `500` episodes)
-- **Checkpoint hiện tại (`rl/artifacts/gnn_ppo_v2_base.zip`):** `SHA-256 = 1a074299ef8edfad6a64c9c58f2eb35e664bbaa56c04054f043efb03c7a7d861` (`selected_seed = 101`, `eval_seed = 2026`, `episodes = 500`).
+### 10.4. Kết Quả Lịch Sử Đối Sánh Cùng `Policy Guardrail` (`2026-11-20`, `500` episodes)
+- **Checkpoint lịch sử (`2026-11-20`):** `SHA-256 = 1a074299ef8edfad6a64c9c58f2eb35e664bbaa56c04054f043efb03c7a7d861` (`selected_seed = 101`, `eval_seed = 2026`, `episodes = 500`).
 - **Cải tiến phương pháp (`F09`):** `DQN-MLP` và `PPO-MLP` được chọn hạt giống trên `val_seed = 999` qua `train_seeds = [101, 202, 303]` tương đương `GNN-PPO`, và cả 3 kiến trúc dùng chung hàm `apply_policy_guardrail()`.
 - **Kết quả (`evaluation_phase3_report.json`):**
   - `Heuristic B3`: Known `58.1104 ± 7.8744` | Transfer `58.1649 ± 7.6597`
@@ -231,3 +231,37 @@ sha256sum artifacts/gnn_ppo_v2_base.zip
   - `GNN-PPO (Masked)`: Known **`61.7239 ± 9.0600`** | Transfer **`62.0429 ± 9.9426`** (`Unmasked`: `66.65` / `67.36`)
 
 *(Ghi chú trung thực theo `.agents/rules/rl-evidence.md`: Toàn bộ số liệu trên thu được trên Simulator mô phỏng giả định động học học viên và đường cong Ebbinghaus, chưa phải bằng chứng lâm sàng trên người học thật.)*
+
+---
+
+## 11. Tái Huấn Luyện & Đồng Bộ Bất Biến Tuần Tự `v3.1.0` (`REM-01` — `2026-11-25`)
+
+### 11.1. Đồng Bộ Lõi `PolicyGuardrailStrategy` & `MultiDomainStudentSimulatorEnv` (`v3.1.0`)
+- **Khóa hành động dư thừa (`guardrail.py` & `multidomain_sim.py`):**
+  1. Khóa hoàn toàn `DEEP_PROBE` trên mọi node đã đạt `1.00 Mastery` (`depth >= 1.0`).
+  2. Khóa `CODE_PRACTICE` khi `code_score >= 1.0` trong lúc `depth < 0.75` (`INV-SEQ-02`: nộp Code Sandbox 100% khi chưa đạt hiểu bản chất `0.75` chỉ dừng ở trần `Applied = 0.50`, bắt buộc hoàn thành `DEEP_PROBE` để lên `0.75`/`1.00`).
+- **Chuẩn hóa đo lường & công bằng ngân sách (`evaluate_phase3.py`):**
+  1. Bổ sung thống kê `steps_to_completion` (`mean ± std`, `median (iqr)`).
+  2. Đưa cả `redundant_action` cùng `prerequisite_violation` / `invalid_pad` vào tổng tỷ lệ lỗi `invalid_action_rate` (và tách bạch `prerequisite_violation_rate`, `redundant_action_rate`).
+  3. Cấp ngân sách bước tương tác môi trường bằng nhau tuyệt đối (**`timesteps_per_seed = 15,000`**) cho cả `GNN-PPO`, `DQN-MLP` và `PPO-MLP` trên `train_seeds = [101, 202, 303]`, chọn mô hình trên `val_seed = 999` (`200` episodes) và đánh giá độc lập trên `eval_seed = 2026` (`500` episodes).
+- **Checkpoint xuất xưởng mới (`rl/artifacts/gnn_ppo_v2_base.zip`):**
+  - `selected_seed = 303`
+  - `SHA-256 = bf55d8098b717c6814ace00633796bf99306c9ad45631f281eb0102213e9ad6f`
+
+### 11.2. Bảng Kết Quả Thực Nghiệm `v3.1.0` (`eval_seed = 2026`, `500` episodes, `timesteps_per_seed = 15,000`)
+
+| Phương Pháp (`Policy`) | Kịch Bản A: 3 Ngành Đã Biết<br>`Mean ± Std` / `Median (IQR)` | Kịch Bản B: *Zero-shot Transfer* (`heldout_data_eng_graph`)<br>`Mean ± Std` / `Median (IQR)` | `steps_to_completion`<br>(Kịch bản A / B) | `invalid_action_rate`<br>(cả `prereq` + `redundant`, A / B) |
+| :--- | :---: | :---: | :---: | :---: |
+| **`Heuristic B1`** *(Tier-order)* | $39.5274 \pm 6.3136$<br>$39.5154\ (8.2701)$ | $38.9764 \pm 6.1916$<br>$38.9505\ (8.5827)$ | `59.97` / `59.99` | `0.00%` / `0.00%` |
+| **`Heuristic B2`** *(Valid-Random)* | $46.8256 \pm 7.9579$<br>$46.7381\ (10.4699)$ | $46.0113 \pm 7.0436$<br>$45.8460\ (9.9141)$ | `59.96` / `60.00` | `0.00%` / `0.00%` |
+| **`Heuristic B3`** *(Greedy-mastery)* | $51.6640 \pm 7.3335$<br>$51.9181\ (9.2850)$ | $51.6574 \pm 7.1569$<br>$51.9181\ (9.3654)$ | `59.99` / `60.00` | `0.00%` / `0.00%` |
+| **`DQN-MLP (Unmasked)`** | $-162.1149 \pm 4.4311$<br>$-162.9000\ (4.9000)$ | $-160.2754 \pm 4.7721$<br>$-160.8500\ (4.9000)$ | `60.00` / `60.00` | `92.47%` / `91.75%` |
+| **`DQN-MLP (Masked)`** | $46.6988 \pm 7.2309$<br>$46.4871\ (10.2458)$ | $48.2465 \pm 6.8981$<br>$48.3304\ (8.8199)$ | `59.99` / `60.00` | `0.00%` / `0.00%` |
+| **`PPO-MLP (Unmasked)`** | $-172.1550 \pm 3.1904$<br>$-172.6000\ (4.9500)$ | $-173.8348 \pm 1.8562$<br>$-175.0500\ (2.4500)$ | `60.00` / `60.00` | `96.83%` / `97.51%` |
+| **`PPO-MLP (Masked)`** | $44.1168 \pm 6.8706$<br>$44.0819\ (9.0762)$ | $41.1670 \pm 5.9563$<br>$41.0008\ (7.1642)$ | `59.98` / `60.00` | `0.00%` / `0.00%` |
+| **`GNN-PPO (Unmasked)`** | **$48.2212 \pm 7.4240$**<br>$48.4183\ (9.7358)$ | **$47.1125 \pm 7.6566$**<br>$47.8589\ (9.7612)$ | `59.99` / `60.00` | **`0.017%`** / **`0.013%`** |
+| **`GNN-PPO (Guardrail Masked)`** | **$\mathbf{49.4476 \pm 7.7480}$**<br>$\mathbf{49.5037\ (9.3407)}$ | **$\mathbf{48.0603 \pm 7.6654}$**<br>$\mathbf{48.4354\ (9.4380)}$ | `59.97` / `60.00` | **`0.00%`** / **`0.00%`** |
+
+- **Nhận xét trung thực khoa học (`.agents/rules/rl-evidence.md`):**
+  1. Khi tính đầy đủ `redundant_action` vào `invalid_action_rate` dưới trần `INV-SEQ-02`, các mạng phẳng `DQN-MLP (Unmasked)` và `PPO-MLP (Unmasked)` rơi vào vòng lặp chọn lặp hành động dư thừa (`91.8%`–`97.5%` bước lỗi). Ngược lại, **`GNN-PPO (Unmasked)` tự học được cấu trúc tiên quyết DAG và quy tắc tuần tự `INV-SEQ-01..03` trực tiếp trên đồ thị, giữ tỷ lệ lỗi chỉ `0.017%` trên 3 ngành đã biết và `0.013%` trên đồ thị chưa từng gặp `heldout_data_eng_graph`** (thấp hơn gần $300\times$ so với ngưỡng `< 5.0%`), đồng thời `Policy Guardrail` đảm bảo `masked_violation_rate == 0.0%` tuyệt đối khi phục vụ.
+  2. Về tổng phần thưởng tích lũy trong giới hạn 60 bước với suy giảm trí nhớ Ebbinghaus khắt khe ($S_0 = 3.0$ ngày, cộng khóa trần `INV-SEQ-02`), `GNN-PPO (Masked)` (`49.45` trên Known Domains) vượt rõ rệt `B1` (`39.53`), `B2` (`46.83`), `DQN-MLP Masked` (`46.70`) và `PPO-MLP Masked` (`44.12`), đồng thời tiệm cận sát sao thuật toán tham lam có cài sẵn quy tắc chuyên gia `B3` (`51.66`). Hầu hết các kịch bản sử dụng trọn vẹn ngân sách ~`60` bước do phải luân phiên củng cố Ebbinghaus `Spaced_Review` song song với mở khóa chiều sâu 3 bước/khái niệm (`Playbook -> Deep_Probe -> Code_Practice`).
