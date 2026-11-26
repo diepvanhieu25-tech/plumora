@@ -74,25 +74,25 @@ $$
 
 ### 3.1. Mô Phỏng Năng Lực Học Viên & Động Lực Tiếp Thu
 - Mỗi episode khởi tạo một học viên ảo với năng lực học tập ngẫu nhiên: $\alpha \sim \text{Uniform}(0.35, 0.75)$.
-- Độ khó của từng tầng: $\text{tier\_difficulty} = 0.08 + 0.07 \cdot (\text{tier} - 1)$.
+- Độ khó của từng tầng: $\text{tier\textunderscore difficulty} = 0.08 + 0.07 \cdot (\text{tier} - 1)$.
 - Điểm trung bình tiên quyết $\overline{m}_{\text{prereqs}}$ lấy theo các khái niệm phụ thuộc trực tiếp (mặc định $0.85$ nếu là khái niệm gốc).
-- Tải trọng nhận thức do phân tán giữa các chủ đề đang dở dang: $\text{cognitive\_load\_penalty} = 0.14 \cdot N_{\text{unfinished}}$, với $N_{\text{unfinished}}$ là số khái niệm khác đang có $0.0 < m_j < 0.75$.
+- Tải trọng nhận thức do phân tán giữa các chủ đề đang dở dang: $\text{cognitive\textunderscore load\textunderscore penalty} = 0.14 \cdot N_{\text{unfinished}}$, với $N_{\text{unfinished}}$ là số khái niệm khác đang có $0.0 < m_j < 0.75$.
 - Năng lực cơ bản:
 $$
-\text{base\_competence} = \begin{cases} 0.24 & \text{nếu } m_a = 0.0 \\ 0.52 + 0.55 \cdot m_a & \text{nếu } m_a > 0.0 \end{cases}
+\text{base\textunderscore competence} = \begin{cases} 0.24 & \text{nếu } m_a = 0.0 \\ 0.52 + 0.55 \cdot m_a & \text{nếu } m_a > 0.0 \end{cases}
 $$
 - Xác suất trả lời đúng từng câu hỏi trắc nghiệm khi học bài $a$ (`effective_p`) được xác định chính xác theo `simulator.py`:
 
 $$
-p_{\text{correct}} = \text{clip}\left(\text{base\_competence} + 0.42 \cdot \alpha \cdot (1.0 - \text{tier\_difficulty}) + 0.12 \cdot \overline{m}_{\text{prereqs}} - \text{cognitive\_load\_penalty}, 0.18, 0.96\right)
+p_{\text{correct}} = \text{clip}\left(\text{base\textunderscore competence} + 0.42 \cdot \alpha \cdot (1.0 - \text{tier\textunderscore difficulty}) + 0.12 \cdot \overline{m}_{\text{prereqs}} - \text{cognitive\textunderscore load\textunderscore penalty}, 0.18, 0.96\right)
 $$
 
 - Điểm bài kiểm tra 4 câu được lấy mẫu theo phân phối nhị thức: $k \sim \text{Binomial}(4, p_{\text{correct}})$.
-- Điểm kiểm tra đạt được: $\text{attempt\_score} = \frac{k}{4.0} \in \{0.00, 0.25, 0.50, 0.75, 1.00\}$.
+- Điểm kiểm tra đạt được: $\text{attempt\textunderscore score} = \frac{k}{4.0} \in \{0.00, 0.25, 0.50, 0.75, 1.00\}$.
 - Quy tắc cập nhật thông thạo theo mức cao nhất (High-Water Mark per `D-06`):
 
 $$
-m_a^{\text{new}} = \max\left(m_a^{\text{old}}, \text{attempt\_score}\right)
+m_a^{\text{new}} = \max\left(m_a^{\text{old}}, \text{attempt\textunderscore score}\right)
 $$
 
 ### 3.2. Đa Dạng Hóa Trạng Thái Ban Đầu (Initial State Distribution)
@@ -129,7 +129,7 @@ Mạng Deep Q-Network sử dụng kiến trúc MLP: $[24 \rightarrow 128 \righta
   - **Seed 303 (Được chọn):** Reward trung bình $= \mathbf{98.19}$, Invalid rate $= \mathbf{0.00\%}$.
 - **Tập kiểm thử Held-Out Benchmark Dùng Chung (`eval_seed = 2026`):**
   - Cố định chính xác 500 hồ sơ học viên ảo: $\text{seed}_i = 2026 \times 10000 + i, \forall i \in [0, 499]$.
-  - Cả 5 chính sách ($B_1, B_2, B_3, \text{DQN}_{\text{unmasked}}, \text{DQN}_{\text{masked\_q}}$) được chạy trên **cùng một tập 500 học viên ảo này** để đảm bảo tính so sánh tuyệt đối.
+  - Cả 5 chính sách ($B_1, B_2, B_3, \text{DQN}_{\text{unmasked}}, \text{DQN}_{\text{masked\textunderscore q}}$) được chạy trên **cùng một tập 500 học viên ảo này** để đảm bảo tính so sánh tuyệt đối.
 
 ---
 
@@ -155,7 +155,7 @@ Bảng số liệu thống kê đầy đủ trên 500 episodes held-out benchmar
 
 ### 7.2. So Sánh DQN Với Thuật Toán Ngẫu Nhiên Hợp Lệ ($B_2$)
 - So với $B_2$, DQN đạt phần thưởng trung bình cao hơn rõ rệt ($98.2700$ vs $97.5510$, chênh lệch $\Delta = +0.7190$ điểm thưởng).
-- Số bước hoàn thành khóa học giảm từ $19.20$ xuống $17.88$ bước (nhanh hơn $6.9\%$). Lý do: Thuật toán ngẫu nhiên $B_2$ thường nhảy qua lại giữa nhiều bài học đang mở khóa trên cùng một tầng, làm tăng tải trọng nhận thức $\text{cognitive\_load\_penalty}$; trong khi DQN học được chính sách tập trung học dứt điểm từng khái niệm để kích hoạt điều kiện mở khóa các tầng tiếp theo.
+- Số bước hoàn thành khóa học giảm từ $19.20$ xuống $17.88$ bước (nhanh hơn $6.9\%$). Lý do: Thuật toán ngẫu nhiên $B_2$ thường nhảy qua lại giữa nhiều bài học đang mở khóa trên cùng một tầng, làm tăng tải trọng nhận thức $\text{cognitive\textunderscore load\textunderscore penalty}$; trong khi DQN học được chính sách tập trung học dứt điểm từng khái niệm để kích hoạt điều kiện mở khóa các tầng tiếp theo.
 
 ### 7.3. So Sánh DQN Với Thuật Toán Chuyên Gia Tham Lam ($B_3$) & Fixed Curriculum ($B_1$)
 - DQN đạt kết quả tương đương tiệm cận với $B_3$ về số bước ($17.88$ vs $17.86$) và nhỉnh hơn nhẹ về phần thưởng ($98.2700$ vs $98.2690$), đồng thời tương đương Fixed Curriculum ($17.93$).

@@ -36,7 +36,7 @@ Toàn bộ các câu hỏi thiết kế và nghiệp vụ (`O-01`–`O-10`) đã
 - **Cấu trúc đề Quiz:** Mỗi lượt làm bài của một khái niệm gồm **cố định 4 câu hỏi trắc nghiệm khách quan (Single-choice MCQ)**, lấy từ ngân hàng Seed 4–6 câu của khái niệm đó. Mỗi câu có 4 phương án (`A, B, C, D`) và duy nhất 1 đáp án đúng.
 - **Điều kiện hợp lệ khi nộp bài:** Học viên phải chọn đủ 4 đáp án cho 4 câu hỏi trong bài; thiếu câu trả lời hoặc gửi ID câu hỏi/phương án không thuộc bài học sẽ bị từ chối (`422 Unprocessable Entity` / `400 Bad Request`).
 - **Công thức chấm điểm lượt làm bài (`attempt_score`):**
-  $$\text{attempt\_score} = \frac{\text{correct\_count}}{4} \in \{0.00, 0.25, 0.50, 0.75, 1.00\}$$
+  $$\text{attempt\textunderscore score} = \frac{\text{correct\textunderscore count}}{4} \in \{0.00, 0.25, 0.50, 0.75, 1.00\}$$
   - Biên dưới ngưỡng thông thạo: $2/4 = 0.50$ (`passed = false`).
   - Biên chạm đúng ngưỡng thông thạo: $3/4 = 0.75$ (`passed = true`).
   - Biên trên ngưỡng thông thạo: $4/4 = 1.00$ (`passed = true`).
@@ -44,7 +44,7 @@ Toàn bộ các câu hỏi thiết kế và nghiệp vụ (`O-01`–`O-10`) đã
   - Cho phép học viên làm lại Quiz của một khái niệm đã mở khóa không giới hạn số lần.
   - Mọi lượt nộp hợp lệ đều tạo bản ghi `QuizAttempt` lưu `attempt_score` và `passed` của đúng lượt đó.
   - Điểm thông thạo tích lũy của khái niệm $i$ ($\text{mastery}_i$) được cập nhật theo hàm đơn điệu không giảm:
-    $$\text{mastery}_i^{\text{new}} = \max\left(\text{mastery}_i^{\text{old}}, \text{attempt\_score}\right)$$
+    $$\text{mastery}_i^{\text{new}} = \max\left(\text{mastery}_i^{\text{old}}, \text{attempt\textunderscore score}\right)$$
   - Khi $\text{mastery}_i^{\text{new}} \ge 0.75$, khái niệm $i$ giữ trạng thái `Mastered` và không bao giờ làm khóa ngược lại các khái niệm phụ thuộc phía sau nếu học viên làm lại đạt điểm thấp hơn ở lượt sau.
 
 ## 4. Hợp đồng Khuyến nghị RL và Xử lý Hành động Không hợp lệ (`D-07` / `O-04` — Đã chốt)
@@ -56,7 +56,7 @@ Toàn bộ các câu hỏi thiết kế và nghiệp vụ (`O-01`–`O-10`) đã
 - **Quy tắc Serving & Safety Guardrail trên API:**
   1. **Trạng thái hoàn thành toàn bộ (`all_mastered`):** Nếu cả 12/12 khái niệm đều có $\text{mastery}_i \ge 0.75$, API trả về trạng thái hoàn thành khóa học (`status = "completed"`, `recommended_concept = null`).
   2. **Đề xuất trực tiếp từ `DQN` (`policy_source = "dqn"`):** Khi checkpoint hợp lệ được nạp và hành động $a^* = \arg\max_{a} Q(s, a)$ có `is_eligible[a*] == 1.0`, trả về khái niệm $a^*$ kèm `policy_source = "dqn"`, `guardrail_applied = false`, `checkpoint_sha256`.
-  3. **Lọc Q-value theo điều kiện tiên quyết (`policy_source = "dqn_masked_q"`):** Nếu $a^* = \arg\max_{a} Q(s, a)$ rơi vào bài bị khóa hoặc đã thông thạo, hệ thống chọn $a_{\text{valid}}^* = \arg\max_{a : \text{is\_eligible}[a]=1} Q(s, a)$ và trả về kèm metadata trung thực: `policy_source = "dqn_masked_q"`, `raw_action_id = a*`, `guardrail_applied = true`, `checkpoint_sha256`.
+  3. **Lọc Q-value theo điều kiện tiên quyết (`policy_source = "dqn_masked_q"`):** Nếu $a^* = \arg\max_{a} Q(s, a)$ rơi vào bài bị khóa hoặc đã thông thạo, hệ thống chọn $a_{\text{valid}}^* = \arg\max_{a : \text{is\textunderscore eligible}[a]=1} Q(s, a)$ và trả về kèm metadata trung thực: `policy_source = "dqn_masked_q"`, `raw_action_id = a*`, `guardrail_applied = true`, `checkpoint_sha256`.
   4. **Fallback khi thiếu hoặc hỏng Checkpoint (`policy_source = "fallback_rule"`):** Nếu không nạp được checkpoint đã kiểm chứng, hệ thống chọn bài đầu tiên hợp lệ theo thứ tự tầng DAG (`is_eligible == 1.0`) và trả về `policy_source = "fallback_rule"`, `degraded = true`, tuyệt đối không gắn nhãn `dqn`.
 
 ## 5. Cấu trúc Màn hình Mini-LMS, Hệ màu Chồi Cây Non và Trạng thái UX (`D-09`, `D-12`, `D-13` / `O-06`, `O-09` — Đã chốt)
@@ -106,9 +106,9 @@ Toàn bộ các câu hỏi thiết kế và nghiệp vụ (`O-01`–`O-10`) đã
 
 - **Bất biến hệ thống (`Invariants`):**
   1. `INV-DAG-01`: Không học viên nào có thể nộp bài Quiz cho một khái niệm đang ở trạng thái `Locked` ($\exists p \in \text{prerequisites}(u) : \text{mastery}(p) < 0.75$); server bắt buộc từ chối với mã `403 Forbidden` (`CONCEPT_LOCKED`).
-  2. `INV-MASTERY-01`: Với mọi lượt nộp bài Quiz hợp lệ của cùng một người học trên một khái niệm, $\text{mastery}^{\text{new}} = \max(\text{mastery}^{\text{old}}, \text{attempt\_score}) \ge \text{mastery}^{\text{old}}$ (không bao giờ giảm điểm thông thạo tích lũy trừ khi người học chủ động gọi `POST /api/v1/me/preset`).
+  2. `INV-MASTERY-01`: Với mọi lượt nộp bài Quiz hợp lệ của cùng một người học trên một khái niệm, $\text{mastery}^{\text{new}} = \max(\text{mastery}^{\text{old}}, \text{attempt\textunderscore score}) \ge \text{mastery}^{\text{old}}$ (không bao giờ giảm điểm thông thạo tích lũy trừ khi người học chủ động gọi `POST /api/v1/me/preset`).
   3. `INV-IDEMP-01`: Gửi lặp cùng `(user_id, submission_id)` luôn trả về cùng `attempt_id`, `attempt_score` và `state_version`, không sinh thêm dòng thứ hai trong `quiz_attempts`.
-  4. `INV-RL-01`: Mọi phản hồi khuyến nghị phải khai báo trung thực `policy_source` $\in \{\text{"dqn"}, \text{"dqn\_masked\_q"}, \text{"fallback\_rule"}\}$ và `state_source` $\in \{\text{"redis\_cache"}, \text{"postgres\_cache\_warm"}, \text{"postgres\_fallback"}\}$.
+  4. `INV-RL-01`: Mọi phản hồi khuyến nghị phải khai báo trung thực `policy_source` $\in \{\text{"dqn"}, \text{"dqn\textunderscore masked\textunderscore q"}, \text{"fallback\textunderscore rule"}\}$ và `state_source` $\in \{\text{"redis\textunderscore cache"}, \text{"postgres\textunderscore cache\textunderscore warm"}, \text{"postgres\textunderscore fallback"}\}$.
 - **Yêu cầu phi chức năng đề xuất cho môi trường Local Docker Compose (`D-04`):**
   - Độ trễ suy luận API khuyến nghị (`POST /api/v1/recommendations`) ở mức tải đơn người dùng khi Demo trên máy cá nhân: mục tiêu $p95 < 200\text{ms}$ khi checkpoint đã nạp sẵn trong bộ nhớ process `FastAPI`.
   - Thời gian huấn luyện 1 seed (`100.000 timesteps`) của `DQN` trên `Student Simulator` 24 chiều: hoàn tất trong vài phút trên CPU máy cá nhân tiêu chuẩn.
@@ -201,8 +201,8 @@ Hệ thống cung cấp sẵn **3 lĩnh vực mẫu cố định có giao thoa k
   - **Tầng 3 (*When & Pitfalls — Ứng dụng & Cạm bẫy*)**, **Tầng 4 (*Trade-offs — Đánh đổi kiến trúc*)**, **Tầng 5 (*Internals — Tối ưu & Nội tại*):** Kết hợp 4 dạng bài thực tế: (1) *Troubleshooting (Chẩn đoán sự cố)*, (2) *Code Review & Refactoring (trên Code Sandbox)*, (3) *Constraint Shifting (Đổi ràng buộc hệ thống)*, (4) *Reverse Explanation / Teach-back (Giải thích ngược theo Rubric)*.
 - **Quy tắc chuyển tầng & chạm Trần hiểu biết (`Knowledge Ceiling`):**
   - Phiên đánh giá bắt đầu tại tầng tương ứng với mức hiểu hiện tại của học viên (mặc định Tầng 1 nếu `depth_level_norm < 0.25`, hoặc Tầng 3 nếu đã đạt `Applied = 0.50`).
-  - Đạt ngưỡng ở tầng $d$ ($\text{step\_score}_d \ge 0.75$) $\rightarrow$ chuyển sang câu hỏi/bài thực tế ở tầng $d+1$ (cho tới khi hoàn tất Tầng 5).
-  - Chưa đạt ($\text{step\_score}_d < 0.75$) ở **2 lượt thử liên tiếp trong cùng tầng $d$** $\rightarrow$ kích hoạt trạng thái **Chạm Trần Hiểu Biết (`Knowledge Ceiling Reached`)** tại tầng $d-1$, kết thúc phiên và tổng hợp mức hiểu.
+  - Đạt ngưỡng ở tầng $d$ ($\text{step\textunderscore score}_d \ge 0.75$) $\rightarrow$ chuyển sang câu hỏi/bài thực tế ở tầng $d+1$ (cho tới khi hoàn tất Tầng 5).
+  - Chưa đạt ($\text{step\textunderscore score}_d < 0.75$) ở **2 lượt thử liên tiếp trong cùng tầng $d$** $\rightarrow$ kích hoạt trạng thái **Chạm Trần Hiểu Biết (`Knowledge Ceiling Reached`)** tại tầng $d-1$, kết thúc phiên và tổng hợp mức hiểu.
 - **Bảng Ánh xạ Tất định 3 Chiều (`Tầng cao nhất đạt chuẩn d` $\times$ `Dạng bài thực tế` $\times$ `Điểm Rubric/Sandbox` $\rightarrow$ `Mức hiểu & Confidence`):**
 
 | Tầng cao nhất đạt chuẩn $d \in \{0..5\}$ | Điều kiện Dạng bài Thực tế & Điểm Kiểm chứng (`step_score >= 0.75`) | Mức hiểu chuẩn hóa (`depth_level_norm`) | Nhãn Mức hiểu (`depth_label`) | Khoảng `confidence` $\in [0.0, 1.0]$ | Mở khóa Tiên quyết DAG (`is_mastered_for_dag`) |
@@ -215,18 +215,18 @@ Hệ thống cung cấp sẵn **3 lĩnh vực mẫu cố định có giao thoa k
 | **Bỏ dở / Chưa đủ bằng chứng** | Phiên bị ngắt giữa chừng (mới làm $< 2$ bước và chưa chạm *Knowledge Ceiling*) hoặc `confidence < 0.50` | *Giữ nguyên `depth_level_norm` cũ* | `insufficient_evidence` | `< 0.50` | *Giữ nguyên trạng thái cũ (`INV-MASTERY-01`)* |
 
 #### 3. Chấm điểm Đa phương thức (Code Sandbox & LLM Rubric Adapter):
-- **Code Sandbox cô lập (`PL3-GRADER-01`):** Chấm các bài `Python`, `SQL`, `JavaScript` bằng bộ unit test cases thật trong container/worker cô lập (`network_mode: none`, `read_only: true`, `timeout <= 3000ms`, `RAM <= 128MB`). Điểm bài code được tính bằng $\text{code\_score} = \frac{\text{passed\_tests}}{\text{total\_tests}} \in [0.0, 1.0]$.
-- **Chấm tự luận ngắn theo Rubric & AI Tutor (`PL3-TUTOR-01`):** Mỗi câu hỏi Tầng 3–5 có bảng `GradingRubric` gồm $M$ tiêu chí ($w_j \in (0, 1], \sum_{j=1}^M w_j = 1.0$, kèm danh sách từ khóa/khái niệm bắt buộc và mẫu giải thích). `LLM Adapter` chấm từng tiêu chí $s_j \in \{0.0, 0.5, 1.0\} \Rightarrow \text{rubric\_score} = \sum_{j=1}^M w_j s_j$ và sinh phản hồi **AI Tutor**. Khi offline, timeout ($> 4000\text{ms}$) hoặc lỗi API ngoài, `Circuit Breaker` tự động chuyển sang `DeterministicRubricGrader` (đối sánh tổ hợp từ khóa ngữ nghĩa & cấu trúc câu trả lời theo Rubric) và trả `grader_source = "deterministic_fallback"`.
+- **Code Sandbox cô lập (`PL3-GRADER-01`):** Chấm các bài `Python`, `SQL`, `JavaScript` bằng bộ unit test cases thật trong container/worker cô lập (`network_mode: none`, `read_only: true`, `timeout <= 3000ms`, `RAM <= 128MB`). Điểm bài code được tính bằng $\text{code\textunderscore score} = \frac{\text{passed\textunderscore tests}}{\text{total\textunderscore tests}} \in [0.0, 1.0]$.
+- **Chấm tự luận ngắn theo Rubric & AI Tutor (`PL3-TUTOR-01`):** Mỗi câu hỏi Tầng 3–5 có bảng `GradingRubric` gồm $M$ tiêu chí ($w_j \in (0, 1], \sum_{j=1}^M w_j = 1.0$, kèm danh sách từ khóa/khái niệm bắt buộc và mẫu giải thích). `LLM Adapter` chấm từng tiêu chí $s_j \in \{0.0, 0.5, 1.0\} \Rightarrow \text{rubric\textunderscore score} = \sum_{j=1}^M w_j s_j$ và sinh phản hồi **AI Tutor**. Khi offline, timeout ($> 4000\text{ms}$) hoặc lỗi API ngoài, `Circuit Breaker` tự động chuyển sang `DeterministicRubricGrader` (đối sánh tổ hợp từ khóa ngữ nghĩa & cấu trúc câu trả lời theo Rubric) và trả `grader_source = "deterministic_fallback"`.
 
 #### 4. Công thức Đường cong Lãng quên *Ebbinghaus* (`PL3-MEMORY-01`):
 - **Khởi tạo độ bền trí nhớ ($S_0$):** Khi học viên lần đầu tiên đạt mức hiểu từ `Applied` trở lên (`depth_level_norm >= 0.50`) tại một khái niệm, hệ thống khởi tạo độ bền trí nhớ **$S_0 = 3.0$ ngày**, ghi nhận `last_practiced_at = now()`, $\Delta t = 0 \Rightarrow R(t) = 1.00$.
 - **Suy giảm theo thời gian thực & Tham số kiểm thử (`simulated_time_offset_days`):**
   - Khoảng thời gian trôi qua (tính bằng ngày):
-    $$\Delta t = \frac{\text{now}() - \text{last\_practiced\_at}}{86400} + \text{simulated\_time\_offset\_days}$$
+    $$\Delta t = \frac{\text{now}() - \text{last\textunderscore practiced\textunderscore at}}{86400} + \text{simulated\textunderscore time\textunderscore offset\textunderscore days}$$
     *(trong đó `simulated_time_offset_days >= 0.0` mặc định bằng `0.0`, được phép truyền qua API kiểm thử/Demo ở môi trường `dev`/`test` để kiểm chứng tự động sự suy giảm trí nhớ mà không phải chờ thời gian thực).*
   - Hệ số duy trì trí nhớ tức thời:
     $$R(t) = e^{-\Delta t / S} \in (0.0, 1.0]$$
-  - Khi $\text{depth\_level\_norm} \ge 0.50$ và **$R(t) < 0.60$**, cờ `needs_review` bật thành `true` (`1.0`).
+  - Khi $\text{depth\textunderscore level\textunderscore norm} \ge 0.50$ và **$R(t) < 0.60$**, cờ `needs_review` bật thành `true` (`1.0`).
 - **Công thức cập nhật độ bền $S_{\text{new}}$ sau phiên Ôn tập (`Spaced_Review` hoặc `Deep_Probe`):**
   - **Nếu lượt ôn tập Đạt chuẩn ($\text{score} \ge 0.75$):** Khôi phục tức thời $\Delta t = 0 \Rightarrow R(t) = 1.00$, tắt cờ `needs_review = false`, và tăng độ bền trí nhớ theo công thức có trần:
     $$S_{\text{new}} = \min\left(60.0,\; S_{\text{old}} \times (1.0 + 0.8 \times \text{score})\right)$$

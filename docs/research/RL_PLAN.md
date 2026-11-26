@@ -21,7 +21,7 @@ Trong simulator có giả định rõ ràng, chính sách DQN đạt kết quả
 - **Action Space (`Discrete(12)`):** Ứng với `action_id` $\in \{0, \dots, 11\}$ của 12 khái niệm Backend (`D-05`).
 - **Khởi tạo Học viên ảo & Chuyển trạng thái (Transition):**
   - Mỗi episode lấy mẫu $\alpha \sim \text{Uniform}(0.35, 0.75)$; 70% episodes bắt đầu từ `mastery = 0.0` toàn bộ, 30% bắt đầu từ trạng thái dở dang hợp lệ trên DAG.
-  - Khi học bài hợp lệ $a$, năng lực tiềm ẩn của học viên ở bài $a$ tăng theo $\alpha$ và độ khó tầng của bài, sau đó mô phỏng làm Quiz 4 câu theo $\text{Binomial}(4, p)$ để sinh `attempt_score` và cập nhật $\text{mastery}_a^{\text{new}} = \max(\text{mastery}_a^{\text{old}}, \text{attempt\_score})$ (`D-06`).
+  - Khi học bài hợp lệ $a$, năng lực tiềm ẩn của học viên ở bài $a$ tăng theo $\alpha$ và độ khó tầng của bài, sau đó mô phỏng làm Quiz 4 câu theo $\text{Binomial}(4, p)$ để sinh `attempt_score` và cập nhật $\text{mastery}_a^{\text{new}} = \max(\text{mastery}_a^{\text{old}}, \text{attempt\textunderscore score})$ (`D-06`).
 - **Hàm Phần thưởng (`Reward Function`) & Xử lý Hành động Không hợp lệ:**
   - Chọn bài chưa đủ điều kiện tiên quyết (`Locked`): Phạt $R = -5.0$, không đổi `mastery`, tăng bộ đếm `prerequisite_violation`.
   - Chọn lại bài đã thông thạo ($\text{mastery}_a \ge 0.75$): Phạt $R = -3.0$, không đổi `mastery`, tăng bộ đếm `redundant_action`.
@@ -80,8 +80,8 @@ Một đồ thị lĩnh vực $\mathcal{G} = (\mathcal{V}, \mathcal{E})$ có $|\
   1. `depth_level_norm`: Mức hiểu đã kiểm chứng hiện tại ($0.0 = \text{Untested}, 0.25 = \text{Surface}, 0.50 = \text{Applied}, 0.75 = \text{Deep Understanding}, 1.00 = \text{Mastery}$).
   2. `confidence`: Độ chắc chắn của bằng chứng đánh giá hiện tại ($\in [0.0, 1.0]$).
   3. `retention_ebbinghaus`: Hệ số duy trì trí nhớ tức thời $R_v(t) = e^{-\Delta t_v / S_{\text{eff}, v}} \in (0.0, 1.0]$.
-  4. `is_eligible`: Cờ nhị phân mở khóa tiên quyết ($1.0$ nếu $\forall u \in \text{prereq}(v): \text{depth\_level\_norm}_u \ge 0.75$, ngược lại $0.0$).
-  5. `needs_review`: Cờ cảnh báo suy giảm trí nhớ ($1.0$ nếu $\text{depth\_level\_norm}_v \ge 0.50 \land R_v(t) < 0.60$, ngược lại $0.0$).
+  4. `is_eligible`: Cờ nhị phân mở khóa tiên quyết ($1.0$ nếu $\forall u \in \text{prereq}(v): \text{depth\textunderscore level\textunderscore norm}_u \ge 0.75$, ngược lại $0.0$).
+  5. `needs_review`: Cờ cảnh báo suy giảm trí nhớ ($1.0$ nếu $\text{depth\textunderscore level\textunderscore norm}_v \ge 0.50 \land R_v(t) < 0.60$, ngược lại $0.0$).
   6. `tier_difficulty`: Độ khó phân tầng chuẩn hóa của khái niệm ($\text{tier} / 4.0 \in \{0.25, 0.50, 0.75, 1.00\}$).
   7. `code_practice_score`: Điểm bài thực hành Code Sandbox gần nhất của node ($\in [0.0, 1.0]$).
   8. `is_goal_path`: Cờ nhị phân ($1.0$ nếu node nằm trên đường đi tiên quyết dẫn tới mục tiêu lĩnh vực hiện tại của học viên).
@@ -98,10 +98,10 @@ Một đồ thị lĩnh vực $\mathcal{G} = (\mathcal{V}, \mathcal{E})$ có $|\
   Tại mỗi bước quyết định cấp lộ trình, mô hình RL chọn một cặp hành động $a = (v, m)$ với:
   - $v \in \{0, \dots, N-1\}$: Khái niệm đích trong đồ thị hiện tại.
   - $m \in \{0, 1, 2, 3\}$: Chế độ học tập tương ứng:
-    - $0 = \text{Learn\_New}$ (Học lý thuyết & đánh giá nền tảng Tầng 1–2 khi chưa đạt `Applied`).
-    - $1 = \text{Deep\_Probe}$ (Đào sâu tình huống/đánh đổi/nội tại Tầng 3–5 để nâng từ `Applied` lên `Deep`/`Mastery`).
-    - $2 = \text{Code\_Practice}$ (Thực hành *Code Review & Refactoring* trên Sandbox để củng cố kỹ năng áp dụng & bản chất).
-    - $3 = \text{Spaced\_Review}$ (Ôn tập ngắt quãng phục hồi $R_v(t) \rightarrow 1.0$ và tăng độ bền trí nhớ $S_v$).
+    - $0 = \text{Learn\textunderscore New}$ (Học lý thuyết & đánh giá nền tảng Tầng 1–2 khi chưa đạt `Applied`).
+    - $1 = \text{Deep\textunderscore Probe}$ (Đào sâu tình huống/đánh đổi/nội tại Tầng 3–5 để nâng từ `Applied` lên `Deep`/`Mastery`).
+    - $2 = \text{Code\textunderscore Practice}$ (Thực hành *Code Review & Refactoring* trên Sandbox để củng cố kỹ năng áp dụng & bản chất).
+    - $3 = \text{Spaced\textunderscore Review}$ (Ôn tập ngắt quãng phục hồi $R_v(t) \rightarrow 1.0$ và tăng độ bền trí nhớ $S_v$).
   - *(Lưu ý ranh giới)*: Khi đã vào trong một phiên đánh giá của node $v$, việc chuyển câu hỏi từ Tầng $1 \rightarrow 5$ do **Assessment State Machine** điều khiển tất định theo kết quả trả lời, không làm phình không gian hành động của RL.
 - **Kiến trúc `GNN Actor-Critic` (`GNN-PPO`) cài đặt bằng PyTorch Tensor / Directed Adjacency Message Passing thuần:**
   1. **Bộ mã hóa Đồ thị 3 Lớp (`3-Layer Directed Adjacency GNN Encoder`):**
@@ -118,18 +118,18 @@ Một đồ thị lĩnh vực $\mathcal{G} = (\mathcal{V}, \mathcal{E})$ có $|\
 
 Tuân thủ bất biến `INV-DEPTH-01` (không dùng điểm số thô chưa kiểm chứng của LLM làm reward trực tiếp):
 - **Vi phạm tiên quyết DAG (`is_eligible[v] == 0`):** Phạt $R = -5.0$ (tăng `prerequisite_violation`, không đổi năng lực).
-- **Lặp thừa vô ích** (chọn $\text{Learn\_New}$ khi đã đạt $\text{Mastery} = 1.00$ và $R_v(t) \ge 0.85$, hoặc chọn $\text{Spaced\_Review}$ khi $R_v(t) \ge 0.90$): Phạt $R = -3.0$ (tăng `redundant_action`).
+- **Lặp thừa vô ích** (chọn $\text{Learn\textunderscore New}$ khi đã đạt $\text{Mastery} = 1.00$ và $R_v(t) \ge 0.85$, hoặc chọn $\text{Spaced\textunderscore Review}$ khi $R_v(t) \ge 0.90$): Phạt $R = -3.0$ (tăng `redundant_action`).
 - **Hành động hợp lệ $(v, m)$:**
-  $$R = -0.4 + 5.0 \times \Delta \text{depth\_verified}_v + 3.0 \times \Delta R_v^{\text{recovered}} + 2.5 \times \Delta \text{code\_verified}_v - c_{\text{cognitive}}(m) + 15.0 \times \mathbb{I}(\text{GoalMastered})$$
+  $$R = -0.4 + 5.0 \times \Delta \text{depth\textunderscore verified}_v + 3.0 \times \Delta R_v^{\text{recovered}} + 2.5 \times \Delta \text{code\textunderscore verified}_v - c_{\text{cognitive}}(m) + 15.0 \times \mathbb{I}(\text{GoalMastered})$$
   trong đó:
-  - $\Delta \text{depth\_verified}_v = \max(0, \text{depth}_v^{\text{new}} - \text{depth}_v^{\text{old}})$ là mức tăng chiều sâu đã kiểm chứng.
-  - $\Delta R_v^{\text{recovered}} = (1.0 - R_v^{\text{before}}) \times \mathbb{I}(R_v^{\text{before}} < 0.60 \land \text{step\_passed})$ là mức phục hồi trí nhớ khi ôn tập đúng bài đang suy giảm nhớ.
-  - $\Delta \text{code\_verified}_v = \max(0, \text{code\_score}_v^{\text{new}} - \text{code\_score}_v^{\text{old}})$.
+  - $\Delta \text{depth\textunderscore verified}_v = \max(0, \text{depth}_v^{\text{new}} - \text{depth}_v^{\text{old}})$ là mức tăng chiều sâu đã kiểm chứng.
+  - $\Delta R_v^{\text{recovered}} = (1.0 - R_v^{\text{before}}) \times \mathbb{I}(R_v^{\text{before}} < 0.60 \land \text{step\textunderscore passed})$ là mức phục hồi trí nhớ khi ôn tập đúng bài đang suy giảm nhớ.
+  - $\Delta \text{code\textunderscore verified}_v = \max(0, \text{code\textunderscore score}_v^{\text{new}} - \text{code\textunderscore score}_v^{\text{old}})$.
   - **Chi phí nhận thức $c_{\text{cognitive}}(m)$ khóa cố định cho 4 chế độ học:**
-    - $c_{\text{cognitive}}(\text{Learn\_New}) = 0.15$
-    - $c_{\text{cognitive}}(\text{Deep\_Probe}) = 0.30$
-    - $c_{\text{cognitive}}(\text{Code\_Practice}) = 0.35$
-    - $c_{\text{cognitive}}(\text{Spaced\_Review}) = 0.10$
+    - $c_{\text{cognitive}}(\text{Learn\textunderscore New}) = 0.15$
+    - $c_{\text{cognitive}}(\text{Deep\textunderscore Probe}) = 0.30$
+    - $c_{\text{cognitive}}(\text{Code\textunderscore Practice}) = 0.35$
+    - $c_{\text{cognitive}}(\text{Spaced\textunderscore Review}) = 0.10$
 - **Điều kiện Kết thúc Episode (`terminated` & `truncated` — Đã khóa):**
   - **`terminated = True` ($\text{GoalMastered}$):** Khi **tất cả các node $v \in \mathcal{V}$ trong đồ thị đích** đồng thời đạt mức hiểu bản chất trở lên (**`depth_level_norm >= 0.75`**) **VÀ** duy trì trí nhớ trên ngưỡng an toàn (**$R_v(t) \ge 0.60$**).
   - **`truncated = True`:** Khi số bước trong episode chạm ngưỡng **`max_steps = 60`** đối với kịch bản đồ thị đơn miền (`Single-Domain Episode`), hoặc **`max_steps = 120`** đối với kịch bản chuỗi đa miền liên tiếp (`Multi-Domain Curriculum Episode`).
