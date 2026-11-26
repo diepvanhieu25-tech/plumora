@@ -4,89 +4,59 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-echo "=== [1/6] Lint Check (Backend, RL, Frontend) ==="
+echo "=== [1/7] Lint Check (Backend, RL, Frontend) ==="
 (cd backend && uv run ruff check .)
 (cd rl && uv run ruff check .)
 (cd frontend && npm run lint)
 
-echo "=== [2/6] Type Check (Backend, RL, Frontend) ==="
+echo "=== [2/7] Type Check (Backend, RL, Frontend) ==="
 (cd backend && uv run mypy app services tests)
 (cd rl && uv run mypy src tests)
 (cd frontend && npm run typecheck)
 
-echo "=== [3/6] Unit & Behavioral Mock Tests (Backend, RL, Frontend) ==="
+echo "=== [3/7] Unit & Behavioral Tests (Backend, RL, Frontend) ==="
 (cd backend && uv run pytest)
 (cd rl && uv run pytest)
 (cd frontend && npm run test:unit)
 
-echo "=== [4/6] Frontend Production Build Check ==="
+echo "=== [4/7] Frontend Production Build Check ==="
 (cd frontend && npm run build)
 
-echo "=== [5/6] Backend Health Verification & Live Fullstack Integration ==="
-BACKEND_PID=""
-FRONTEND_PID=""
-cleanup() {
-  if [ -n "$BACKEND_PID" ]; then
-    echo "Stopping background backend process (PID: $BACKEND_PID)..."
-    kill "$BACKEND_PID" 2>/dev/null || true
-  fi
-  if [ -n "$FRONTEND_PID" ]; then
-    echo "Stopping background frontend process (PID: $FRONTEND_PID)..."
-    kill "$FRONTEND_PID" 2>/dev/null || true
-  fi
-}
-trap cleanup EXIT
+echo "=== [5/7] Live Docker 4-Microservices + API Gateway Readiness & Integration ==="
+docker compose config --quiet
 
-if ! curl -sf http://127.0.0.1:8000/api/v1/health > /dev/null 2>&1; then
-  echo "Backend is not running at 127.0.0.1:8000. Starting backend in background..."
-  (cd backend && PYTHONPATH=../rl/src uv run uvicorn app.main:app --host 127.0.0.1 --port 8000) &
-  BACKEND_PID=$!
-  echo "Waiting up to 30s for backend readiness at http://127.0.0.1:8000/api/v1/health..."
-  HEALTHY=0
-  for i in $(seq 1 30); do
-    if curl -sf http://127.0.0.1:8000/api/v1/health > /dev/null 2>&1; then
-      echo "Backend is healthy after ${i}s."
-      HEALTHY=1
+GW_HEALTH=$(curl -sf http://127.0.0.1:8000/api/v1/health 2>/dev/null || true)
+FE_READY=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:3000 2>/dev/null || true)
+
+if ! echo "$GW_HEALTH" | grep -q '"mode":"microservices"' || [ "$FE_READY" != "200" ]; then
+  echo "Starting unified 4-Microservices + API Gateway + Frontend Docker stack..."
+  docker compose up -d --build --remove-orphans
+  echo "Waiting up to 60s for API Gateway (:8000) & Frontend (:3000) readiness..."
+  STACK_READY=0
+  for i in $(seq 1 60); do
+    GW_HEALTH=$(curl -sf http://127.0.0.1:8000/api/v1/health 2>/dev/null || true)
+    FE_READY=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:3000 2>/dev/null || true)
+    if echo "$GW_HEALTH" | grep -q '"mode":"microservices"' && echo "$GW_HEALTH" | grep -q '"status":"ok"' && [ "$FE_READY" = "200" ]; then
+      echo "Live Docker Microservices stack is healthy after ${i}s."
+      STACK_READY=1
       break
     fi
     sleep 1
   done
-  if [ "$HEALTHY" -ne 1 ]; then
-    echo "FATAL: Backend at 127.0.0.1:8000 failed to become healthy within 30 seconds."
+  if [ "$STACK_READY" -ne 1 ]; then
+    echo "FATAL: Docker Microservices stack failed to become healthy within 60s."
+    docker compose ps
     exit 1
   fi
 else
-  echo "Backend at 127.0.0.1:8000 is already active and healthy."
+  echo "Live Docker 4-Microservices + API Gateway stack (:8000) & Frontend (:3000) already healthy."
 fi
 
-# Run live fullstack jsdom integration against real backend
+# Run live fullstack jsdom integration against real API Gateway -> 4 Microservices -> PG/Redis
 (cd frontend && npm run test:integration)
 
-# Ensure frontend server is active for browser E2E (either pre-existing or vite preview)
-if ! curl -sf http://localhost:3000 > /dev/null 2>&1; then
-  echo "Frontend is not running at http://localhost:3000. Starting vite preview in background..."
-  (cd frontend && npx vite preview --host 127.0.0.1 --port 3000) &
-  FRONTEND_PID=$!
-  echo "Waiting up to 15s for frontend preview readiness at http://localhost:3000..."
-  FE_HEALTHY=0
-  for i in $(seq 1 15); do
-    if curl -sf http://localhost:3000 > /dev/null 2>&1; then
-      echo "Frontend preview is healthy after ${i}s."
-      FE_HEALTHY=1
-      break
-    fi
-    sleep 1
-  done
-  if [ "$FE_HEALTHY" -ne 1 ]; then
-    echo "FATAL: Frontend failed to become ready on port 3000 within 15 seconds."
-    exit 1
-  fi
-else
-  echo "Frontend at http://localhost:3000 is already active and healthy."
-fi
-
-echo "=== [6/6] Real Browser E2E Audit & Negative Control Verification ==="
-# 6.1 Real Chromium E2E Audit (must exit 0)
+echo "=== [6/7] Real Browser E2E Audit & Negative Control Verification ==="
+# 6.1 Real Chromium E2E Audit against live Docker Frontend (:3000) -> API Gateway (:8000)
 node scripts/audit_p3_slice1.cjs
 
 # 6.2 Negative Control Verification (must exit non-zero when conditions fail)
@@ -98,17 +68,29 @@ else
   echo "Audit negative-control probe correctly failed with non-zero exit code as expected."
 fi
 
-echo "=== [7/7] Docker Compose Config, Microservices Edge & Diff Whitespace Check ==="
-docker compose config --quiet
-docker compose --profile microservices config --quiet
-if curl -s -o /dev/null http://127.0.0.1:8080/api/v1/auth/me 2>/dev/null; then
-  GW_INT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/api/v2/internal/domains/frontend/bundle)
-  if [ "$GW_INT_STATUS" != "403" ]; then
-    echo "FATAL: API Gateway :8080 internal route returned $GW_INT_STATUS (expected 403)"
-    exit 1
-  fi
-  echo "API Gateway :8080 internal edge block verified (403)."
+echo "=== [7/7] Microservices Edge Security, 4-Schema Isolation & Diff Whitespace Check ==="
+GW_INT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/api/v2/internal/domains/frontend/bundle)
+if [ "$GW_INT_STATUS" != "403" ]; then
+  echo "FATAL: API Gateway :8000 internal route returned $GW_INT_STATUS (expected 403)"
+  exit 1
 fi
+FE_INT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/api/v2/internal/domains/frontend/bundle)
+if [ "$FE_INT_STATUS" != "403" ]; then
+  echo "FATAL: Frontend Nginx :3000 internal route returned $FE_INT_STATUS (expected 403)"
+  exit 1
+fi
+GW_TRAV_STATUS=$(curl -s --path-as-is -o /dev/null -w "%{http_code}" "http://127.0.0.1:8000/api/v2/domains/%25252e%25252e/%25252e%25252e/health")
+if [ "$GW_TRAV_STATUS" != "400" ]; then
+  echo "FATAL: API Gateway :8000 multi-encoded traversal returned $GW_TRAV_STATUS (expected 400)"
+  exit 1
+fi
+DEAD_V1_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/api/v1/roadmap)
+if [ "$DEAD_V1_STATUS" != "404" ]; then
+  echo "FATAL: Removed v1 route /api/v1/roadmap returned $DEAD_V1_STATUS (expected 404)"
+  exit 1
+fi
+echo "Edge security verified: Gateway/Nginx internal routes -> 403, removed v1 routes -> 404."
+
 git diff --check
 
-echo "=== ALL DAY-0 CI, INTEGRATION & BROWSER E2E HARDENING CHECKS PASSED ==="
+echo "=== ALL DAY-0 CI, LIVE MICROSERVICES INTEGRATION & BROWSER E2E CHECKS PASSED ==="

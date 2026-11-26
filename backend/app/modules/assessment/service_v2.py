@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import UTC, datetime
 from typing import Any
 
+import redis
 from fastapi import HTTPException, status
 from plumora_rl.domain import (
     EbbinghausMemoryModel,
@@ -16,14 +18,14 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.db.models import (
     AssessmentSessionModel,
     AttemptRecordModel,
-    ConceptModel,
-    UserConceptMasteryModel,
     UserModel,
     UserNodeCompetencyModel,
 )
+from app.db.redis_pool import get_redis_client
 from app.db.uow import SqlAlchemyUnitOfWork
 from app.modules.assessment.depth_state_machine import (
     advance_depth_state,
@@ -75,6 +77,7 @@ from app.modules.assessment.schemas_v2 import (
     V2RecommendationResponse,
     V2RecommendedAction,
 )
+from app.modules.auth.security import _can_query_users_table
 from app.modules.contracts.adapters import get_content_catalog_port
 from app.modules.contracts.dtos import ConceptNodeDTO, DepthQuestionDTO
 from app.modules.contracts.ports import ContentCatalogPort
@@ -89,8 +92,13 @@ _GRADER_REGISTRY = TaskGraderRegistry(_RUBRIC_SERVICE)
 _SANDBOX_WORKER = IsolatedSandboxWorkerAdapter()
 
 
+logger = logging.getLogger(__name__)
+
+
 def _bump_user_state_version_if_accessible(db: Session, user_id: uuid.UUID) -> None:
-    """Increment auth_svc.users.state_version in monolith mode; safe SAVEPOINT no-op under schema isolation."""
+    """Increment auth_svc.users.state_version in monolith mode; zero-error no-op under schema isolation."""
+    if not _can_query_users_table(db):
+        return
     try:
         with db.begin_nested():
             user_row = db.get(UserModel, user_id)
@@ -100,35 +108,18 @@ def _bump_user_state_version_if_accessible(db: Session, user_id: uuid.UUID) -> N
         pass
 
 
-def _sync_v2_to_mvp_if_backend(
-    db: Session,
-    user_id: uuid.UUID,
-    concept_slug: str,
-    depth_norm: float,
-) -> None:
-    """Keep MVP user_concept_mastery synchronized when a Backend concept is updated in monolith mode."""
+def _invalidate_user_competency_cache(user_id: uuid.UUID) -> None:
+    """Immediately delete Redis plumora:raw_comp_state:{user_id}:* keys after competency COMMIT (REM-03)."""
     try:
-        with db.begin_nested():
-            concept = db.scalars(select(ConceptModel).where(ConceptModel.slug == concept_slug)).first()
-            if concept is None:
-                return
-            mastery = db.get(UserConceptMasteryModel, (user_id, concept.action_id))
-            if mastery is None:
-                db.add(
-                    UserConceptMasteryModel(
-                        user_id=user_id,
-                        concept_action_id=concept.action_id,
-                        mastery_score=depth_norm,
-                        is_mastered=depth_norm >= 0.75,
-                        updated_at=datetime.now(UTC),
-                    )
-                )
-            elif depth_norm > mastery.mastery_score:
-                mastery.mastery_score = depth_norm
-                mastery.is_mastered = depth_norm >= 0.75
-                mastery.updated_at = datetime.now(UTC)
-    except SQLAlchemyError:
-        return
+        client = get_redis_client(settings.redis_url, decode_responses=True, socket_timeout=0.2)
+        keys = [
+            str(k)
+            for k in client.scan_iter(match=f"plumora:raw_comp_state:{user_id}:*", count=50)
+        ]
+        if keys:
+            client.delete(*keys)
+    except (redis.RedisError, OSError) as exc:
+        logger.warning("Failed to invalidate Redis competency cache for user %s: %s", user_id, exc)
 
 
 def _get_or_create_competency(
@@ -393,7 +384,6 @@ def complete_concept_playbook(
             if target_depth >= 0.50:
                 comp.last_practiced_at = now
         comp.updated_at = now
-        _sync_v2_to_mvp_if_backend(db, user.id, concept_slug, comp.depth_level_norm)
         _bump_user_state_version_if_accessible(db, user.id)
         db.flush()
 
@@ -450,7 +440,8 @@ def complete_concept_playbook(
                     response_json=resp_obj.model_dump(mode="json"),
                 )
             )
-        return resp_obj
+    _invalidate_user_competency_cache(user.id)
+    return resp_obj
 
 
 def start_placement_session(
@@ -653,7 +644,6 @@ def submit_placement_answer(
                     comp.stability_s = node_init.stability_s
                     comp.last_practiced_at = now
                     comp.playbook_completed_at = comp.playbook_completed_at or now
-                    _sync_v2_to_mvp_if_backend(db, user.id, node_init.concept_slug, comp.depth_level_norm)
                 elif not passed and comp.confidence == 0.0:
                     comp.confidence = node_init.confidence
                 comp.updated_at = now
@@ -762,7 +752,8 @@ def submit_placement_answer(
                     response_json=resp_obj.model_dump(mode="json"),
                 )
             )
-            return resp_obj
+        _invalidate_user_competency_cache(user.id)
+        return resp_obj
     except IntegrityError as exc:
         replayed = db.scalars(
             select(AttemptRecordModel).where(
@@ -837,7 +828,7 @@ def start_depth_or_review_session(
     q = _select_question_for_tier(concept_qs, start_tier, seen_ids)
     if q is None and concept_qs:
         active_qs = [cand for cand in concept_qs if cand.is_active]
-        q = active_qs[0] if active_qs else concept_qs[0]
+        q = active_qs[0] if active_qs else None
     if q is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -920,11 +911,13 @@ def abandon_assessment_session(
 
         session.updated_at = datetime.now(UTC)
         db.flush()
-        return AssessmentAbandonResponse(
+        resp_abandon = AssessmentAbandonResponse(
             session_id=session.id,
             session_status=session.status,
             updated_competency=_build_competency_out(comp, stability_before=stab_before),
         )
+    _invalidate_user_competency_cache(user.id)
+    return resp_abandon
 
 
 def submit_depth_or_review_step(
@@ -1137,7 +1130,6 @@ def submit_depth_or_review_step(
                         )
                         comp.last_practiced_at = now
                     comp.updated_at = now
-                    _sync_v2_to_mvp_if_backend(db, user.id, concept_slug, new_depth)
 
             session.updated_at = now
             _bump_user_state_version_if_accessible(db, user.id)
@@ -1207,7 +1199,8 @@ def submit_depth_or_review_step(
                     response_json=resp_obj.model_dump(mode="json"),
                 )
             )
-            return resp_obj
+        _invalidate_user_competency_cache(user.id)
+        return resp_obj
     except IntegrityError as exc:
         replayed = db.scalars(
             select(AttemptRecordModel).where(
@@ -1392,7 +1385,6 @@ def submit_code_sandbox(
                     else INITIAL_STABILITY_DAYS
                 )
                 comp.last_practiced_at = now
-                _sync_v2_to_mvp_if_backend(db, user.id, concept_slug, new_depth)
             comp.updated_at = now
             _bump_user_state_version_if_accessible(db, user.id)
             db.flush()
@@ -1472,7 +1464,8 @@ def submit_code_sandbox(
                     response_json=resp_obj.model_dump(mode="json"),
                 )
             )
-            return resp_obj
+        _invalidate_user_competency_cache(user.id)
+        return resp_obj
     except IntegrityError as exc:
         replayed = db.scalars(
             select(AttemptRecordModel).where(

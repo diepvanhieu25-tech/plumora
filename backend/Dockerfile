@@ -8,7 +8,7 @@ ENV UV_COMPILE_BYTECODE=1 \
 COPY backend/pyproject.toml ./backend/
 RUN cd backend && uv venv /app/.venv && uv pip install -r pyproject.toml
 
-# ── Stage 2: Minimal Non-Root Production Runner ──
+# ── Stage 2: Minimal Non-Root Production Runner (Python 3.12 + SQLite3 + Node.js for Sandbox) ──
 FROM python:3.12-slim-bookworm AS runner
 WORKDIR /app
 
@@ -21,8 +21,11 @@ ENV PATH="/app/.venv/bin:$PATH" \
     RL_CHECKPOINT_PATH=/app/rl/artifacts/gnn_ppo_v2_base.zip \
     RL_MANIFEST_PATH=/app/rl/artifacts/manifest_phase3.json
 
-# Create unprivileged non-root user
-RUN groupadd -g 10001 plumora && \
+# Install Node.js runtime for Isolated JavaScript Code Sandbox challenges & create non-root user
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends nodejs && \
+    rm -rf /var/lib/apt/lists/* && \
+    groupadd -g 10001 plumora && \
     useradd -u 10001 -g plumora -s /bin/sh -M plumora
 
 # Copy virtual environment from builder
@@ -37,9 +40,11 @@ COPY --chown=plumora:plumora rl/src/plumora_rl/domain /app/backend/plumora_rl/do
 COPY --chown=plumora:plumora rl/src/plumora_rl/inference /app/backend/plumora_rl/inference
 COPY --chown=plumora:plumora rl/artifacts /app/rl/artifacts
 
+RUN mkdir -p /app/rl/artifacts/candidates && chown -R plumora:plumora /app/rl/artifacts
+
 USER plumora
 WORKDIR /app/backend
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "services.api_gateway:app", "--host", "0.0.0.0", "--port", "8000"]

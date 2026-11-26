@@ -97,7 +97,7 @@ flowchart TB
         BO["Back-Office: BackOfficeAppShell\n/backoffice/login • /studio/* • /cohort • /mlops/* • /infra/*"]
     end
 
-    Nginx -->|"Static SPA + Proxy /api"| GW["FastAPI Monolith :8000 / API Gateway :8080"]
+    Nginx -->|"Static SPA + Proxy /api"| GW["API Gateway :8000"]
 
     subgraph Services_Layer["4 Bounded Contexts — Hexagonal Ports & Adapters"]
         S1["user-auth-service :8001\nArgon2id + JWT jti + RBAC"]
@@ -129,9 +129,9 @@ flowchart TB
     S4 --> RLCore
 ```
 
-- **PostgreSQL 16 (4 Schema cô lập):** `auth_svc`, `content_svc` (có `outbox_events` riêng), `assess_svc` (có `outbox_events` & `consumed_events` riêng), `rec_ai_svc` (có `consumed_events` riêng); quét Outbox bằng `FOR UPDATE SKIP LOCKED` chống phát trùng đa worker.
-- **Redis 7:** Kết nối tập trung qua `RedisConnectionProvider`, hỗ trợ Time-Aware Feature Cache, đồng bộ con trỏ Active Model (`plumora:model_registry:active`), thu hồi JWT (`jti`) và 2 luồng `Redis Streams` (`plumora:competency_events`, `plumora:stream:domain_events`).
-- **Hỗ trợ 2 Chế độ Triển khai:** Monolith (`docker compose up -d --build`) và 4 Microservices + `db-migrate-seed` cold-boot job + API Gateway (`docker compose --profile microservices up -d --build`), kèm cấu hình Kubernetes (`k8s/` với `env`, `HPA`, `NetworkPolicy`).
+- **PostgreSQL 16 (4 Schema cô lập):** `auth_svc`, `content_svc` (có `outbox_events` riêng), `assess_svc` (có `outbox_events` & `consumed_events` riêng), `rec_ai_svc` (có `consumed_events` riêng); kiểm tra cô lập thực tế qua `pg_catalog`, quét Outbox bằng `FOR UPDATE SKIP LOCKED` chống phát trùng đa worker.
+- **Redis 7:** Kết nối tập trung qua `RedisConnectionProvider`, hỗ trợ Time-Aware Feature Cache (`plumora:raw_comp_state:*` xóa tức thời khi cập nhật năng lực), đồng bộ epoch cache đa worker (`plumora:kg:epoch`), đồng bộ con trỏ Active Model (`plumora:model_registry:active`), thu hồi JWT (`jti`) và 2 luồng `Redis Streams` (`plumora:competency_events`, `plumora:stream:domain_events` với `consumer_name = {hostname}-{pid}`).
+- **Kiến trúc Docker Thống nhất (`v3.1` — `D-27`):** `docker compose up -d --build` dựng duy nhất cụm **4 Microservices + API Gateway (`:8000`) + `db-migrate-seed` + non-root Nginx Frontend (`:3000`) + PostgreSQL 16 + Redis 7** kèm persistent volume `plumora_rl_candidates`. (`backend/app/main.py` chỉ giữ làm in-process harness cho `pytest`; thư mục `k8s/` giữ ở mức *Experimental Production Blueprint* ngoài phạm vi nghiệm thu hiện tại).
 
 ---
 
@@ -140,13 +140,10 @@ flowchart TB
 Yêu cầu: đã cài **Docker** và **Docker Compose**.
 
 ```bash
-# Chế độ tiêu chuẩn (postgres, redis, backend, frontend)
+# Khởi dựng thống nhất cụm 4 Microservices + API Gateway + PostgreSQL + Redis + Frontend
 docker compose up -d --build
 
-# Hoặc chế độ 4 Microservices + API Gateway + db-migrate-seed
-docker compose --profile microservices up -d --build
-
-# Kiểm tra trạng thái container
+# Kiểm tra trạng thái container (toàn bộ dịch vụ hiển thị Up / healthy)
 docker compose ps
 ```
 
@@ -174,14 +171,15 @@ Giao diện đăng nhập đã loại bỏ toàn bộ nút điền nhanh demo. �
 
 ---
 
-## 6. Kết quả Đánh giá Mô hình `GNN-PPO` (Trong Mô phỏng)
+## 6. Kết quả Đánh giá Mô hình `GNN-PPO` (Trong Mô phỏng `v3.1.0`)
 
-Checkpoint cơ sở `rl/artifacts/gnn_ppo_v2_base.zip` (`SHA-256 = 1a074299ef8edfad6a64c9c58f2eb35e664bbaa56c04054f043efb03c7a7d861`) được huấn luyện trên 3 seeds (`101`, `202`, `303`) và đánh giá trên **500 episodes** (`eval_seed = 2026`):
+Checkpoint cơ sở `rl/artifacts/gnn_ppo_v2_base.zip` (`selected_seed = 303`, `SHA-256 = bf55d8098b717c6814ace00633796bf99306c9ad45631f281eb0102213e9ad6f`) được huấn luyện công bằng với cùng ngân sách `timesteps_per_seed = 15,000` trên 3 seeds (`101`, `202`, `303`), chọn trên `val_seed = 999` (`200` episodes) và đánh giá trên **500 episodes** (`eval_seed = 2026`, đồng bộ bất biến `INV-SEQ-01..03`):
 
-| Chỉ số | `GNN-PPO` (3 ngành đã biết) | `GNN-PPO` (*Zero-shot*: `heldout_data_eng_graph`) |
+| Chỉ số | `GNN-PPO Masked` (3 ngành đã biết) | `GNN-PPO Masked` (*Zero-shot*: `heldout_data_eng_graph`) |
 | :--- | :---: | :---: |
-| **Phần thưởng tích lũy (`episodic_reward`)** | `66.65` | `67.36` |
-| **Tỷ lệ vi phạm tiên quyết (`guardrail_violation_rate`)** | `0.0%` | `0.0%` |
+| **Phần thưởng tích lũy (`mean_reward ± std`)** | `49.45 ± 7.75` (`Unmasked`: `48.22 ± 7.42`) | `48.06 ± 7.67` (`Unmasked`: `47.11 ± 7.66`) |
+| **Tỷ lệ lỗi `Unmasked` (cả tiên quyết & lặp thừa)** | `0.017%` (`DQN-MLP`: `92.47%`, `PPO-MLP`: `96.83%`) | `0.013%` (`DQN-MLP`: `91.75%`, `PPO-MLP`: `97.51%`) |
+| **Tỷ lệ vi phạm có `Policy Guardrail`** | `0.0%` | `0.0%` |
 
 > Kết quả trên được đo trong bộ mô phỏng đa ngành (`rl/src/plumora_rl/multidomain_sim.py`), không đồng nhất với hiệu quả học tập trên người thật. Chi tiết xem tại [RL_EXPERIMENTAL_REPORT.md](docs/defense/RL_EXPERIMENTAL_REPORT.md).
 
@@ -190,10 +188,9 @@ Checkpoint cơ sở `rl/artifacts/gnn_ppo_v2_base.zip` (`SHA-256 = 1a074299ef8ed
 ## 7. Kiểm tra Chất lượng Tự động & Tài liệu
 
 ```bash
-# Chạy toàn bộ 7 cổng CI (Lint, Type Check, Unit + 5 Architectural Fitness Functions,
-# Frontend Build, Live Fullstack Integration, Real Chromium E2E + Negative Control, Docker Compose Config)
+# Chạy toàn bộ 7 cổng CI trực tiếp trên cụm Docker 4 Microservices + API Gateway sống
 ./scripts/ci_check.sh
 ```
 
-- **Bộ kiểm thử hiện có:** `10` RL tests (bao gồm parity PyTorch $\leftrightarrow$ NumPy & zero-Torch import), `85` Backend tests (bao gồm `13` Architectural Fitness Functions tại `backend/tests/architecture/`), `8` Frontend Vitest unit tests, cùng Live Fullstack Integration & Real Chromium E2E.
+- **Bộ kiểm thử hiện có:** `13` RL tests (bao gồm parity PyTorch $\leftrightarrow$ NumPy, zero-Torch import & bất biến `INV-SEQ-02`), `100` Backend tests (bao gồm `13` Architectural Fitness Functions tại `backend/tests/architecture/`), `11` Frontend Vitest unit tests, cùng Live Fullstack Integration & Real Chromium E2E trên cụm Microservices thật.
 - **Tài liệu dự án:** [Intent](docs/intent.md) | [Spec](docs/spec.md) | [Design](docs/design.md) | [UI Design System](docs/ui-design-system.md) | [Decisions](docs/decisions.md) | [RL Plan](docs/research/RL_PLAN.md) | [RL Experimental Report](docs/defense/RL_EXPERIMENTAL_REPORT.md) | [Manual Testing Script](docs/verification/MANUAL_SYSTEM_TESTING_SCRIPT.md)

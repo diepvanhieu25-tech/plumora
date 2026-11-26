@@ -146,30 +146,30 @@ sequenceDiagram
 
 ---
 
-## 4. Kịch Bản Thao Diễn Đích Giai Đoạn 3 (`v2.0.0` — 20 Màn Hình & 3 Vai Trò)
+## 4. Kịch Bản Thao Diễn Hệ Thống Thống Nhất `v3.1` (4 Microservices + API Gateway & 2 Cổng Ứng Dụng)
 
-### 4.1. Khởi Chạy Cụm 4 Microservices (Tùy chọn khi Demo Kiến Trúc Phân Tán)
+### 4.1. Khởi Chạy Cụm Docker 4 Microservices + API Gateway Thống Nhất (`D-27`)
 ```bash
-docker compose -f docker-compose.microservices.yml up --build -d
+docker compose up --build -d
+docker compose ps
 ```
-- `user-auth-service` (`8001`), `content-kg-service` (`8002`), `assessment-grader-service` (`8003`), `recommendation-ai-service` (`8004`), `api-gateway` (`8000`).
+- Mặc định `docker compose up -d --build` khởi dựng đầy đủ: `postgres`, `redis`, `db-migrate-seed`, `user-auth-service:8001`, `content-kg-service:8002`, `assessment-grader-service:8003`, `recommendation-ai-service:8004`, `api-gateway:8000` và `frontend:3000` (Nginx non-root trỏ thẳng `http://api-gateway:8000`). *(Ghi chú: thư mục `k8s/` được giữ ở mức Experimental Production Blueprint ngoài phạm vi nghiệm thu hiện tại).*
 
-### 4.2. Luồng Bấm Demo 3 Vai Trò (`SCR-01`..`SCR-20`)
-1. **Vai trò `Learner` (`SCR-01` $\rightarrow$ `SCR-09`..`SCR-14`):**
-   - Đăng nhập `learner_foundation` (`PlumoraDemo#2026`) $\rightarrow$ Nhấn nút **"Đa lĩnh vực"** trên Header mở **`SCR-09` (`MultiDomainHubPage`)**: chỉ ra 3 ngành `Backend (12)`, `Frontend (10)`, `DevOps (9)` và số node giao thoa (`GitMerge`).
-   - Chọn **"Chẩn đoán Đầu vào"** trên `Frontend` mở **`SCR-10` (`AdaptivePlacementPage`)**: làm 1–2 câu nhảy tầng DAG, nhấn mạnh trần khởi tạo `75%` (`confidence = 0.60`).
-   - Vào **`SCR-11` (`MultiDomainRoadmapPage`)**: chỉ ra node giao thoa `net-internet` / `web-http` tự động sáng mở khóa; bật nút **"Mô phỏng +5 ngày (Ebbinghaus)"** để hội đồng thấy thanh $R(t)$ giảm dưới `60%` chuyển màu Hổ Phách `Cần ôn tập`; chỉ ra Banner **`GNN-PPO + Policy Guardrail`** (`SHA-256` verified).
-   - Nhấp **"Đào sâu 5 tầng"** mở **`SCR-12` (`DepthProbePage`)**: trả lời câu Tầng 3 tự luận và nhận phản hồi từ **AI Tutor & Rubric Drawer (`SCR-14`)** (huy hiệu nguồn `Deterministic Fallback` hoạt động ngay cả khi tắt mạng).
-   - Nhấp **"Code"** mở **`SCR-13` (`CodeSandboxPage`)**: sửa hàm Python `parse_host_port` (hoặc thử nộp `while True: pass` để chứng minh cắt timeout `408` trong $\le 3000\text{ms}$).
-2. **Vai trò `Expert` (`SCR-15`..`SCR-17`):**
-   - Đăng xuất $\rightarrow$ Đăng nhập `expert_demo` (`PlumoraDemo#2026`) $\rightarrow$ Mở **"Cổng Chuyên gia"**.
-   - Trên **`SCR-15`**, thử nối cạnh vòng lặp để kích hoạt `422 DAG_CYCLE_DETECTED`, sau đó sửa hợp lệ và xuất bản.
-   - Giới thiệu nhanh **`SCR-16`** (soạn Rubric tổng trọng số $= 1.0$) và **`SCR-17`** (chạy thử `solution_code` qua Sandbox trước khi lưu).
-3. **Vai trò `Admin` (`SCR-18`..`SCR-20`):**
-   - Đăng xuất $\rightarrow$ Đăng nhập `admin_demo` (`PlumoraDemo#2026`) $\rightarrow$ Mở **"Cổng Admin"**.
-   - Trên **`SCR-18`**, giới thiệu `Verified Experience Buffer` và ngưỡng `KL-divergence <= 0.02`.
-   - Trên **`SCR-19`**, chỉ ra nút **"Kích hoạt Checkpoint Mới"** bị khóa cứng đối với model `BLOCKED` (`INV-ONLINE-RL-01`) và thao diễn **`1-Click Rollback`** ($< 2000\text{ms}$).
-   - Trên **`SCR-20`**, trình chiếu trạng thái 4 Microservices, 4 Schema cô lập (`auth_svc`, `content_svc`, `assess_svc`, `rec_ai_svc`) và `Redis Streams`.
+### 4.2. Luồng Bấm Demo 2 Cổng & 3 Vai Trò (`Web Client` & `Back-Office Console`)
+1. **Web Client — Vai trò `Learner` (`/login` $\rightarrow$ `/domains/*`, `SCR-09`..`SCR-14`):**
+   - Mở `http://localhost:3000/login` (giao diện sạch, không có nút demo; thử nhấn `F5` sau khi đăng nhập để thấy khôi phục phiên mượt không nháy màn hình Login). Đăng nhập `learner_foundation` (`PlumoraDemo#2026`) $\rightarrow$ Mở **`SCR-09` (`MultiDomainHubPage`)**: chỉ ra 3 ngành `Backend (12)`, `Frontend (10)`, `DevOps (9)` và 7 node giao thoa liên ngành.
+   - Chọn **"Định vị Đầu vào"** trên `Frontend` mở **`SCR-10` (`AdaptivePlacementPage`)**: làm 1–2 câu nhảy tầng DAG với *Transitive Prerequisite Promotion* mở khóa Tầng 2 (trần khởi tạo `75%`, `confidence = 0.60`).
+   - Vào **`SCR-11` (`MultiDomainRoadmapPage`)**: chỉ ra Banner **`GNN-PPO + Policy Guardrail`** (`SHA-256 = bf55d809...` verified) và lịch hẹn ôn tập *Ebbinghaus* thực tế (`next_review_due_at`).
+   - Tuân thủ chuỗi tuần tự `INV-SEQ-01..03`: mở **Playbook 5 phần** $\rightarrow$ bấm hoàn thành Playbook $\rightarrow$ chuyển sang **`SCR-12` (`DepthProbePage`)** làm câu Tầng 1–2 trắc nghiệm & Tầng 3–5 tự luận có phản hồi **Socratic AI Tutor & Rubric Drawer (`SCR-14`)** + `PlaybookQuickDrawer` $\rightarrow$ mở **`SCR-13` (`CodeSandboxPage`)** chạy thử bài tập `Python` / `JavaScript` / `SQL` trong Sandbox cô lập (`<= 3000ms`, khóa trần `INV-SEQ-02` `50%` nếu chưa đạt `Deep >= 75%`).
+2. **Back-Office Console — Vai trò `Expert` (`/backoffice/login` $\rightarrow$ `/backoffice/studio/*`, `SCR-15`..`SCR-17`):**
+   - Đăng xuất $\rightarrow$ Mở `http://localhost:3000/backoffice/login`, đăng nhập `expert_demo` (`PlumoraDemo#2026`).
+   - Trên **`SCR-15`**, thử nối cạnh vòng lặp để kích hoạt `422 DAG_CYCLE_DETECTED`, sau đó sửa hợp lệ và xuất bản (`DomainGraphUpdatedEvent` + đồng bộ `plumora:kg:epoch` đa worker).
+   - Giới thiệu **`SCR-16`** (CRUD câu hỏi 5 tầng, tổng trọng số Rubric $= 1.0$ + **Live Rubric Dry-Run**), **`SCR-17`** (CRUD Code Sandbox Python/JS/SQL với **Dual Sandbox Verification**) và **Cohort Analytics** (`/backoffice/cohort` tổng hợp trực tiếp từ `assessment-grader-service`).
+3. **Back-Office Console — Vai trò `Admin` (`/backoffice/login` $\rightarrow$ `/backoffice/mlops/*` & `/infra/*`, `SCR-18`..`SCR-20`):**
+   - Đăng nhập `admin_demo` (`PlumoraDemo#2026`) tại `/backoffice/login`.
+   - Trên **`SCR-18`**, trình chiếu `Verified Experience Buffer`, **Policy Inspector** (khớp chính xác `model_version` với `checkpoint_sha256` thực tế) kèm thanh trượt **What-If Time Clock** mô phỏng suy giảm *Ebbinghaus* theo ngày.
+   - Trên **`SCR-19`**, chỉ ra bảng điểm **Safety Evaluation Gate** (`200` episodes, `KL <= 0.02`, khóa cứng model `BLOCKED` theo `INV-ONLINE-RL-01`) và thao diễn **`1-Click Rollback`** ($< 2000\text{ms}$, lưu ứng viên bền vững trên volume `plumora_rl_candidates`).
+   - Trên **`SCR-20`**, trình chiếu trạng thái sống của **4 Microservices**, **4 Schema PostgreSQL cô lập (`schemas_isolated: true` qua `pg_catalog`)**, số đếm Outbox theo từng `event_type`, nút **Trigger Outbox Relay** liên dịch vụ và kiểm tra **Redis Streams DLQ**.
 
 ---
 

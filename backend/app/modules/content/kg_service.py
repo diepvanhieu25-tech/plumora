@@ -3,23 +3,18 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
 from plumora_rl.domain import EbbinghausMemoryModel
 from sqlalchemy import select
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db.models import (
     CodeChallengeModel,
-    ConceptModel,
     DomainConceptMapModel,
     DomainModel,
-    UserConceptMasteryModel,
 )
-from app.modules.assessment.depth_state_machine import depth_label_for_norm
 from app.modules.content.schemas_v2 import (
     ConceptPlaybookDetailResponse,
     DomainListItem,
@@ -33,57 +28,8 @@ from app.modules.contracts.dtos import UserCompetencySnapshotDTO, UserNodeCompet
 from app.modules.contracts.ports import CompetencyReaderPort
 
 
-def _overlay_mvp_mastery_readonly(
-    db: Session,
-    user_id: uuid.UUID,
-    comp_map: dict[str, UserNodeCompetencyDTO],
-) -> dict[str, UserNodeCompetencyDTO]:
-    """Overlay legacy MVP user_concept_mastery rows in memory without mutating or committing DB."""
-    try:
-        mvp_rows = db.execute(
-            select(UserConceptMasteryModel, ConceptModel.slug)
-            .join(ConceptModel, ConceptModel.action_id == UserConceptMasteryModel.concept_action_id)
-            .where(UserConceptMasteryModel.user_id == user_id)
-        ).all()
-    except SQLAlchemyError:
-        db.rollback()
-        return comp_map
-
-    merged = dict(comp_map)
-    for mastery_row, slug in mvp_rows:
-        score = float(mastery_row.mastery_score)
-        if score <= 0.0:
-            continue
-        existing = merged.get(slug)
-        if existing is None:
-            merged[slug] = UserNodeCompetencyDTO(
-                concept_slug=slug,
-                depth_level_norm=score,
-                peak_depth_level_norm=score,
-                depth_label=depth_label_for_norm(score),
-                confidence=0.85 if score >= 0.75 else 0.65,
-                stability_s=EbbinghausMemoryModel.INITIAL_STABILITY_DAYS,
-                last_practiced_at=mastery_row.updated_at or datetime.now(UTC),
-                playbook_completed_at=mastery_row.updated_at or datetime.now(UTC),
-                code_practice_score=0.0,
-            )
-        elif score > existing.depth_level_norm:
-            merged[slug] = UserNodeCompetencyDTO(
-                concept_slug=slug,
-                depth_level_norm=score,
-                peak_depth_level_norm=max(existing.peak_depth_level_norm, score),
-                depth_label=depth_label_for_norm(score),
-                confidence=max(existing.confidence, 0.85 if score >= 0.75 else 0.65),
-                stability_s=existing.stability_s,
-                last_practiced_at=existing.last_practiced_at or mastery_row.updated_at or datetime.now(UTC),
-                playbook_completed_at=existing.playbook_completed_at or mastery_row.updated_at or datetime.now(UTC),
-                code_practice_score=existing.code_practice_score,
-            )
-    return merged
-
-
 def sync_mvp_mastery_to_v2_competency(db: Session, user_id: uuid.UUID) -> None:
-    """Backward-compatible no-op for read paths (MVP overlay is strictly read-only now)."""
+    """Backward-compatible no-op for read paths (MVP overlay is strictly read-only inside port)."""
     _ = (db, user_id)
 
 
@@ -94,8 +40,7 @@ def _load_user_snapshot(
 ) -> tuple[UserCompetencySnapshotDTO, dict[str, UserNodeCompetencyDTO]]:
     port = competency_port or get_competency_reader_port(db)
     snapshot = port.get_user_competency_snapshot(user_id)
-    comp_map = _overlay_mvp_mastery_readonly(db, user_id, snapshot.by_slug())
-    return snapshot, comp_map
+    return snapshot, snapshot.by_slug()
 
 
 def _build_roadmap_node(

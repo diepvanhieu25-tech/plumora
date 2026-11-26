@@ -1,4 +1,4 @@
-"""Auth module public interface and backward compatibility layer."""
+"""Auth module public interface."""
 
 from __future__ import annotations
 
@@ -10,18 +10,13 @@ from app.modules.auth.security import (
     hash_password,
     verify_password,
 )
-from app.modules.auth.service import (
-    DEMO_PASSWORD,
-    PRESET_MASTERY_MAPS,
-    apply_preset_to_user_in_tx,
-)
+from app.modules.auth.service import DEMO_PASSWORD, PRESET_COMPETENCY_MAPS
 
 __all__ = [
     "DEMO_PASSWORD",
-    "PRESET_MASTERY_MAPS",
+    "PRESET_COMPETENCY_MAPS",
     "LoginRequest",
     "RegisterRequest",
-    "apply_preset_to_user_in_tx",
     "create_access_token",
     "extract_current_user",
     "hash_password",

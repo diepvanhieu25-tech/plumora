@@ -1,8 +1,7 @@
-"""FastAPI HTTP endpoints for learner authentication (PL-AUTH-01, D-11)."""
+"""FastAPI HTTP endpoints for user authentication (PL-AUTH-01, D-11, PL3-ROLE-01)."""
 
 from __future__ import annotations
 
-import os
 import uuid
 
 from fastapi import APIRouter, Request
@@ -12,7 +11,6 @@ from sqlalchemy.exc import IntegrityError
 
 from app.config import settings
 from app.db.models import DbSession, UserModel
-from app.db.redis_store import write_through_state_cache
 from app.modules.auth.schemas import LoginRequest, RegisterRequest, serialize_user
 from app.modules.auth.security import (
     create_access_token,
@@ -23,16 +21,12 @@ from app.modules.auth.security import (
     set_auth_cookie,
     verify_password,
 )
-from app.modules.auth.service import apply_preset_to_user_in_tx
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 
-def _is_microservice_mode() -> bool:
-    return (
-        os.environ.get("MICROSERVICE_MODE", "").lower() == "true"
-        or bool(os.environ.get("ASSESSMENT_SERVICE_URL") or os.environ.get("CONTENT_SERVICE_URL"))
-    )
+def write_through_state_cache(*_args: object, **_kwargs: object) -> None:
+    """Retired v1 state-cache hook retained only as an uncalled no-op symbol for C01 regression tests."""
 
 
 @router.post("/register")
@@ -40,7 +34,7 @@ def register_user(
     payload: RegisterRequest,
     db: DbSession,
 ) -> JSONResponse:
-    """Register a new learner account with 12 initialized mastery=0.0 rows (PL-AUTH-01)."""
+    """Register a new learner account strictly inside auth_svc.users (PL-AUTH-01, Decision A1)."""
     existing = db.scalar(select(UserModel).where(UserModel.username == payload.username))
     if existing is not None:
         return JSONResponse(
@@ -59,12 +53,8 @@ def register_user(
         password_hash=hash_password(payload.password),
         state_version=1,
     )
-    is_microservice_mode = _is_microservice_mode()
     try:
         db.add(user)
-        db.flush()
-        if not is_microservice_mode:
-            apply_preset_to_user_in_tx(db, user, "new_learner")
         db.commit()
     except IntegrityError:
         db.rollback()
@@ -78,9 +68,6 @@ def register_user(
         )
 
     db.refresh(user)
-    if not is_microservice_mode:
-        write_through_state_cache(db, user.id)
-
     token = create_access_token(user.id, user.username, role=user.role)
     res = JSONResponse(
         status_code=201,
@@ -95,7 +82,7 @@ def login_user(
     payload: LoginRequest,
     db: DbSession,
 ) -> JSONResponse:
-    """Authenticate a learner account using Argon2id and issue HttpOnly session cookie."""
+    """Authenticate an account using Argon2id and issue HttpOnly session cookie."""
     user = db.scalar(select(UserModel).where(UserModel.username == payload.username))
     if user is None or not verify_password(payload.password, user.password_hash):
         return JSONResponse(
@@ -131,13 +118,11 @@ def login_user(
             status_code=403,
             content={
                 "error_code": "FORBIDDEN_ROLE",
-                "message": "Tài khoản Quản trị/Chuyên gia vui lòng đăng nhập tại cổng riêng (/admin/login hoặc /expert/login).",
+                "message": "Tài khoản Quản trị/Chuyên gia vui lòng đăng nhập tại cổng riêng (/backoffice/login).",
                 "details": {"role": user_role, "portal": payload.portal},
             },
         )
 
-    if not _is_microservice_mode():
-        write_through_state_cache(db, user.id)
     token = create_access_token(user.id, user.username, role=user.role)
     res = JSONResponse(
         status_code=200,
@@ -152,7 +137,7 @@ def logout_user(
     request: Request,
     db: DbSession,
 ) -> JSONResponse:
-    """Revoke the JWT token (Redis JTI blocklist + local fallback) and clear session cookie."""
+    """Revoke the JWT token (Redis JTI blocklist + local fallback) and clear session cookies."""
     user = extract_current_user(request, db)
     if user is None:
         return JSONResponse(
@@ -166,9 +151,21 @@ def logout_user(
     for token in extract_all_raw_tokens(request):
         revoke_token(token)
     res = JSONResponse(status_code=200, content={"logged_out": True})
-    res.delete_cookie(key=settings.effective_session_cookie_name, path="/")
-    res.delete_cookie(key="plumora_session", path="/")
-    res.delete_cookie(key="__Host-plumora_session", path="/")
+    res.delete_cookie(
+        key=settings.effective_session_cookie_name,
+        path="/",
+        secure=settings.cookie_secure,
+        httponly=True,
+        samesite="lax",
+    )
+    res.delete_cookie(key="plumora_session", path="/", httponly=True, samesite="lax")
+    res.delete_cookie(
+        key="__Host-plumora_session",
+        path="/",
+        secure=True,
+        httponly=True,
+        samesite="lax",
+    )
     return res
 
 
@@ -177,7 +174,7 @@ def get_me(
     request: Request,
     db: DbSession,
 ) -> JSONResponse:
-    """Return the authenticated learner profile or 401 AUTH_REQUIRED."""
+    """Return the authenticated user profile or 401 AUTH_REQUIRED."""
     user = extract_current_user(request, db)
     if user is None:
         return JSONResponse(

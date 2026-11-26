@@ -40,10 +40,63 @@ from app.modules.content.expert_schemas import (
     ExpertRubricDryRunResponse,
     ExpertUpdateGraphRequest,
 )
+from app.modules.events.internal_client import (
+    assessment_service_url,
+    bump_kg_cache_epoch,
+    fetch_cohort_analytics_data_internal,
+)
 from app.modules.events.outbox import record_outbox_event_in_tx, relay_pending_outbox_events
 
 _SANDBOX = IsolatedSandboxWorkerAdapter()
 _DRY_RUN_GRADER = DeterministicRubricGrader()
+
+
+def _emit_content_mutation_in_tx(
+    db: Session,
+    *,
+    concept_slug: str | None = None,
+    domain_slug: str | None = None,
+    change_summary: str,
+) -> list[str]:
+    """Increment graph_version and record DomainGraphUpdatedEvent for all affected domains."""
+    affected: list[str] = []
+    if domain_slug:
+        affected.append(domain_slug)
+    if concept_slug:
+        mapped_domains = db.scalars(
+            select(DomainConceptMapModel.domain_slug).where(
+                DomainConceptMapModel.concept_slug == concept_slug
+            )
+        ).all()
+        for d_slug in mapped_domains:
+            if d_slug not in affected:
+                affected.append(str(d_slug))
+
+    for d_slug in affected:
+        dom = db.get(DomainModel, d_slug)
+        if dom is not None:
+            dom.graph_version += 1
+            ev_id = uuid.uuid4()
+            record_outbox_event_in_tx(
+                db,
+                event_id=ev_id,
+                event_type="DomainGraphUpdatedEvent",
+                stream_name="plumora:stream:domain_events",
+                payload={
+                    "event_id": str(ev_id),
+                    "occurred_at": datetime.now(UTC).isoformat(),
+                    "domain_slug": d_slug,
+                    "graph_version": dom.graph_version,
+                    "change_summary": change_summary,
+                },
+            )
+    return affected
+
+
+def _flush_content_caches_after_commit(db: Session, affected_domains: list[str]) -> None:
+    """Invalidate Redis plumora:kg:* + cross-worker _BUNDLE_CACHE epoch and relay outbox."""
+    bump_kg_cache_epoch(affected_domains if affected_domains else None)
+    relay_pending_outbox_events(db)
 
 
 def create_expert_domain(db: Session, payload: ExpertCreateDomainRequest) -> dict[str, Any]:
@@ -62,6 +115,7 @@ def create_expert_domain(db: Session, payload: ExpertCreateDomainRequest) -> dic
     )
     db.add(dom)
     db.commit()
+    bump_kg_cache_epoch([dom.slug])
     return {"slug": dom.slug, "title": dom.title, "graph_version": dom.graph_version}
 
 
@@ -227,7 +281,7 @@ def update_expert_domain_graph(
         },
     )
     db.commit()
-    relay_pending_outbox_events(db)
+    _flush_content_caches_after_commit(db, [domain_slug])
 
     return ExpertGraphUpdateResponse(
         domain_slug=domain_slug,
@@ -344,7 +398,13 @@ def create_expert_question(
                 reference_explanation=payload.rubric.reference_explanation,
             )
         )
+    affected = _emit_content_mutation_in_tx(
+        db,
+        concept_slug=concept_slug,
+        change_summary=f"Created tier-{payload.depth_tier} question for {concept_slug}",
+    )
     db.commit()
+    _flush_content_caches_after_commit(db, affected)
     return {
         "item_id": str(q_id),
         "concept_slug": concept_slug,
@@ -395,7 +455,13 @@ def update_expert_question(
     elif existing_r is not None:
         db.delete(existing_r)
 
+    affected = _emit_content_mutation_in_tx(
+        db,
+        concept_slug=q.concept_slug,
+        change_summary=f"Updated question {q.id} (v{q.version}) for {q.concept_slug}",
+    )
     db.commit()
+    _flush_content_caches_after_commit(db, affected)
     return {
         "item_id": str(q.id),
         "concept_slug": q.concept_slug,
@@ -413,7 +479,13 @@ def delete_expert_question(db: Session, question_id: uuid.UUID) -> dict[str, Any
             detail={"error_code": "QUESTION_NOT_FOUND", "message": "Question not found."},
         )
     q.is_active = False
+    affected = _emit_content_mutation_in_tx(
+        db,
+        concept_slug=q.concept_slug,
+        change_summary=f"Deactivated question {q.id} for {q.concept_slug}",
+    )
     db.commit()
+    _flush_content_caches_after_commit(db, affected)
     return {"deleted": True, "item_id": str(q.id)}
 
 
@@ -584,7 +656,13 @@ def create_expert_code_challenge(
             version=max_ver + 1,
         )
     )
+    affected = _emit_content_mutation_in_tx(
+        db,
+        concept_slug=concept_slug,
+        change_summary=f"Published code challenge v{max_ver + 1} for {concept_slug}",
+    )
     db.commit()
+    _flush_content_caches_after_commit(db, affected)
     return {
         "item_id": str(ch_id),
         "concept_slug": concept_slug,
@@ -608,50 +686,88 @@ def get_expert_cohort_analytics(db: Session, domain_slug: str | None = None) -> 
         )
 
     slugs = [n.concept_slug for n in nodes]
-    try:
-        comp_rows = db.scalars(
-            select(UserNodeCompetencyModel).where(UserNodeCompetencyModel.concept_slug.in_(slugs))
-        ).all()
-        session_rows = db.scalars(
-            select(AssessmentSessionModel).where(
-                AssessmentSessionModel.concept_slug.in_(slugs),
-                AssessmentSessionModel.status.in_(["ceiling_reached", "insufficient_evidence"]),
-            )
-        ).all()
-    except SQLAlchemyError:
-        db.rollback()
-        comp_rows = []
-        session_rows = []
+    comp_items: list[dict[str, Any]] = []
+    session_items: list[dict[str, Any]] = []
+
+    if assessment_service_url():
+        remote_data = fetch_cohort_analytics_data_internal(slugs)
+        if remote_data is not None:
+            comp_items = list(remote_data.get("competencies", []))
+            session_items = list(remote_data.get("sessions", []))
+    else:
+        try:
+            comp_rows = db.scalars(
+                select(UserNodeCompetencyModel).where(UserNodeCompetencyModel.concept_slug.in_(slugs))
+            ).all()
+            session_rows = db.scalars(
+                select(AssessmentSessionModel).where(
+                    AssessmentSessionModel.concept_slug.in_(slugs),
+                    AssessmentSessionModel.status.in_(["ceiling_reached", "insufficient_evidence"]),
+                )
+            ).all()
+            comp_items = [
+                {
+                    "user_id": str(c.user_id),
+                    "concept_slug": c.concept_slug,
+                    "depth_level_norm": float(c.depth_level_norm),
+                    "stability_s": float(c.stability_s),
+                    "last_practiced_at": c.last_practiced_at,
+                }
+                for c in comp_rows
+            ]
+            session_items = [
+                {
+                    "concept_slug": s.concept_slug,
+                    "current_depth_tier": int(s.current_depth_tier),
+                }
+                for s in session_rows
+            ]
+        except SQLAlchemyError:
+            db.rollback()
+            remote_data = fetch_cohort_analytics_data_internal(slugs)
+            if remote_data is not None:
+                comp_items = list(remote_data.get("competencies", []))
+                session_items = list(remote_data.get("sessions", []))
 
     heatmap: list[dict[str, Any]] = []
     total_needs_review = 0
-    active_learners: set[uuid.UUID] = set()
+    active_learners: set[str] = set()
 
     for n in nodes:
-        n_comps = [c for c in comp_rows if c.concept_slug == n.concept_slug]
+        n_comps = [c for c in comp_items if c.get("concept_slug") == n.concept_slug]
         surface = applied = deep = mastery = needs_rev = 0
         for c in n_comps:
-            active_learners.add(c.user_id)
-            if c.depth_level_norm >= 1.0:
+            active_learners.add(str(c["user_id"]))
+            depth_norm = float(c.get("depth_level_norm", 0.0))
+            stab_s = float(c.get("stability_s", 3.0))
+            lp_raw = c.get("last_practiced_at")
+            lp_dt = (
+                datetime.fromisoformat(lp_raw)
+                if isinstance(lp_raw, str)
+                else (lp_raw if isinstance(lp_raw, datetime) else None)
+            )
+
+            if depth_norm >= 1.0:
                 mastery += 1
-            elif c.depth_level_norm >= 0.75:
+            elif depth_norm >= 0.75:
                 deep += 1
-            elif c.depth_level_norm >= 0.50:
+            elif depth_norm >= 0.50:
                 applied += 1
-            elif c.depth_level_norm >= 0.25:
+            elif depth_norm >= 0.25:
                 surface += 1
 
-            if c.last_practiced_at is not None and c.depth_level_norm >= EbbinghausMemoryModel.MIN_DEPTH_FOR_RETENTION:
-                dt = EbbinghausMemoryModel.compute_elapsed_days(c.last_practiced_at, 0.0)
-                ret = EbbinghausMemoryModel.compute_retention(dt, c.stability_s)
-                if EbbinghausMemoryModel.is_review_needed(c.depth_level_norm, ret):
+            if lp_dt is not None and depth_norm >= EbbinghausMemoryModel.MIN_DEPTH_FOR_RETENTION:
+                dt = EbbinghausMemoryModel.compute_elapsed_days(lp_dt, 0.0)
+                ret = EbbinghausMemoryModel.compute_retention(dt, stab_s)
+                if EbbinghausMemoryModel.is_review_needed(depth_norm, ret):
                     needs_rev += 1
                     total_needs_review += 1
 
-        n_bottlenecks = [s for s in session_rows if s.concept_slug == n.concept_slug]
+        n_bottlenecks = [s for s in session_items if s.get("concept_slug") == n.concept_slug]
         tier_hits: dict[int, int] = {}
         for s in n_bottlenecks:
-            tier_hits[s.current_depth_tier] = tier_hits.get(s.current_depth_tier, 0) + 1
+            tier_num = int(s.get("current_depth_tier", 1))
+            tier_hits[tier_num] = tier_hits.get(tier_num, 0) + 1
         bottleneck_tier = max(tier_hits, key=lambda t: tier_hits[t]) if tier_hits else None
 
         heatmap.append(

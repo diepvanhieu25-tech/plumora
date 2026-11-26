@@ -281,16 +281,21 @@ class MultiDomainStudentSimulatorEnv(gym.Env[Any, Any]):
         ret_before_vec = self._compute_retention_vec()
         ret_before = float(ret_before_vec[v])
 
-        # Check redundant action
+        # Check redundant / out-of-sequence action (INV-SEQ-01, INV-SEQ-02)
         if (
             (m == LearningMode.LEARN_NEW and self._depth[v] >= 0.50)
-            or (m == LearningMode.DEEP_PROBE and self._depth[v] >= 1.0 and ret_before >= 0.85)
+            or (m == LearningMode.DEEP_PROBE and (self._depth[v] < 0.25 or self._depth[v] >= 1.0))
             or (
                 m == LearningMode.CODE_PRACTICE
-                and self._code_score[v] >= 1.0
-                and self._depth[v] >= 1.0
+                and (
+                    self._depth[v] < 0.25
+                    or (
+                        self._code_score[v] >= 1.0
+                        and (self._depth[v] < 0.75 or self._depth[v] >= 1.0)
+                    )
+                )
             )
-            or (m == LearningMode.SPACED_REVIEW and ret_before >= 0.85)
+            or (m == LearningMode.SPACED_REVIEW and (self._depth[v] < 0.50 or ret_before >= 0.85))
         ):
             truncated = self._step_count >= self.max_steps
             return (
@@ -366,7 +371,11 @@ class MultiDomainStudentSimulatorEnv(gym.Env[Any, Any]):
                 self._depth[v] = max(self._depth[v], target)
                 self._confidence[v] = max(self._confidence[v], 0.75 if target >= 0.50 else 0.65)
             elif m == LearningMode.DEEP_PROBE:
-                target = 1.00 if self._depth[v] >= 0.75 else 0.75
+                target = (
+                    1.00
+                    if (self._depth[v] >= 0.75 or self._code_score[v] >= 1.0)
+                    else 0.75
+                )
                 self._depth[v] = max(self._depth[v], target)
                 self._confidence[v] = max(self._confidence[v], 0.95 if target >= 1.0 else 0.85)
                 self._stability[v] = EbbinghausMemoryModel.update_stability(
@@ -374,9 +383,11 @@ class MultiDomainStudentSimulatorEnv(gym.Env[Any, Any]):
                 )
             elif m == LearningMode.CODE_PRACTICE:
                 self._code_score[v] = max(self._code_score[v], 1.0)
-                target = 1.00 if self._depth[v] >= 0.75 else 0.75
+                # INV-SEQ-02: Passing 100% code when depth < 0.75 caps at 0.50 (Applied);
+                # reaching 1.00 Mastery strictly requires BOTH depth >= 0.75 AND code_score >= 1.0.
+                target = 1.00 if self._depth[v] >= 0.75 else max(float(self._depth[v]), 0.50)
                 self._depth[v] = max(self._depth[v], target)
-                self._confidence[v] = max(self._confidence[v], 0.95 if target >= 1.0 else 0.85)
+                self._confidence[v] = max(self._confidence[v], 0.95 if target >= 1.0 else 0.75)
                 self._stability[v] = EbbinghausMemoryModel.update_stability(
                     float(self._stability[v]), score, passed=True
                 )

@@ -30,7 +30,15 @@ export interface BenchmarkPolicyMetrics {
   episodes: number
   mean_reward: number
   std_reward: number
+  median_reward?: number
+  iqr_reward?: number
+  steps_to_completion?: number
+  std_steps_to_completion?: number
+  median_steps_to_completion?: number
+  iqr_steps_to_completion?: number
   invalid_action_rate: number
+  prerequisite_violation_rate?: number
+  redundant_action_rate?: number
   masked_violation_rate: number
   completion_rate: number
 }

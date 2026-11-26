@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -12,6 +13,7 @@ import redis
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from fastapi import Request, Response
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -212,12 +214,39 @@ def require_internal_service(request: Request) -> str:
     return str(decoded["svc"])
 
 
-_USERS_TABLE_INACCESSIBLE = False
+_USERS_TABLE_LOCK = threading.Lock()
+_USERS_TABLE_ACCESSIBLE_CACHE: dict[str, bool] = {}
+
+
+def _can_query_users_table(db: Session) -> bool:
+    """Check once per DB bind whether the 'users' relation is accessible without triggering SQL errors."""
+    bind = db.get_bind()
+    cache_key = str(getattr(bind, "url", id(bind))) if bind is not None else "default"
+    cached = _USERS_TABLE_ACCESSIBLE_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
+    with _USERS_TABLE_LOCK:
+        cached = _USERS_TABLE_ACCESSIBLE_CACHE.get(cache_key)
+        if cached is not None:
+            return cached
+        is_pg = bind is not None and bind.dialect.name == "postgresql"
+        if is_pg:
+            try:
+                accessible = bool(
+                    db.execute(text("SELECT to_regclass('users') IS NOT NULL")).scalar()
+                )
+            except SQLAlchemyError:
+                db.rollback()
+                accessible = False
+        else:
+            accessible = True
+        _USERS_TABLE_ACCESSIBLE_CACHE[cache_key] = accessible
+        return accessible
 
 
 def extract_current_user(request: Request, db: Session) -> UserModel | None:
     """Extract and verify authenticated UserModel from Cookie or Authorization Bearer header."""
-    global _USERS_TABLE_INACCESSIBLE
     token = extract_raw_token(request)
     if not token:
         return None
@@ -229,12 +258,14 @@ def extract_current_user(request: Request, db: Session) -> UserModel | None:
         user_id = uuid.UUID(str(decoded["sub"]))
     except (jwt.PyJWTError, ValueError, KeyError):
         return None
-    if not _USERS_TABLE_INACCESSIBLE:
+    if _can_query_users_table(db):
         try:
             return db.get(UserModel, user_id)
         except SQLAlchemyError:
             db.rollback()
-            _USERS_TABLE_INACCESSIBLE = True
+            bind = db.get_bind()
+            cache_key = str(getattr(bind, "url", id(bind))) if bind is not None else "default"
+            _USERS_TABLE_ACCESSIBLE_CACHE[cache_key] = False
     return UserModel(
         id=user_id,
         username=str(decoded.get("username", "")),

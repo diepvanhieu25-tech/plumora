@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.db.models import (
     CodeChallengeModel,
@@ -14,6 +14,7 @@ from app.db.models import (
     DomainConceptMapModel,
     DomainModel,
     GradingRubricModel,
+    OutboxEventModel,
     UserModel,
 )
 from app.modules.auth import extract_current_user
@@ -28,6 +29,7 @@ from app.modules.content.schemas_v2 import (
     DomainRoadmapResponse,
     DomainsListResponse,
 )
+from app.modules.events.outbox import relay_pending_outbox_events
 
 router = APIRouter(prefix="/api/v2", tags=["content_kg"])
 
@@ -102,10 +104,7 @@ def get_domain_bundle_internal(slug: str, db: DbSession) -> dict[str, Any]:
     questions = (
         db.scalars(
             select(DepthQuestionModel)
-            .where(
-                DepthQuestionModel.concept_slug.in_(slugs),
-                DepthQuestionModel.is_active.is_(True),
-            )
+            .where(DepthQuestionModel.concept_slug.in_(slugs))
             .order_by(
                 DepthQuestionModel.depth_tier,
                 DepthQuestionModel.version.desc(),
@@ -202,10 +201,7 @@ def get_concept_bundle_internal(
         )
     questions = db.scalars(
         select(DepthQuestionModel)
-        .where(
-            DepthQuestionModel.concept_slug == concept_slug,
-            DepthQuestionModel.is_active.is_(True),
-        )
+        .where(DepthQuestionModel.concept_slug == concept_slug)
         .order_by(
             DepthQuestionModel.depth_tier,
             DepthQuestionModel.version.desc(),
@@ -283,3 +279,32 @@ def get_concept_bundle_internal(
             else None
         ),
     }
+
+
+@router.get("/internal/outbox/pending-count", dependencies=[Depends(require_internal_service)])
+def get_content_outbox_pending_count_internal(db: DbSession) -> dict[str, Any]:
+    """Internal endpoint returning pending outbox event count & breakdown on content_svc."""
+    cnt = int(
+        db.scalar(
+            select(func.count())
+            .select_from(OutboxEventModel)
+            .where(OutboxEventModel.published_at.is_(None))
+        )
+        or 0
+    )
+    ev_rows = db.execute(
+        select(OutboxEventModel.event_type, func.count())
+        .where(OutboxEventModel.published_at.is_(None))
+        .group_by(OutboxEventModel.event_type)
+    ).all()
+    return {
+        "pending_count": cnt,
+        "by_event_type": {str(ev_t): int(c) for ev_t, c in ev_rows},
+    }
+
+
+@router.post("/internal/outbox/relay", dependencies=[Depends(require_internal_service)])
+def post_content_outbox_relay_internal(db: DbSession) -> dict[str, int]:
+    """Internal endpoint triggering immediate outbox relay on content_svc."""
+    relayed = relay_pending_outbox_events(db)
+    return {"relayed": relayed}

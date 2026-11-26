@@ -162,36 +162,48 @@ def _read_through_raw_competencies(
     topology: DomainTopologyDTO,
     competency_port: CompetencyReaderPort,
 ) -> tuple[dict[str, UserNodeCompetencyDTO], str]:
-    """Time-Aware Read-Through Feature Store: cache raw competency + timestamps by state_version.
+    """Time-Aware Read-Through Feature Store: check Redis FIRST, call HTTP/DB port only on cache miss.
 
-    Real-time Ebbinghaus retention & needs_review are ALWAYS projected fresh at request time
-    using EbbinghausMemoryModel so cache hits never serve stale retention values.
+    Assessment mutations actively invalidate `plumora:raw_comp_state:{user_id}:*`, and domain mutations
+    increment `topology.graph_version`, guaranteeing zero stale competency cache without extra HTTP calls.
+    Real-time Ebbinghaus retention & needs_review are ALWAYS projected fresh at request time.
     """
-    snapshot: UserCompetencySnapshotDTO = competency_port.get_user_competency_snapshot(user_id)
-    state_version = snapshot.state_version
     node_slugs = [n.concept_slug for n in topology.nodes]
     key = _raw_comp_redis_key(user_id, domain_slug)
+    redis_client: redis.Redis | None = None
 
     try:
-        client = get_redis_client(decode_responses=True, socket_timeout=0.25)
-        raw = client.get(key)
+        redis_client = get_redis_client(decode_responses=True, socket_timeout=0.25)
+        raw = redis_client.get(key)
         if isinstance(raw, str):
             data = json.loads(raw)
             if (
-                int(data.get("state_version", -1)) == state_version
-                and int(data.get("graph_version", -1)) == topology.graph_version
+                int(data.get("graph_version", -1)) == topology.graph_version
                 and isinstance(data.get("competencies"), dict)
             ):
-                client.incr("plumora:metrics:kg_cache_hits")
+                redis_client.incr("plumora:metrics:kg_cache_hits")
                 return _deserialize_comp_map_from_cache(data["competencies"]), "redis_cache"
+    except (redis.RedisError, OSError, ValueError, KeyError) as exc:
+        redis_client = None
+        logger.warning(
+            "Redis raw competency cache read unavailable for user %s/%s: %s",
+            user_id,
+            domain_slug,
+            exc,
+        )
 
-        comp_map = snapshot.by_slug()
-        client.incr("plumora:metrics:kg_cache_misses")
-        client.set(
+    snapshot: UserCompetencySnapshotDTO = competency_port.get_user_competency_snapshot(user_id)
+    comp_map = snapshot.by_slug()
+    if redis_client is None:
+        return comp_map, "postgres_fallback"
+
+    try:
+        redis_client.incr("plumora:metrics:kg_cache_misses")
+        redis_client.set(
             key,
             json.dumps(
                 {
-                    "state_version": state_version,
+                    "state_version": snapshot.state_version,
                     "graph_version": topology.graph_version,
                     "competencies": _serialize_comp_map_for_cache(comp_map, node_slugs),
                 }
@@ -199,14 +211,14 @@ def _read_through_raw_competencies(
             ex=settings.redis_state_ttl_seconds,
         )
         return comp_map, "postgres_cache_warm"
-    except (redis.RedisError, OSError, ValueError, KeyError) as exc:
+    except (redis.RedisError, OSError) as exc:
         logger.warning(
-            "Redis raw competency cache unavailable for user %s/%s: %s",
+            "Redis raw competency cache warm failed for user %s/%s: %s",
             user_id,
             domain_slug,
             exc,
         )
-        return snapshot.by_slug(), "postgres_fallback"
+        return comp_map, "postgres_fallback"
 
 
 def build_domain_graph_observation(

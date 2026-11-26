@@ -1,39 +1,45 @@
-# Kịch Bản Kiểm Thử Hệ Thống Thực (Manual System Testing Script — Plumora `v2.0.0`)
+# Kịch Bản Kiểm Thử Hệ Thống Thực (Manual System Testing Script — Plumora `v3.1`)
 
-> **Mục đích:** Hướng dẫn chủ dự án tự mở trình duyệt kiểm thử trực tiếp toàn bộ hệ thống Plumora Phase 3 (`v2.0.0`) đang chạy trên cụm Docker thật (`plumora-frontend`, `plumora-backend`, `plumora-postgres`, `plumora-redis`).
+> **Mục đích:** Hướng dẫn chủ dự án tự mở trình duyệt kiểm thử trực tiếp toàn bộ hệ thống Plumora (`v3.1`) đang chạy trên **cụm Docker 4 Microservices + API Gateway thống nhất** (`plumora-frontend`, `plumora-api-gateway`, `plumora-user-auth-service`, `plumora-content-kg-service`, `plumora-assessment-grader-service`, `plumora-recommendation-ai-service`, `plumora-postgres`, `plumora-redis`).
 
 ---
 
 ## 1. Thông Tin Truy Cập & Tài Khoản Kiểm Thử Thật
 
-- **Giao diện Web (Frontend):** `http://localhost:3000`
-- **API Swagger Docs (Backend):** `http://localhost:8000/docs`
-- **Health Check Endpoint:** `http://localhost:8000/api/v1/health`
+- **Web Client (Học viên):** `http://localhost:3000/login` (hoặc đăng ký mới tại `/register`)
+- **Back-Office Console (Chuyên gia & Quản trị):** `http://localhost:3000/backoffice/login`
+- **API Swagger Docs (API Gateway):** `http://localhost:8000/docs`
+- **Aggregated Microservices Health Endpoint:** `http://localhost:8000/api/v1/health`
 
 | Vai trò | Đường dẫn Cổng Đăng nhập | Tên đăng nhập (`username`) | Mật khẩu (`password`) | Ghi chú |
 | --- | --- | --- | --- | --- |
-| **Learner (Mới)** | `http://localhost:3000/login` | `learner_new` | `PlumoraDemo#2026` | 0/12 node — phù hợp test *Adaptive Placement* |
-| **Learner (Nền tảng)** | `http://localhost:3000/login` | `learner_foundation` | `PlumoraDemo#2026` | 4/12 node — phù hợp test lộ trình `GNN-PPO`, Quiz & Sandbox |
+| **Learner (Mới)** | `http://localhost:3000/login` | `learner_new` | `PlumoraDemo#2026` | 0/12 node — phù hợp test *Adaptive Placement* & chuỗi tuần tự `Playbook -> Probe -> Sandbox` |
+| **Learner (Nền tảng)** | `http://localhost:3000/login` | `learner_foundation` | `PlumoraDemo#2026` | 4/12 node — mở sẵn Tầng 2 và node giao thoa liên ngành |
 | **Learner (Tầng API)** | `http://localhost:3000/login` | `learner_api_stage` | `PlumoraDemo#2026` | 7/12 node — mở nhiều node nâng cao |
-| **Expert (Chuyên gia)** | `http://localhost:3000/expert/login` | `expert_demo` | `PlumoraDemo#2026` | Quản trị Knowledge Graph, câu hỏi 5 tầng & Code Challenge |
-| **Admin (Quản trị)** | `http://localhost:3000/admin/login` | `admin_demo` | `PlumoraDemo#2026` | Giám sát Safe Online RL, Safety Gate, Rollback & Health |
+| **Expert (Chuyên gia)** | `http://localhost:3000/backoffice/login` | `expert_demo` | `PlumoraDemo#2026` | Content Studio (DAG, Playbook, 5-Depth CRUD, Code Sandbox) & Cohort Analytics |
+| **Admin (Quản trị)** | `http://localhost:3000/backoffice/login` | `admin_demo` | `PlumoraDemo#2026` | Toàn quyền Studio, Cohort, Safe Online RL, Policy Inspector, Rollback & System Health |
 
 > **Lưu ý kiểm tra trạng thái Docker trước khi test:**
 > ```bash
+> docker compose up -d --build
 > docker compose ps
 > ```
-> Cả 4 container (`plumora-frontend`, `plumora-backend`, `plumora-postgres`, `plumora-redis`) phải ở trạng thái `Up` / `healthy`.
+> Toàn bộ 8 container dịch vụ chạy nền (`postgres`, `redis`, `user-auth-service`, `content-kg-service`, `assessment-grader-service`, `recommendation-ai-service`, `api-gateway`, `frontend`) phải ở trạng thái `Up (healthy)` (và `db-migrate-seed` hoàn tất với `Exited (0)`).
 
 ---
 
 ## 2. Kịch Bản Kiểm Thử Chi Tiết Theo Vai Trò
 
-### Phần A — Kiểm thử Phân quyền Tách Cổng & Bảo mật (`RBAC 403`)
-1. Mở `http://localhost:3000/admin/login`.
+### Phần A — Kiểm thử Phân quyền Tách 2 Cổng, Khôi phục Phiên `F5` & Bảo mật Biên (`RBAC 403`)
+1. Mở `http://localhost:3000/backoffice/login`.
 2. Thử đăng nhập bằng tài khoản `learner_foundation` / `PlumoraDemo#2026`.
-   - **Kỳ vọng:** Hệ thống từ chối với lỗi `403 FORBIDDEN_ROLE` (không cho phép Learner vào cổng Admin).
-3. Mở trực tiếp URL `http://localhost:3000/expert/domains` khi đang chưa đăng nhập (hoặc đang đăng nhập Learner).
-   - **Kỳ vọng:** Bị chặn điều hướng / hiển thị trang `403 Forbidden` hoặc yêu cầu đăng nhập đúng cổng.
+   - **Kỳ vọng:** Hệ thống từ chối với lỗi `403 FORBIDDEN_ROLE` (không cho phép Learner vào cổng Back-Office).
+3. Ngược lại, mở `http://localhost:3000/login` và thử đăng nhập `admin_demo` / `PlumoraDemo#2026`.
+   - **Kỳ vọng:** Bị chặn `403` và hướng dẫn chuyển sang `/backoffice/login`.
+4. Sau khi đăng nhập hợp lệ vào `/domains` (hoặc `/backoffice/mlops/online-rl`), nhấn phím **`F5` (Reload)**.
+   - **Kỳ vọng:** Hiển thị khung chờ khôi phục phiên ngắn gọn rồi vào thẳng trang đang đứng, **không bị nháy màn hình Login**.
+5. Mở `http://localhost:8000/api/v2/internal/domains/frontend/bundle` hoặc `http://localhost:3000/api/v2/internal/domains/frontend/bundle`.
+   - **Kỳ vọng:** Bị chặn cứng `403 Forbidden` ngay tại API Gateway và Nginx Edge.
 
 ---
 
@@ -50,8 +56,8 @@
    - Mở lộ trình của lĩnh vực `backend` (hoặc `frontend` / `devops`).
    - Quan sát Banner khuyến nghị AI (`GNN-PPO` + `Policy Guardrail`) ở đầu trang và trạng thái các node trên đồ thị DAG (node đã học, node mở khóa, node khóa, node giao thoa đa ngành, và chỉ số suy giảm trí nhớ Ebbinghaus $R(t)$).
    - Bấm vào một node **đang khóa** $\rightarrow$ **Kỳ vọng:** Hệ thống hiển thị cảnh báo điều kiện tiên quyết, không cho học nhảy cóc.
-4. **Học & Thăm dò Chiều sâu 5 Tầng (`SCR-12` — Depth Probe):**
-   - Bấm vào node được AI khuyến nghị (hoặc một node đang mở khóa).
+4. **Học Playbook & Thăm dò Chiều sâu 5 Tầng (`INV-SEQ-01`, `SCR-12` — Depth Probe):**
+   - Bấm vào node được AI khuyến nghị (hoặc một node đang mở khóa), đọc bài giảng **Playbook 5 phần**, tích xác nhận nắm vững lý thuyết và bấm **Hoàn thành Bài học Lý thuyết** (mở khóa `INV-SEQ-01`).
    - Chọn chế độ **Thăm dò Chiều sâu 5 Tầng** (`SCR-12`), trả lời câu hỏi trắc nghiệm / tự luận ngắn qua các tầng (Tầng 1 $\rightarrow$ Tầng 5).
    - **Kỳ vọng:** Phản hồi chấm điểm tức thì; mở ngăn kéo **AI Tutor & Rubric (`SCR-14`)** để xem phân tích tiêu chí chấm điểm (hoạt động ổn định ngay cả khi không có LLM API key nhờ `Deterministic Fallback`).
 5. **Thực hành Code Sandbox Cô lập (`SCR-13`):**
@@ -64,7 +70,7 @@
 
 ### Phần C — Luồng Chuyên gia (`SCR-15`..`SCR-17`)
 
-1. Mở `http://localhost:3000/expert/login`, đăng nhập `expert_demo` / `PlumoraDemo#2026`.
+1. Mở `http://localhost:3000/backoffice/login`, đăng nhập `expert_demo` / `PlumoraDemo#2026`.
 2. **Quản lý Lĩnh vực & Kiểm tra Chu trình DAG (`SCR-15`):**
    - Xem danh sách các lĩnh vực (`backend`, `frontend`, `devops`) và sơ đồ phụ thuộc.
    - Thử tạo một cạnh phụ thuộc tạo chu trình (A $\rightarrow$ B $\rightarrow$ A) $\rightarrow$ **Kỳ vọng:** Hệ thống chặn với lỗi `422` (thuật toán Kahn phát hiện chu trình DAG).
@@ -77,7 +83,7 @@
 
 ### Phần D — Luồng Quản trị Hệ thống & Online RL (`SCR-18`..`SCR-20`)
 
-1. Mở `http://localhost:3000/admin/login`, đăng nhập `admin_demo` / `PlumoraDemo#2026`.
+1. Mở `http://localhost:3000/backoffice/login`, đăng nhập `admin_demo` / `PlumoraDemo#2026`.
 2. **Giám sát Safe Online RL & Buffer (`SCR-18`):**
    - Quan sát 4 thẻ KPI: `Verified Experience Buffer`, `Guardrail & Safety Gate`, `Ràng buộc Chống Quên (KL)`, và `Prod Checkpoint Đang Phục vụ`.
    - Thử chỉnh `Kích thước Lô (batch_size)` lớn hơn `buffer_count` hiện có $\rightarrow$ **Kỳ vọng:** Nút **"Chạy Lô Tinh chỉnh Safe Micro-batch Online RL"** tự động khóa (`disabled`) kèm nhãn `Thiếu mẫu (...)`.

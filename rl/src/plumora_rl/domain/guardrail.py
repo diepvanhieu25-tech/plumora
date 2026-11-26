@@ -39,8 +39,8 @@ class PolicyGuardrailStrategy:
         - `is_eligible == False` -> all modes blocked.
         - `depth < 0.25` -> `DEEP_PROBE` and `CODE_PRACTICE` blocked (`INV-SEQ-01`).
         - `depth >= 0.50` -> `LEARN_NEW` blocked.
-        - `has_code_challenge == False` or (`code_score >= 1.0` and `depth >= 1.0`) -> `CODE_PRACTICE` blocked (`INV-SEQ-03`).
-        - `depth >= 1.0` and `retention >= 0.85` -> `DEEP_PROBE` blocked.
+        - `has_code_challenge == False` or (`code_score >= 1.0` and (`depth < 0.75` or `depth >= 1.0`)) -> `CODE_PRACTICE` blocked (`INV-SEQ-02`, `INV-SEQ-03`).
+        - `depth >= 1.0` -> `DEEP_PROBE` blocked (`1.00 Mastery` already reached).
         - `SPACED_REVIEW` only allowed when `needs_review == True` (or `depth >= 0.50` and `retention < 0.85`).
         """
         if isinstance(obs, GraphObservation):
@@ -72,13 +72,17 @@ class PolicyGuardrailStrategy:
             if depth < 0.50:
                 mask[i, LearningMode.LEARN_NEW] = True
 
-            # Mode 1: DEEP_PROBE — requires depth >= 0.25 (INV-SEQ-01) and not already mastered+fresh
-            if depth >= 0.25 and (depth < 1.0 or retention < 0.85):
+            # Mode 1: DEEP_PROBE — requires 0.25 <= depth < 1.0 (INV-SEQ-01; locked once 1.00 Mastery reached)
+            if 0.25 <= depth < 1.0:
                 mask[i, LearningMode.DEEP_PROBE] = True
 
             # Mode 2: CODE_PRACTICE — requires depth >= 0.25 (INV-SEQ-01), challenge exists (INV-SEQ-03),
-            # and not already both code_score >= 1.0 and depth >= 1.0
-            if depth >= 0.25 and node_has_code and not (code_score >= 1.0 and depth >= 1.0):
+            # and blocked if code_score >= 1.0 while depth < 0.75 (INV-SEQ-02) or depth >= 1.0
+            if (
+                depth >= 0.25
+                and node_has_code
+                and not (code_score >= 1.0 and (depth < 0.75 or depth >= 1.0))
+            ):
                 mask[i, LearningMode.CODE_PRACTICE] = True
 
             # Mode 3: SPACED_REVIEW — allowed when needs_review or (depth >= 0.50 and retention < 0.85)

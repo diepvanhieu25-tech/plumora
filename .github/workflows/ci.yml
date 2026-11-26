@@ -147,4 +147,3 @@ jobs:
       - name: 8. Validate Docker Compose Configuration
         run: |
           docker compose config --quiet
-          docker compose --profile microservices config --quiet

@@ -83,7 +83,10 @@ export function LessonPlaybookPage({
       : (node?.prerequisites ?? []).map((slug) => ({ slug, title: slug }))
 
   return (
-    <section className="w-full pb-10 space-y-6" data-testid="lesson-playbook-page">
+    <section
+      className="w-full pb-10 space-y-6"
+      data-testid={loading ? 'lesson-playbook-loading' : 'lesson-playbook-page'}
+    >
       <PageContextBar
         backLabel={`Quay về Lộ trình (${domainTitle})`}
         onBack={onBackToRoadmap}

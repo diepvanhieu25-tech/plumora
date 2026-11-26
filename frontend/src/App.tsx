@@ -1,3 +1,4 @@
+import { Loader2, Sprout } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { apiGetMe, apiLogin, apiLogout, apiRegister } from './api'
 import { Toast } from './components/common/Toast'
@@ -25,6 +26,9 @@ function mapBackOfficeViewToActiveView(view: BackOfficeView): ActiveView {
 export function App({ initialUser = null, initialView }: AppProps = {}) {
   const { route, navigate, pushPath } = useRouter()
   const [user, setUser] = useState<LearnerUser | null>(initialUser)
+  const [isBootstrappingAuth, setIsBootstrappingAuth] = useState<boolean>(
+    () => !initialUser && !route.isLoginPath && !route.isRegisterPath,
+  )
   const [authMode, setAuthMode] = useState<'login' | 'register'>(
     route.isRegisterPath ? 'register' : 'login',
   )
@@ -40,15 +44,24 @@ export function App({ initialUser = null, initialView }: AppProps = {}) {
   }
 
   useEffect(() => {
-    if (initialUser) return
+    if (initialUser) {
+      setIsBootstrappingAuth(false)
+      return
+    }
     let mounted = true
     ;(async () => {
-      const me = await apiGetMe()
-      if (!mounted || !me) return
-      setUser(me)
-      const role = me.role ?? 'learner'
-      if (route.isLoginPath || route.isRegisterPath || window.location.pathname === '/') {
-        pushPath(defaultPathForRole(role))
+      try {
+        const me = await apiGetMe()
+        if (!mounted || !me) return
+        setUser(me)
+        const role = me.role ?? 'learner'
+        if (route.isLoginPath || route.isRegisterPath || window.location.pathname === '/') {
+          pushPath(defaultPathForRole(role))
+        }
+      } finally {
+        if (mounted) {
+          setIsBootstrappingAuth(false)
+        }
       }
     })()
     return () => {
@@ -98,6 +111,28 @@ export function App({ initialUser = null, initialView }: AppProps = {}) {
     setAuthMode('login')
     pushPath(wasBackOffice ? loginPathForPortal('admin') : loginPathForPortal('learner'))
     showToast('Đã đăng xuất an toàn.', 'info')
+  }
+
+  // 0. SESSION BOOTSTRAP (Anti-FOUC on F5 reload for protected routes)
+  if (isBootstrappingAuth && !user) {
+    return (
+      <div
+        data-testid="auth-bootstrap-loader"
+        role="status"
+        aria-live="polite"
+        className="min-h-screen bg-background text-on-surface font-sans antialiased flex items-center justify-center px-4"
+      >
+        <div className="flex flex-col items-center gap-3 p-6 rounded-2xl bg-white border border-outline-variant/60 shadow-xs">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+            <Sprout className="w-5 h-5" aria-hidden="true" />
+          </div>
+          <div className="flex items-center gap-2 text-sm font-semibold text-on-surface">
+            <Loader2 className="w-4 h-4 text-primary animate-spin" aria-hidden="true" />
+            <span>Đang khôi phục phiên học tập...</span>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   // 1. UNAUTHENTICATED: Strict Dual-Portal Login Separation

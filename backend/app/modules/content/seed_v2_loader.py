@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import json
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.models import (
@@ -16,7 +17,11 @@ from app.db.models import (
     DomainConceptMapModel,
     DomainModel,
     GradingRubricModel,
+    UserModel,
+    UserNodeCompetencyModel,
 )
+from app.modules.assessment.depth_state_machine import depth_label_for_norm
+from app.modules.auth import PRESET_COMPETENCY_MAPS
 from app.modules.content.dag_validator import validate_dag_acyclic
 
 SEED_DIR = Path(__file__).resolve().parents[2] / "seed"
@@ -29,6 +34,7 @@ def _upsert_domain_and_nodes(
     description: str,
     nodes_data: list[dict[str, Any]],
 ) -> None:
+    """Seed domain and concept nodes once without overwriting Expert Studio edits on restart."""
     node_slugs = [str(n["slug"]) for n in nodes_data]
     edges = [
         (str(n["slug"]), str(p))
@@ -47,10 +53,10 @@ def _upsert_domain_and_nodes(
             graph_version=1,
         )
         db.add(domain)
-    else:
-        domain.title = title
-        domain.description = description
-    db.flush()
+        db.flush()
+    elif domain.graph_version > 1:
+        # Expert has published graph updates in Studio -> never overwrite domain or nodes on restart
+        return
 
     for n in nodes_data:
         c_slug = str(n["slug"])
@@ -67,17 +73,51 @@ def _upsert_domain_and_nodes(
                 lesson_markdown=str(n.get("lesson_markdown", "")),
             )
             db.add(row)
-        else:
-            row.node_idx = int(n["node_idx"])
-            row.title = str(n["title"])
-            row.tier = int(n["tier"])
-            row.is_shared = bool(n["is_shared"])
-            row.prerequisites_json = [str(p) for p in n.get("prerequisites", [])]
-            row.lesson_markdown = str(n.get("lesson_markdown", ""))
+
+
+def _seed_demo_learner_competencies_once(db: Session) -> None:
+    """Seed initial v2 UserNodeCompetencyModel rows for demo learners if they have zero rows yet."""
+    now = datetime.now(UTC)
+    for username, preset_key in (
+        ("learner_foundation", "foundation_ready"),
+        ("learner_api_stage", "api_stage_ready"),
+    ):
+        user = db.scalar(select(UserModel).where(UserModel.username == username))
+        if user is None:
+            continue
+        existing_cnt = int(
+            db.scalar(
+                select(func.count())
+                .select_from(UserNodeCompetencyModel)
+                .where(UserNodeCompetencyModel.user_id == user.id)
+            )
+            or 0
+        )
+        if existing_cnt > 0:
+            continue
+        comp_map = PRESET_COMPETENCY_MAPS.get(preset_key, {})
+        for c_slug, depth in comp_map.items():
+            if depth <= 0.0:
+                continue
+            db.add(
+                UserNodeCompetencyModel(
+                    user_id=user.id,
+                    concept_slug=c_slug,
+                    depth_level_norm=depth,
+                    peak_depth_level_norm=depth,
+                    depth_label=depth_label_for_norm(depth),
+                    confidence=0.95 if depth >= 1.0 else (0.85 if depth >= 0.75 else 0.65),
+                    stability_s=5.4 if depth >= 0.75 else 3.0,
+                    last_practiced_at=now,
+                    playbook_completed_at=now,
+                    code_practice_score=1.0 if depth >= 1.0 else 0.0,
+                    updated_at=now,
+                )
+            )
 
 
 def seed_phase3_v2_data(db: Session) -> None:
-    """Idempotently seed Backend/Frontend/DevOps domains, 5-depth questions, rubrics, and code challenges."""
+    """Idempotently seed Backend/Frontend/DevOps domains, 5-depth questions, rubrics & code challenges."""
     be_raw = json.loads((SEED_DIR / "backend_12_concepts.json").read_text(encoding="utf-8"))
     fe_raw = json.loads((SEED_DIR / "frontend_10_concepts.json").read_text(encoding="utf-8"))
     do_raw = json.loads((SEED_DIR / "devops_9_concepts.json").read_text(encoding="utf-8"))
@@ -131,7 +171,7 @@ def seed_phase3_v2_data(db: Session) -> None:
     )
     db.flush()
 
-    # Seed depth questions and rubrics
+    # Seed depth questions and rubrics strictly once per ID (preserve Expert edits & soft-deletes)
     dq_raw = json.loads(
         (SEED_DIR / "depth_questions_and_rubrics.json").read_text(encoding="utf-8")
     )
@@ -153,35 +193,23 @@ def seed_phase3_v2_data(db: Session) -> None:
                 display_order=int(q.get("display_order", idx)),
             )
             db.add(existing_q)
-        else:
-            existing_q.task_type = str(q["task_type"])
-            existing_q.prompt = str(q["prompt"])
-            existing_q.options_json = q.get("options")
-            existing_q.correct_option_key = q.get("correct_option_key")
-            existing_q.is_placement_eligible = bool(q.get("is_placement_eligible", False))
-            existing_q.is_active = bool(q.get("is_active", True))
-            existing_q.version = int(q.get("version", existing_q.version))
-            existing_q.display_order = int(q.get("display_order", idx))
-        db.flush()
+            db.flush()
 
-        rubric_data = q.get("rubric")
-        if rubric_data is not None:
-            existing_r = db.scalars(
-                select(GradingRubricModel).where(GradingRubricModel.question_id == q_id)
-            ).first()
-            if existing_r is None:
-                db.add(
-                    GradingRubricModel(
-                        question_id=q_id,
-                        criteria_json=list(rubric_data["criteria"]),
-                        reference_explanation=str(rubric_data["reference_explanation"]),
+            rubric_data = q.get("rubric")
+            if rubric_data is not None:
+                existing_r = db.scalars(
+                    select(GradingRubricModel).where(GradingRubricModel.question_id == q_id)
+                ).first()
+                if existing_r is None:
+                    db.add(
+                        GradingRubricModel(
+                            question_id=q_id,
+                            criteria_json=list(rubric_data["criteria"]),
+                            reference_explanation=str(rubric_data["reference_explanation"]),
+                        )
                     )
-                )
-            else:
-                existing_r.criteria_json = list(rubric_data["criteria"])
-                existing_r.reference_explanation = str(rubric_data["reference_explanation"])
 
-    # Seed code challenges
+    # Seed code challenges strictly once per ID (preserve Expert Studio updates & active version flags)
     cc_raw = json.loads((SEED_DIR / "code_challenges.json").read_text(encoding="utf-8"))
     for idx, ch in enumerate(cc_raw["challenges"]):
         ch_id = uuid.UUID(str(ch["id"]))
@@ -205,16 +233,6 @@ def seed_phase3_v2_data(db: Session) -> None:
                     display_order=int(ch.get("display_order", idx)),
                 )
             )
-        else:
-            existing_ch.title = str(ch["title"])
-            existing_ch.language = str(ch["language"])
-            existing_ch.prompt = str(ch["prompt"])
-            existing_ch.buggy_starter_code = str(ch["buggy_starter_code"])
-            existing_ch.solution_code = str(ch["solution_code"])
-            existing_ch.test_cases_json = list(ch["test_cases"])
-            existing_ch.setup_sql = ch.get("setup_sql")
-            existing_ch.is_active = bool(ch.get("is_active", True))
-            existing_ch.version = int(ch.get("version", existing_ch.version))
-            existing_ch.display_order = int(ch.get("display_order", idx))
 
+    _seed_demo_learner_competencies_once(db)
     db.commit()
