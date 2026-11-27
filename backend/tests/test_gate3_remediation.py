@@ -20,7 +20,6 @@ from app.db.models import (
     OutboxEventModel,
     RlExperienceBufferModel,
     SessionLocal,
-    UserConceptMasteryModel,
     UserModel,
     UserNodeCompetencyModel,
 )
@@ -40,7 +39,6 @@ def _cleanup_user(username: str) -> None:
         db.execute(delete(AttemptRecordModel).where(AttemptRecordModel.user_id == uid))
         db.execute(delete(AssessmentSessionModel).where(AssessmentSessionModel.user_id == uid))
         db.execute(delete(UserNodeCompetencyModel).where(UserNodeCompetencyModel.user_id == uid))
-        db.execute(delete(UserConceptMasteryModel).where(UserConceptMasteryModel.user_id == uid))
         db.execute(delete(RlExperienceBufferModel).where(RlExperienceBufferModel.user_id == uid))
         db.execute(delete(UserModel).where(UserModel.id == uid))
         db.commit()

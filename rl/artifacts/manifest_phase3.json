@@ -1,17 +1,17 @@
 {
   "checkpoint_file": "gnn_ppo_v2_base.zip",
-  "checkpoint_sha256": "bf55d8098b717c6814ace00633796bf99306c9ad45631f281eb0102213e9ad6f",
-  "simulator_version": "3.1.0",
-  "selected_seed": 303,
+  "checkpoint_sha256": "824bebf1c988b914e31b293787403de8b65f7f9d3d72c3e6caf68a1f3998d2f6",
+  "simulator_version": "4.0.0",
+  "selected_seed": 101,
   "train_seeds": [
     101,
     202,
     303
   ],
-  "timesteps_per_seed": 15000,
+  "timesteps_per_seed": 60000,
   "val_seed": 999,
   "val_episodes": 200,
   "eval_seed": 2026,
   "eval_episodes": 500,
-  "created_at": "2026-11-25T16:37:54.112291+00:00"
+  "created_at": "2026-11-27T02:45:24.052316+00:00"
 }

@@ -84,27 +84,26 @@ jobs:
         run: |
           cd frontend && npm run build
 
-      - name: 5. Start Backend Server & Verify Health Probe
-        env:
-          DATABASE_URL: postgresql+psycopg://plumora_app:plumora_dev_pass_local_only@127.0.0.1:5432/plumora_dev
-          REDIS_URL: redis://127.0.0.1:6379/0
-          APP_ENV: development
-          PYTHONPATH: ../rl/src
+      - name: 5. Start Unified Docker 4-Microservices + API Gateway + Frontend Stack
         run: |
-          cd backend
-          uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 &
-          echo "Waiting up to 30s for backend readiness at http://127.0.0.1:8000/api/v1/health..."
-          HEALTHY=0
-          for i in $(seq 1 30); do
-            if curl -sf http://127.0.0.1:8000/api/v1/health > /dev/null 2>&1; then
-              echo "Backend is healthy after ${i}s."
-              HEALTHY=1
+          docker compose config --quiet
+          docker compose up -d --build --remove-orphans
+          echo "Waiting up to 90s for API Gateway (:8000) & Frontend (:3000) readiness..."
+          STACK_READY=0
+          for i in $(seq 1 90); do
+            GW_HEALTH=$(curl -sf http://127.0.0.1:8000/api/v1/health 2>/dev/null || true)
+            FE_READY=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:3000 2>/dev/null || true)
+            if echo "$GW_HEALTH" | grep -q '"mode":"microservices"' && echo "$GW_HEALTH" | grep -q '"status":"ok"' && [ "$FE_READY" = "200" ]; then
+              echo "Live Docker Microservices stack is healthy after ${i}s."
+              STACK_READY=1
               break
             fi
             sleep 1
           done
-          if [ "$HEALTHY" -ne 1 ]; then
-            echo "FATAL: Backend failed to become healthy within 30s"
+          if [ "$STACK_READY" -ne 1 ]; then
+            echo "FATAL: Docker Microservices stack failed to become healthy within 90s."
+            docker compose ps
+            docker compose logs --tail=50
             exit 1
           fi
 
@@ -112,28 +111,13 @@ jobs:
         run: |
           cd frontend && npm run test:integration
 
-      - name: 7. Start Frontend & Run Real Browser E2E Audit
+      - name: 7. Real Browser E2E Audit & Negative Control
         env:
-          FRONTEND_BASE_URL: http://127.0.0.1:3000
+          FRONTEND_BASE_URL: http://localhost:3000
           BACKEND_BASE_URL: http://127.0.0.1:8000
         run: |
           cd frontend
           npx playwright install --with-deps chromium
-          npx vite preview --host 127.0.0.1 --port 3000 &
-          echo "Waiting up to 20s for frontend readiness at http://127.0.0.1:3000..."
-          FE_HEALTHY=0
-          for i in $(seq 1 20); do
-            if curl -sf http://127.0.0.1:3000 > /dev/null 2>&1; then
-              echo "Frontend preview is healthy after ${i}s."
-              FE_HEALTHY=1
-              break
-            fi
-            sleep 1
-          done
-          if [ "$FE_HEALTHY" -ne 1 ]; then
-            echo "FATAL: Frontend preview failed to become healthy within 20s"
-            exit 1
-          fi
           cd ..
           node scripts/audit_p3_slice1.cjs
           echo "Running negative-control audit verification in CI..."
@@ -144,6 +128,12 @@ jobs:
             echo "Negative-control probe correctly failed with non-zero exit code as expected."
           fi
 
-      - name: 8. Validate Docker Compose Configuration
+      - name: 8. Edge Security Probes & Kubernetes v4.0 Manifest Validation
         run: |
-          docker compose config --quiet
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/v2/internal/domains/frontend/bundle)" = "403"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/v2/internal/domains/frontend/bundle)" = "403"
+          test "$(curl -s --path-as-is -o /dev/null -w '%{http_code}' 'http://127.0.0.1:8000/api/v2/domains/%25252e%25252e/%25252e%25252e/health')" = "400"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/v1/roadmap)" = "404"
+          GW_RID=$(curl -sI -H "X-Request-ID: ci-trace-001" http://127.0.0.1:8000/api/v1/health | tr -d '\r' | grep -i "^x-request-id:" | awk '{print $2}')
+          test "$GW_RID" = "ci-trace-001"
+          cd backend && uv run python -c "import glob, yaml; [list(yaml.safe_load_all(open(f))) for f in glob.glob('../k8s/*.yaml')]; print('k8s YAML valid')"

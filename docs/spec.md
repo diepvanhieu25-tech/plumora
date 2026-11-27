@@ -1,6 +1,6 @@
 # Đặc tả hành vi Plumora
 
-Phiên bản: `2.0.0` — **APPROVED (Gate 1 Baseline Giai đoạn 3 — Chủ dự án duyệt tại `D-16`..`D-26` ngày 2026-11-18; bảo lưu trọn vẹn lịch sử Gate 1 Baseline MVP `v1.0.0` duyệt tại `D-14` / `O-10` ngày 2026-11-16)**. Căn cứ: [intent](intent.md) (`v2.0.0`), [brief](brief/project-direction.md), [báo cáo phân tích Giai đoạn 3](proposals/PHASE3_ANALYSIS.md), [quyết định](decisions.md) (`v2.0.0`, `D-01`–`D-26`), [System Design](design.md) (`v2.0.0`) và [UI Design System](ui-design-system.md) (`v2.0.0`).
+Phiên bản: `4.0.0` — **APPROVED (Final Clean Baseline `v4.0.0` — Chủ dự án duyệt tại `D-31`..`D-36` ngày 2026-11-26)**. Căn cứ: [intent](intent.md), [brief](brief/project-direction.md), [quyết định](decisions.md) (`D-01`–`D-36`), [System Design](design.md) và [UI Design System](ui-design-system.md).
 
 Toàn bộ các câu hỏi thiết kế và nghiệp vụ (`O-01`–`O-10`) đã được chủ dự án chốt và phê duyệt chính thức cho **Gate 1 (G1)** (`PL-AUTH-01`, `PL-CONTENT-01`, `PL-QUIZ-01`, `PL-PROGRESS-01`, `PL-REC-01`, `PL-REC-02`, `PL-RL-01`, `PL-E2E-01`). Nhiệm vụ `ENV-01` (Gate 2 Readiness) đã được mở khóa (`ready`).
 
@@ -136,7 +136,7 @@ Mỗi AC được duyệt phải truy về yêu cầu nguồn, thiết kế, nhi
 
 ## 10. Đặc tả Mở rộng Giai đoạn sau MVP — Đích Giai đoạn 3 (`v2.0.0` — APPROVED tại `D-16`..`D-26`)
 
-- **Nguồn căn cứ:** [intent.md](intent.md) (`v2.0.0`), [proposals/PHASE3_ANALYSIS.md](proposals/PHASE3_ANALYSIS.md) và các quyết định `D-16`–`D-26` trong [decisions.md](decisions.md) (Chủ dự án phê duyệt ngày `2026-11-18`).
+- **Nguồn căn cứ:** [intent.md](intent.md) và các quyết định `D-16`–`D-36` trong [decisions.md](decisions.md).
 - **Nguyên tắc tương thích ngược:** Giữ nguyên toàn bộ bất biến MVP (`INV-DAG-01`, `INV-MASTERY-01`, `INV-IDEMP-01`, `INV-RL-01`) và mở rộng cho đồ thị đa lĩnh vực, đánh giá chiều sâu 5 tầng, Code Sandbox, AI Tutor, Spaced Repetition (*Ebbinghaus*), `GNN-PPO` + `Safe Micro-batch Online RL` và kiến trúc 4 Microservices.
 
 ### 10.1. Vai trò & Phân quyền RBAC Mở rộng (`PL3-ROLE-01`, `D-17`)

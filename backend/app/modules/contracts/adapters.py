@@ -5,11 +5,10 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
 import redis
-from plumora_rl.domain import EbbinghausMemoryModel
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -19,13 +18,11 @@ from app.db.models import (
     AssessmentSessionModel,
     AttemptRecordModel,
     CodeChallengeModel,
-    ConceptModel,
     DbSession,
     DepthQuestionModel,
     DomainConceptMapModel,
     DomainModel,
     GradingRubricModel,
-    UserConceptMasteryModel,
     UserModel,
     UserNodeCompetencyModel,
 )
@@ -470,76 +467,6 @@ class SqlCompetencyReaderAdapter:
             )
             for r in rows
         }
-
-        has_legacy_join = True
-        if is_pg:
-            has_legacy_join = bool(
-                self._db.execute(
-                    text(
-                        "SELECT to_regclass('user_concept_mastery') IS NOT NULL "
-                        "AND to_regclass('concepts') IS NOT NULL"
-                    )
-                ).scalar()
-            )
-        if has_legacy_join:
-            try:
-                with self._db.begin_nested():
-                    mvp_rows = self._db.execute(
-                        select(UserConceptMasteryModel, ConceptModel.slug)
-                        .join(
-                            ConceptModel,
-                            ConceptModel.action_id == UserConceptMasteryModel.concept_action_id,
-                        )
-                        .where(UserConceptMasteryModel.user_id == user_id)
-                    ).all()
-                for mastery_row, c_slug in mvp_rows:
-                    score = float(mastery_row.mastery_score)
-                    if score <= 0.0:
-                        continue
-                    lbl = (
-                        "Mastery"
-                        if score >= 1.0
-                        else (
-                            "Deep Understanding"
-                            if score >= 0.75
-                            else ("Applied" if score >= 0.50 else "Surface")
-                        )
-                    )
-                    existing = merged.get(c_slug)
-                    if existing is None:
-                        merged[c_slug] = UserNodeCompetencyDTO(
-                            concept_slug=c_slug,
-                            depth_level_norm=score,
-                            peak_depth_level_norm=score,
-                            depth_label=lbl,
-                            confidence=0.85 if score >= 0.75 else 0.65,
-                            stability_s=EbbinghausMemoryModel.INITIAL_STABILITY_DAYS,
-                            last_practiced_at=mastery_row.updated_at or datetime.now(UTC),
-                            playbook_completed_at=mastery_row.updated_at or datetime.now(UTC),
-                            code_practice_score=0.0,
-                        )
-                    elif score > existing.depth_level_norm:
-                        merged[c_slug] = UserNodeCompetencyDTO(
-                            concept_slug=c_slug,
-                            depth_level_norm=score,
-                            peak_depth_level_norm=max(existing.peak_depth_level_norm, score),
-                            depth_label=lbl,
-                            confidence=max(existing.confidence, 0.85 if score >= 0.75 else 0.65),
-                            stability_s=existing.stability_s,
-                            last_practiced_at=(
-                                existing.last_practiced_at
-                                or mastery_row.updated_at
-                                or datetime.now(UTC)
-                            ),
-                            playbook_completed_at=(
-                                existing.playbook_completed_at
-                                or mastery_row.updated_at
-                                or datetime.now(UTC)
-                            ),
-                            code_practice_score=existing.code_practice_score,
-                        )
-            except SQLAlchemyError:
-                pass
 
         return UserCompetencySnapshotDTO(
             user_id=user_id,

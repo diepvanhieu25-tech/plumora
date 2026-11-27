@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="440" viewBox="0 0 880 440" role="img" aria-label="Fig 3. GNN-PPO Ablation Study: Sample Budget & Message-Passing Depth">
+  <rect width="880" height="440" rx="12" fill="#FAFAF9" stroke="#E7E5E4"/>
+  <text x="36" y="38" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18" font-weight="700" fill="#1C1917">Fig 3. GNN-PPO Ablation Study: Sample Budget & Message-Passing Depth</text>
+  <text x="36" y="60" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="12" fill="#57534E">Selected seed=101 | 500 evaluation episodes</text>
+<text x="65" y="92" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="700" fill="#15803D">A. Sample Budget Curve (Known Domains)</text>
+  <line x1="65" y1="350" x2="415" y2="350" stroke="#A8A29E"/>
+  <circle cx="105.0" cy="154.8" r="5" fill="#15803D"/>
+  <text x="105.0" y="144.8" text-anchor="middle" font-family="monospace" font-size="11" font-weight="700" fill="#1C1917">53.8</text>
+  <text x="105.0" y="372" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="11" fill="#44403C">15000 steps</text>
+  <circle cx="240.0" cy="162.9" r="5" fill="#15803D"/>
+  <text x="240.0" y="152.9" text-anchor="middle" font-family="monospace" font-size="11" font-weight="700" fill="#1C1917">51.6</text>
+  <text x="240.0" y="372" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="11" fill="#44403C">30000 steps</text>
+  <circle cx="375.0" cy="135.0" r="5" fill="#15803D"/>
+  <text x="375.0" y="125.0" text-anchor="middle" font-family="monospace" font-size="11" font-weight="700" fill="#1C1917">59.3</text>
+  <text x="375.0" y="372" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="11" fill="#44403C">60000 steps</text>
+  <polyline fill="none" stroke="#15803D" stroke-width="2.5" points="105.0,154.8 240.0,162.9 375.0,135.0"/>
+  <text x="480" y="92" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="700" fill="#0D9488">B. Encoder Depth (Zero-shot Transfer)</text>
+  <line x1="480" y1="350" x2="830" y2="350" stroke="#A8A29E"/>
+  <rect x="515" y="152.2" width="64" height="197.8" rx="4" fill="#78716C"/>
+  <text x="547.0" y="144.2" text-anchor="middle" font-family="monospace" font-size="11" font-weight="700" fill="#1C1917">56.5</text>
+  <text x="547.0" y="372" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="600" fill="#44403C">MLP-PPO</text>
+  <rect x="620" y="135.0" width="64" height="215.0" rx="4" fill="#0D9488"/>
+  <text x="652.0" y="127.0" text-anchor="middle" font-family="monospace" font-size="11" font-weight="700" fill="#1C1917">61.4</text>
+  <text x="652.0" y="372" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="600" fill="#44403C">1-Layer GNN</text>
+  <rect x="725" y="137.6" width="64" height="212.4" rx="4" fill="#15803D"/>
+  <text x="757.0" y="129.6" text-anchor="middle" font-family="monospace" font-size="11" font-weight="700" fill="#1C1917">60.6</text>
+  <text x="757.0" y="372" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="600" fill="#44403C">3-Layer GNN</text>
+</svg>

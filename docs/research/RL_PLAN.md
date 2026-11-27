@@ -66,7 +66,7 @@ Các đề xuất PPO/Actor-Critic, GNN và chuyển giao domain ở Giai đoạ
 
 ## Thiết kế Mở rộng Giai đoạn 3: `GNN-PPO`, Đa lĩnh vực & `Safe Micro-batch Online RL` (`v2.0.0` — APPROVED tại `D-20`, `D-21`, `D-25`, `D-26`)
 
-- **Nguồn căn cứ:** [intent.md](../intent.md) (`v2.0.0`), [spec.md](../spec.md) (`v2.0.0`: `PL3-RL-01`, `PL3-GUARD-01`), [proposals/PHASE3_ANALYSIS.md](../proposals/PHASE3_ANALYSIS.md) và quyết định của chủ dự án (`D-20`, `D-21`, `D-25`, `D-26` ngày `2026-11-18`).
+- **Nguồn căn cứ:** [intent.md](../intent.md), [spec.md](../spec.md) (`PL3-RL-01`, `PL3-GUARD-01`) và quyết định của chủ dự án (`D-20`, `D-21`, `D-32`–`D-34`).
 - **Mục tiêu nghiên cứu mở rộng:** Chứng minh sự kết hợp giữa **Graph Neural Networks (`GNN`)** đọc cấu trúc đồ thị không phụ thuộc lĩnh vực với thuật toán **Actor-Critic (`PPO`)** trên hồ sơ năng lực chiều sâu + đường cong nhớ *Ebbinghaus* giúp:
   1. Cá nhân hóa đồng thời **Khái niệm đích** và **Chế độ học** sát năng lực học viên hơn so với chỉ chọn bài MCQ phẳng.
   2. Chuyển giao chính sách học tập sang **lĩnh vực mới chưa từng thấy khi huấn luyện (*Zero-shot Domain Transfer*)** mà không bị phụ thuộc cố định vào số lượng node như mạng `MLP` truyền thống.

@@ -57,6 +57,10 @@ class ActorTransition:
     adj_out: np.ndarray  # (N, N) row-degree normalized
     action_idx: int
     reward: float
+    next_node_features: np.ndarray | None = None
+    done: bool = False
+    valid_mask: np.ndarray | None = None
+    gamma: float = 0.99
 
 
 @dataclass(frozen=True)
@@ -188,6 +192,7 @@ class NumpyGnnPredictor:
         clip_eps: float = 0.2,
         beta_kl: float = 0.5,
         max_param_step: float = 0.02,
+        target_kl: float = 0.04,
     ) -> MicroBatchUpdateResult:
         """Analytical PPO-Clip actor-head update with explicit KL penalty beta_KL * D_KL(pi_prod || pi_cand).
 
@@ -206,8 +211,25 @@ class NumpyGnnPredictor:
                 epochs_run=0,
             )
 
-        rewards = np.array([t.reward for t in transitions], dtype=np.float32)
-        advs = (rewards - float(np.mean(rewards))) / (float(np.std(rewards)) + 1e-6)
+        raw_advs: list[float] = []
+        for tr in transitions:
+            if tr.next_node_features is not None:
+                v_s = self.predict_value(tr.node_features, tr.adj_in, tr.adj_out)
+                v_next = (
+                    0.0
+                    if tr.done
+                    else self.predict_value(tr.next_node_features, tr.adj_in, tr.adj_out)
+                )
+                raw_advs.append(float(tr.reward + tr.gamma * v_next - v_s))
+            else:
+                raw_advs.append(float(tr.reward))
+
+        adv_arr = np.array(raw_advs, dtype=np.float32)
+        adv_std = float(np.std(adv_arr))
+        if adv_std > 1e-5:
+            advs = (adv_arr - float(np.mean(adv_arr))) / (adv_std + 1e-6)
+        else:
+            advs = adv_arr
         advs = np.clip(advs, -2.0, 2.0)
 
         cached_prod: list[tuple[ActorTransition, np.ndarray, float]] = []
@@ -243,6 +265,12 @@ class NumpyGnnPredictor:
                     one_hot[tr.action_idx] = 1.0
                     d_flat = d_flat + (ratio * adv) * (one_hot - cand_probs)
 
+                if tr.valid_mask is not None:
+                    m_flat = tr.valid_mask.reshape(-1).astype(np.float32)
+                    valid_mass = float(np.sum(cand_probs * m_flat))
+                    if valid_mass > 1e-6:
+                        d_flat = d_flat + 0.05 * ((cand_probs * m_flat) / valid_mass - cand_probs)
+
                 d_logits = d_flat.reshape(logits.shape).astype(np.float32)
                 g_w2 += d_logits.T @ a1
                 g_b2 += d_logits.sum(axis=0)
@@ -252,18 +280,49 @@ class NumpyGnnPredictor:
                 g_b0 += d_a1_pre.sum(axis=0)
 
             scale = lr / max(1, len(cached_prod))
-            cand_weights["actor_head__2__weight"] += np.clip(
-                scale * g_w2, -max_param_step, max_param_step
-            )
-            cand_weights["actor_head__2__bias"] += np.clip(
-                scale * g_b2, -max_param_step, max_param_step
-            )
-            cand_weights["actor_head__0__weight"] += np.clip(
-                scale * g_w0, -max_param_step, max_param_step
-            )
-            cand_weights["actor_head__0__bias"] += np.clip(
-                scale * g_b0, -max_param_step, max_param_step
-            )
+            step_w2 = np.clip(scale * g_w2, -max_param_step, max_param_step)
+            step_b2 = np.clip(scale * g_b2, -max_param_step, max_param_step)
+            step_w0 = np.clip(scale * g_w0, -max_param_step, max_param_step)
+            step_b0 = np.clip(scale * g_b0, -max_param_step, max_param_step)
+
+            accepted = False
+            for factor in (1.0, 0.5, 0.25, 0.125):
+                cand_weights["actor_head__2__weight"] += factor * step_w2
+                cand_weights["actor_head__2__bias"] += factor * step_b2
+                cand_weights["actor_head__0__weight"] += factor * step_w0
+                cand_weights["actor_head__0__bias"] += factor * step_b0
+
+                epoch_kls = [
+                    max(
+                        0.0,
+                        float(
+                            np.sum(
+                                p_probs
+                                * np.log(
+                                    (p_probs + 1e-8)
+                                    / (
+                                        _softmax(
+                                            cand_predictor.predict_logits(
+                                                tr.node_features, tr.adj_in, tr.adj_out
+                                            ).reshape(-1)
+                                        )
+                                        + 1e-8
+                                    )
+                                )
+                            )
+                        ),
+                    )
+                    for tr, p_probs, _ in cached_prod
+                ]
+                if not epoch_kls or float(np.mean(epoch_kls)) <= target_kl:
+                    accepted = True
+                    break
+                cand_weights["actor_head__2__weight"] -= factor * step_w2
+                cand_weights["actor_head__2__bias"] -= factor * step_b2
+                cand_weights["actor_head__0__weight"] -= factor * step_w0
+                cand_weights["actor_head__0__bias"] -= factor * step_b0
+            if not accepted:
+                break
 
         kl_vals: list[float] = []
         for tr, prod_probs, _ in cached_prod:

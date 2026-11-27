@@ -51,21 +51,25 @@ def test_pl3_memory_01_roadmap_simulated_time_offset_triggers_needs_review() -> 
         # Seed mastered state on net-internet (depth >= 0.75, S0 = 3.0 days) via DB SSoT
         from datetime import UTC, datetime
 
-        from sqlalchemy import select
         from sqlalchemy.orm import Session
 
-        from app.db.models import ConceptModel, UserConceptMasteryModel, engine
+        from app.db.models import UserNodeCompetencyModel, engine
 
         with Session(engine) as db:
-            concept = db.scalar(select(ConceptModel).where(ConceptModel.slug == "net-internet"))
-            assert concept is not None
+            now = datetime.now(UTC)
             db.merge(
-                UserConceptMasteryModel(
+                UserNodeCompetencyModel(
                     user_id=user_id,
-                    concept_action_id=concept.action_id,
-                    mastery_score=0.9,
-                    is_mastered=True,
-                    updated_at=datetime.now(UTC),
+                    concept_slug="net-internet",
+                    depth_level_norm=0.75,
+                    peak_depth_level_norm=0.75,
+                    depth_label="Deep Understanding",
+                    confidence=0.85,
+                    stability_s=3.0,
+                    last_practiced_at=now,
+                    playbook_completed_at=now,
+                    code_practice_score=0.0,
+                    updated_at=now,
                 )
             )
             db.commit()

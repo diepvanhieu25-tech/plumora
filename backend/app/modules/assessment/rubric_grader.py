@@ -186,7 +186,7 @@ class DeterministicRubricGrader(RubricGraderPort):
 
 
 class LlmRubricGraderAdapter(RubricGraderPort):
-    """External LLM Rubric Adapter (with strict 4s timeout); fails over via CircuitBreaker when offline."""
+    """External LLM Rubric Adapter (default 8.0s timeout via PLUMORA_LLM_TIMEOUT_S); fails over via CircuitBreaker when offline."""
 
     def __init__(self, timeout_s: float | None = None) -> None:
         if timeout_s is not None:

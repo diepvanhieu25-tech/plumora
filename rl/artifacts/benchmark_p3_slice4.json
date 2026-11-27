@@ -1,0 +1,9 @@
+{
+  "overall_p50_ms": 130.92,
+  "overall_p95_ms": 256.25,
+  "overall_p99_ms": 341.07,
+  "gnn_ppo_p95_ms": 242.89,
+  "requests_per_second": 126.93,
+  "total_requests": 7680,
+  "http_5xx_rate_pct": 0.0
+}

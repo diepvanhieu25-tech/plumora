@@ -84,7 +84,7 @@ from app.modules.contracts.ports import ContentCatalogPort
 from app.modules.events.outbox import record_outbox_event_in_tx
 
 _RUBRIC_SERVICE = CircuitBreakerRubricService(
-    primary=LlmRubricGraderAdapter(timeout_s=4.0),
+    primary=LlmRubricGraderAdapter(),
     fallback=DeterministicRubricGrader(),
     failure_threshold=2,
 )
@@ -812,18 +812,16 @@ def start_depth_or_review_session(
     concept_qs = bundle.questions if bundle is not None else ()
 
     # Rotate away from recently attempted questions for Spaced Review
-    seen_ids: set[str] = set()
-    if payload.session_mode == "spaced_review":
-        prev_q_ids = db.scalars(
-            select(AttemptRecordModel.question_or_challenge_id)
-            .where(
-                AttemptRecordModel.user_id == user.id,
-                AttemptRecordModel.concept_slug == payload.concept_slug,
-            )
-            .order_by(AttemptRecordModel.created_at.desc())
-            .limit(10)
-        ).all()
-        seen_ids = {str(qid) for qid in prev_q_ids}
+    prev_q_ids = db.scalars(
+        select(AttemptRecordModel.question_or_challenge_id)
+        .where(
+            AttemptRecordModel.user_id == user.id,
+            AttemptRecordModel.concept_slug == payload.concept_slug,
+        )
+        .order_by(AttemptRecordModel.created_at.desc())
+        .limit(10)
+    ).all()
+    seen_ids: set[str] = {str(qid) for qid in prev_q_ids}
 
     q = _select_question_for_tier(concept_qs, start_tier, seen_ids)
     if q is None and concept_qs:
@@ -890,6 +888,8 @@ def abandon_assessment_session(
         comp = _get_or_create_competency(db, user.id, concept_slug)
         stab_before = float(comp.stability_s)
 
+        bundle = get_content_catalog_port(db).get_concept_bundle(concept_slug)
+        has_code = bundle is not None and bundle.code_challenge is not None
         mapped = map_depth_to_competency(
             highest_passed_tier=session.highest_passed_tier,
             passed_code_sandbox=comp.code_practice_score >= 1.0,
@@ -897,6 +897,7 @@ def abandon_assessment_session(
             abandoned=True,
             steps_completed=session.steps_completed,
             existing_depth=comp.depth_level_norm,
+            has_code_challenge=has_code,
         )
         if mapped.depth_label == "insufficient_evidence":
             session.status = "insufficient_evidence"
@@ -1108,6 +1109,7 @@ def submit_depth_or_review_step(
                 }
 
                 passed_code = comp.code_practice_score >= 1.0
+                has_code = bundle is not None and bundle.code_challenge is not None
                 mapped = map_depth_to_competency(
                     highest_passed_tier=session.highest_passed_tier,
                     passed_code_sandbox=passed_code,
@@ -1115,6 +1117,7 @@ def submit_depth_or_review_step(
                     abandoned=False,
                     steps_completed=session.steps_completed,
                     existing_depth=comp.depth_level_norm,
+                    has_code_challenge=has_code,
                 )
                 if session.status in ("ceiling_reached", "completed") or mapped.depth_level_norm > comp.depth_level_norm:
                     new_depth = max(comp.peak_depth_level_norm, mapped.depth_level_norm)

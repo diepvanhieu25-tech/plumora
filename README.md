@@ -131,7 +131,7 @@ flowchart TB
 
 - **PostgreSQL 16 (4 Schema cô lập):** `auth_svc`, `content_svc` (có `outbox_events` riêng), `assess_svc` (có `outbox_events` & `consumed_events` riêng), `rec_ai_svc` (có `consumed_events` riêng); kiểm tra cô lập thực tế qua `pg_catalog`, quét Outbox bằng `FOR UPDATE SKIP LOCKED` chống phát trùng đa worker.
 - **Redis 7:** Kết nối tập trung qua `RedisConnectionProvider`, hỗ trợ Time-Aware Feature Cache (`plumora:raw_comp_state:*` xóa tức thời khi cập nhật năng lực), đồng bộ epoch cache đa worker (`plumora:kg:epoch`), đồng bộ con trỏ Active Model (`plumora:model_registry:active`), thu hồi JWT (`jti`) và 2 luồng `Redis Streams` (`plumora:competency_events`, `plumora:stream:domain_events` với `consumer_name = {hostname}-{pid}`).
-- **Kiến trúc Docker Thống nhất (`v3.1` — `D-27`):** `docker compose up -d --build` dựng duy nhất cụm **4 Microservices + API Gateway (`:8000`) + `db-migrate-seed` + non-root Nginx Frontend (`:3000`) + PostgreSQL 16 + Redis 7** kèm persistent volume `plumora_rl_candidates`. (`backend/app/main.py` chỉ giữ làm in-process harness cho `pytest`; thư mục `k8s/` giữ ở mức *Experimental Production Blueprint* ngoài phạm vi nghiệm thu hiện tại).
+- **Kiến trúc Docker Thống nhất (`v4.0` — `D-27`..`D-36`):** `docker compose up -d --build` dựng duy nhất cụm **4 Microservices + API Gateway (`:8000`, có `X-Request-ID` & Redis Sliding-Window Rate Limiter) + `db-migrate-seed` + non-root Nginx Frontend (`:3000`) + PostgreSQL 16 + Redis 7** kèm persistent volume `plumora_rl_candidates`. (`backend/app/main.py` chỉ giữ làm in-process harness cho `pytest`; thư mục `k8s/` đã đồng bộ lên chuẩn `v4.0.0`).
 
 ---
 
@@ -172,15 +172,16 @@ Giao diện đăng nhập đã loại bỏ toàn bộ nút điền nhanh demo. �
 
 ---
 
-## 6. Kết quả Đánh giá Mô hình `GNN-PPO` (Trong Mô phỏng `v3.1.0`)
+## 6. Kết quả Đánh giá Mô hình `GNN-PPO` (Trong Mô phỏng `v4.0.0`)
 
-Checkpoint cơ sở `rl/artifacts/gnn_ppo_v2_base.zip` (`selected_seed = 303`, `SHA-256 = bf55d8098b717c6814ace00633796bf99306c9ad45631f281eb0102213e9ad6f`) được huấn luyện công bằng với cùng ngân sách `timesteps_per_seed = 15,000` trên 3 seeds (`101`, `202`, `303`), chọn trên `val_seed = 999` (`200` episodes) và đánh giá trên **500 episodes** (`eval_seed = 2026`, đồng bộ bất biến `INV-SEQ-01..03`):
+Checkpoint cơ sở `rl/artifacts/gnn_ppo_v2_base.zip` (`selected_seed = 101`, `SHA-256 = 824bebf1c988b914e31b293787403de8b65f7f9d3d72c3e6caf68a1f3998d2f6`) được huấn luyện công bằng với cùng ngân sách `timesteps_per_seed = 60,000` trên 3 seeds (`101`, `202`, `303`), chọn trên `val_seed = 999` (`200` episodes) và đánh giá trên **500 episodes** (`eval_seed = 2026`, `dt = 0.25d`, đồng bộ bất biến `INV-SEQ-01..03`):
 
 | Chỉ số | `GNN-PPO Masked` (3 ngành đã biết) | `GNN-PPO Masked` (*Zero-shot*: `heldout_data_eng_graph`) |
 | :--- | :---: | :---: |
-| **Phần thưởng tích lũy (`mean_reward ± std`)** | `49.45 ± 7.75` (`Unmasked`: `48.22 ± 7.42`) | `48.06 ± 7.67` (`Unmasked`: `47.11 ± 7.66`) |
-| **Tỷ lệ lỗi `Unmasked` (cả tiên quyết & lặp thừa)** | `0.017%` (`DQN-MLP`: `92.47%`, `PPO-MLP`: `96.83%`) | `0.013%` (`DQN-MLP`: `91.75%`, `PPO-MLP`: `97.51%`) |
-| **Tỷ lệ vi phạm có `Policy Guardrail`** | `0.0%` | `0.0%` |
+| **Phần thưởng tích lũy (`mean_reward ± std`)** | `59.30 ± 10.14` (`Unmasked`: `59.29 ± 10.07`) | `60.63 ± 10.93` (`Unmasked`: `60.56 ± 10.92`) |
+| **Tỷ lệ hoàn thành khóa học (`completion_rate`)** | `53.6%` (`Unmasked`: `53.4%`) | `61.0%` (`Unmasked`: `61.2%`) |
+| **Tỷ lệ lỗi `Unmasked` (cả tiên quyết & lặp thừa)** | `0.00%` (`DQN-MLP`: `78.58%`, `PPO-MLP`: `87.04%`) | `0.00%` (`DQN-MLP`: `78.22%`, `PPO-MLP`: `82.09%`) |
+| **Tỷ lệ vi phạm có `Policy Guardrail`** | `0.00%` | `0.00%` |
 
 > Kết quả trên được đo trong bộ mô phỏng đa ngành (`rl/src/plumora_rl/multidomain_sim.py`), không đồng nhất với hiệu quả học tập trên người thật. Chi tiết xem tại [RL_EXPERIMENTAL_REPORT.md](docs/defense/RL_EXPERIMENTAL_REPORT.md).
 
@@ -193,5 +194,5 @@ Checkpoint cơ sở `rl/artifacts/gnn_ppo_v2_base.zip` (`selected_seed = 303`, `
 ./scripts/ci_check.sh
 ```
 
-- **Bộ kiểm thử hiện có:** `13` RL tests (bao gồm parity PyTorch $\leftrightarrow$ NumPy, zero-Torch import & bất biến `INV-SEQ-02`), `100` Backend tests (bao gồm `13` Architectural Fitness Functions tại `backend/tests/architecture/`), `11` Frontend Vitest unit tests, cùng Live Fullstack Integration & Real Chromium E2E trên cụm Microservices thật.
+- **Bộ kiểm thử hiện có:** `17` RL tests (bao gồm parity PyTorch $\leftrightarrow$ NumPy, zero-Torch import & hiệu chuẩn `v4.0`), `104` Backend tests (bao gồm `13` Architectural Fitness Functions tại `backend/tests/architecture/`), `13` Frontend Vitest unit tests, cùng Live Fullstack Integration & Real Chromium E2E trên cụm Microservices thật.
 - **Tài liệu dự án:** [Intent](docs/intent.md) | [Spec](docs/spec.md) | [Design](docs/design.md) | [UI Design System](docs/ui-design-system.md) | [Decisions](docs/decisions.md) | [RL Plan](docs/research/RL_PLAN.md) | [RL Experimental Report](docs/defense/RL_EXPERIMENTAL_REPORT.md) | [Manual Testing Script](docs/verification/MANUAL_SYSTEM_TESTING_SCRIPT.md)

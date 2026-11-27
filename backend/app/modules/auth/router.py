@@ -25,10 +25,6 @@ from app.modules.auth.security import (
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 
-def write_through_state_cache(*_args: object, **_kwargs: object) -> None:
-    """Retired v1 state-cache hook retained only as an uncalled no-op symbol for C01 regression tests."""
-
-
 @router.post("/register")
 def register_user(
     payload: RegisterRequest,

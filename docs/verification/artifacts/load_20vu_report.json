@@ -1,40 +1,40 @@
 {
   "rubric_consistency_audit": {
-    "total_questions_evaluated": 66,
-    "total_response_samples": 198,
+    "total_questions_evaluated": 132,
+    "total_response_samples": 396,
     "pass_fail_agreement_rate": 1.0,
-    "mean_absolute_error": 0.0833,
-    "pearson_correlation": 0.9608
+    "mean_absolute_error": 0.0821,
+    "pearson_correlation": 0.9609
   },
   "load_benchmark_20vu_60s": {
     "target_environment": "live_docker_microservices",
     "gateway_url": "http://127.0.0.1:8000",
     "concurrent_vus": 20,
-    "duration_seconds": 60.42,
-    "total_requests": 7875,
-    "requests_per_second": 130.33,
+    "duration_seconds": 60.51,
+    "total_requests": 7680,
+    "requests_per_second": 126.93,
     "status_histogram": {
-      "2xx": 7875
+      "2xx": 7680
     },
     "http_5xx_count": 0,
     "http_5xx_rate_pct": 0.0,
     "overall_latency_ms": {
-      "mean": 137.67,
-      "p50": 127.97,
-      "p95": 249.35,
-      "p99": 326.92
+      "mean": 141.93,
+      "p50": 130.92,
+      "p95": 256.25,
+      "p99": 341.07
     },
     "gnn_ppo_recommendation_latency_ms": {
-      "mean": 114.29,
-      "p50": 104.58,
-      "p95": 214.22,
-      "p99": 282.22
+      "mean": 138.62,
+      "p50": 128.78,
+      "p95": 242.89,
+      "p99": 306.81
     },
     "assessment_write_latency_ms": {
-      "mean": 146.17,
-      "p50": 136.52,
-      "p95": 260.1,
-      "p99": 347.21
+      "mean": 151.31,
+      "p50": 138.95,
+      "p95": 275.96,
+      "p99": 373.78
     }
   }
 }

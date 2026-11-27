@@ -28,13 +28,7 @@ def test_c01_login_succeeds_in_microservice_mode_without_cross_schema_grants(
 
     auth_router_mod = importlib.import_module("app.modules.auth.router")
     monkeypatch.setenv("MICROSERVICE_MODE", "true")
-    monkeypatch.setattr(
-        auth_router_mod,
-        "write_through_state_cache",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AssertionError("login_user must not call write_through_state_cache in microservice mode")
-        ),
-    )
+    assert not hasattr(auth_router_mod, "write_through_state_cache")
 
     uname = f"c01_u_{uuid.uuid4().hex[:8]}"
     with TestClient(auth_app) as client:

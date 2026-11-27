@@ -5,6 +5,10 @@ from __future__ import annotations
 import asyncio
 import os
 import posixpath
+import re
+import time
+import uuid
+from collections import defaultdict, deque
 from collections.abc import Awaitable, Callable
 from http.cookiejar import CookieJar
 from typing import Any
@@ -14,8 +18,10 @@ import httpx
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from redis.exceptions import RedisError
 
 from app.config import settings
+from app.db.redis_pool import get_redis_client
 
 
 class _StatelessNoOpCookieJar(CookieJar):
@@ -43,7 +49,7 @@ def build_gateway_http_client(
 
 app = FastAPI(
     title="Plumora API Gateway",
-    version="3.1.0",
+    version="4.0.0",
     description="Unified BFF / Reverse-Proxy Gateway for Plumora 4-Microservice Architecture",
 )
 
@@ -52,8 +58,54 @@ app.add_middleware(
     allow_origins=[settings.frontend_origin, "http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "X-CSRF-Token", "Idempotency-Key"],
+    allow_headers=["Content-Type", "Authorization", "X-CSRF-Token", "Idempotency-Key", "X-Request-ID"],
+    expose_headers=["X-Request-ID"],
 )
+
+_REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+_MEM_RATE_BUCKETS: dict[str, deque[float]] = defaultdict(deque)
+
+
+def _extract_client_ip(request: Request) -> str:
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        first_ip = xff.split(",", 1)[0].strip()
+        if first_ip:
+            return first_ip
+    return request.client.host if request.client else "unknown"
+
+
+def _check_sliding_window_rate_limit(bucket_key: str, limit: int, window_s: int = 60) -> tuple[bool, int]:
+    """Return (allowed, retry_after_s) using Redis ZSET sliding window with in-memory fallback."""
+    if limit <= 0:
+        return True, 0
+    now = time.time()
+    cutoff = now - window_s
+    member = f"{now:.6f}:{uuid.uuid4().hex[:8]}"
+    try:
+        client = get_redis_client(decode_responses=True, socket_timeout=0.2)
+        pipe = client.pipeline()
+        pipe.zremrangebyscore(bucket_key, 0, cutoff)
+        pipe.zcard(bucket_key)
+        _, current_count = pipe.execute()
+        if int(current_count) >= limit:
+            oldest = client.zrange(bucket_key, 0, 0, withscores=True)
+            retry_after = max(1, int(window_s - (now - float(oldest[0][1])))) if oldest else window_s
+            return False, retry_after
+        pipe2 = client.pipeline()
+        pipe2.zadd(bucket_key, {member: now})
+        pipe2.expire(bucket_key, window_s + 5)
+        pipe2.execute()
+        return True, 0
+    except RedisError:
+        dq = _MEM_RATE_BUCKETS[bucket_key]
+        while dq and dq[0] <= cutoff:
+            dq.popleft()
+        if len(dq) >= limit:
+            retry_after = max(1, int(window_s - (now - dq[0])))
+            return False, retry_after
+        dq.append(now)
+        return True, 0
 
 _GATEWAY_CLIENT = build_gateway_http_client()
 
@@ -83,8 +135,51 @@ async def security_headers_middleware(
     request: Request,
     call_next: Callable[[Request], Awaitable[Response]],
 ) -> Response:
-    """Attach mandatory security headers; allow Swagger UI assets strictly on /docs and /redoc."""
+    """Attach X-Request-ID, enforce sliding-window rate limits, and set mandatory security headers."""
+    incoming_rid = request.headers.get("x-request-id", "").strip()
+    request_id = incoming_rid if _REQUEST_ID_RE.fullmatch(incoming_rid) else str(uuid.uuid4())
+    request.state.request_id = request_id
+
+    if request.method == "POST":
+        path = request.url.path
+        client_ip = _extract_client_ip(request)
+        if path in ("/api/v1/auth/login", "/api/v1/auth/register"):
+            auth_limit = int(os.environ.get("GATEWAY_AUTH_RATE_LIMIT_PER_MIN", "20"))
+            allowed, retry_after = _check_sliding_window_rate_limit(
+                f"plumora:rl:auth:{client_ip}", auth_limit, 60
+            )
+            if not allowed:
+                resp_429 = JSONResponse(
+                    status_code=429,
+                    content={
+                        "detail": {
+                            "error_code": "RATE_LIMITED",
+                            "message": "Too many authentication requests. Please retry later.",
+                        }
+                    },
+                    headers={"Retry-After": str(retry_after), "X-Request-ID": request_id},
+                )
+                return resp_429
+        elif path.startswith("/api/v2/concepts/") and path.endswith("/code-sandbox/submit"):
+            sb_limit = int(os.environ.get("GATEWAY_SANDBOX_RATE_LIMIT_PER_MIN", "30"))
+            allowed, retry_after = _check_sliding_window_rate_limit(
+                f"plumora:rl:sandbox:{client_ip}", sb_limit, 60
+            )
+            if not allowed:
+                resp_429 = JSONResponse(
+                    status_code=429,
+                    content={
+                        "detail": {
+                            "error_code": "RATE_LIMITED",
+                            "message": "Too many Code Sandbox submissions. Please retry later.",
+                        }
+                    },
+                    headers={"Retry-After": str(retry_after), "X-Request-ID": request_id},
+                )
+                return resp_429
+
     response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
@@ -243,8 +338,9 @@ async def proxy_api(request: Request, rest: str) -> Response:
     req_headers = [
         (k, v)
         for k, v in request.headers.raw
-        if k.decode("latin-1").lower() not in {"host", "content-length"}
+        if k.decode("latin-1").lower() not in {"host", "content-length", "x-request-id"}
     ]
+    req_headers.append((b"x-request-id", str(getattr(request.state, "request_id", "")).encode("latin-1")))
     try:
         resp = await _GATEWAY_CLIENT.request(
             method=request.method,

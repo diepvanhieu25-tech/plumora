@@ -5,8 +5,7 @@
 | Tài liệu | Vai trò / thẩm quyền |
 | --- | --- |
 | [Định hướng gốc](brief/project-direction.md) | Bản sao nguyên byte tài liệu chủ dự án cung cấp; ba giai đoạn sản phẩm |
-| [Phân tích Giai đoạn 3](proposals/PHASE3_ANALYSIS.md) | Báo cáo phân tích & tổng hợp mở rộng Đích Giai đoạn 3 (`P3-01`..`P3-10`, `Q-01`–`Q-07`); **Gate 1 Baseline (`v2.0.0` — APPROVED tại `D-16`..`D-26`)** |
-| [Intent](intent.md) | Tổng hợp mục tiêu, ranh giới MVP (`v1.0.0`) và mở rộng Đích Giai đoạn 3 + KPI định lượng; **Gate 1 Baseline (`v2.0.0` — APPROVED)** |
+| [Intent](intent.md) | Tổng hợp mục tiêu, ranh giới kiến trúc chuẩn `v4.0.0` + KPI định lượng; **Gate 1 Baseline (`v4.0.0` — APPROVED)** |
 | [Spec](spec.md) | Tiêu chí hành vi MVP (`PL-AUTH-01`..`PL-E2E-01`) & Giai đoạn 3 (`PL3-KG-01`..`PL3-ARCH-01`), công thức định lượng và bất biến hệ thống; **Gate 1 Baseline (`v2.0.0` — APPROVED)** |
 | [System Design](design.md) | Kiến trúc lịch sử Modular Monolith (`v1.0.0`) & Kiến trúc chạy thật thống nhất **4 Microservices + API Gateway** (`v2.0.0` / `v3.1`), C4/ERD/Sequence/StateMachine/Security/RL-DFD, hợp đồng `/api/v1/auth/*`, `/api/v1/health`, `/api/v2/*` & `Redis Streams` (`k8s/` giữ ở mức *Experimental Production Blueprint*) |
 | [UI Design System](ui-design-system.md) | Hệ thống thiết kế giao diện Chồi Cây Non (`#15803D` / `#D97706` / `#0D9488`), 100% SVG icons `lucide-react` (không emoji), tách 2 cổng `Web Client` & `Back-Office Console` (`SCR-01`–`SCR-20`), 5+2 trạng thái UX và biên bản Stitch (`D-15`, `D-26`) |

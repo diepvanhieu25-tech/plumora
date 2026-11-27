@@ -72,8 +72,8 @@ class PolicyGuardrailStrategy:
             if depth < 0.50:
                 mask[i, LearningMode.LEARN_NEW] = True
 
-            # Mode 1: DEEP_PROBE — requires 0.25 <= depth < 1.0 (INV-SEQ-01; locked once 1.00 Mastery reached)
-            if 0.25 <= depth < 1.0:
+            # Mode 1: DEEP_PROBE — requires 0.25 <= depth < 0.75, or < 1.0 when no code challenge exists (D-34 / INV-SEQ-02)
+            if 0.25 <= depth < 0.75 or (0.75 <= depth < 1.0 and not node_has_code):
                 mask[i, LearningMode.DEEP_PROBE] = True
 
             # Mode 2: CODE_PRACTICE — requires depth >= 0.25 (INV-SEQ-01), challenge exists (INV-SEQ-03),

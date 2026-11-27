@@ -269,6 +269,9 @@ export function LearnerAppShell({
             conceptSlug={conceptSlug}
             sessionMode={sessionMode}
             onBackToRoadmap={() => onNavigate('domain_roadmap', { domainSlug })}
+            onStartCodeSandbox={(cSlug) =>
+              onNavigate('code_sandbox', { domainSlug, conceptSlug: cSlug })
+            }
           />
         )}
 
@@ -277,6 +280,13 @@ export function LearnerAppShell({
             domainSlug={domainSlug}
             conceptSlug={conceptSlug}
             onBackToRoadmap={() => onNavigate('domain_roadmap', { domainSlug })}
+            onStartDepthProbe={(cSlug) =>
+              onNavigate('depth_probe', {
+                domainSlug,
+                conceptSlug: cSlug,
+                sessionMode: 'depth_probe',
+              })
+            }
           />
         )}
       </main>
