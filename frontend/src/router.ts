@@ -1,12 +1,14 @@
 import type { ActiveView, LearnerUser, PortalKind } from './types'
 
 export type AssessmentSessionMode = 'depth_probe' | 'spaced_review'
+export type PublicPageKind = 'home' | 'how_it_works' | 'curriculum' | 'about'
 
 export interface ParsedRoute {
   portal: PortalKind
   view: ActiveView
   isLoginPath: boolean
   isRegisterPath: boolean
+  publicPage?: PublicPageKind
   domainSlug?: string
   conceptSlug?: string
   sessionMode?: AssessmentSessionMode
@@ -197,6 +199,44 @@ export function parseRoute(pathname: string, search: string = ''): ParsedRoute {
       isRegisterPath: false,
       domainSlug: queryDomain || 'backend',
       conceptSlug: decodeURIComponent(sandboxMatch[1]),
+    }
+  }
+
+  // Public Showcase Routes (PUB-01..PUB-04 — D-42)
+  if (clean === '/') {
+    return {
+      portal: 'learner',
+      view: 'domains',
+      isLoginPath: false,
+      isRegisterPath: false,
+      publicPage: 'home',
+    }
+  }
+  if (clean === '/how-it-works') {
+    return {
+      portal: 'learner',
+      view: 'domains',
+      isLoginPath: false,
+      isRegisterPath: false,
+      publicPage: 'how_it_works',
+    }
+  }
+  if (clean === '/curriculum') {
+    return {
+      portal: 'learner',
+      view: 'domains',
+      isLoginPath: false,
+      isRegisterPath: false,
+      publicPage: 'curriculum',
+    }
+  }
+  if (clean === '/about') {
+    return {
+      portal: 'learner',
+      view: 'domains',
+      isLoginPath: false,
+      isRegisterPath: false,
+      publicPage: 'about',
     }
   }
 
