@@ -1,7 +1,7 @@
 # Active Session Memory
 
 - **Project:** Plumora — Adaptive Personalized Learning-Path Recommendation & Management using RL.
-- **Current Branch:** `feat/v4.1-ux-rl-observability` (branched from `main` `0f8440f`; awaiting explicit Gate 4 user `git commit` / `git merge` / `git push` authorization per `AGENTS.md`).
+- **Current Branch:** `main` (`245c5e1` includes merged `v4.1` `D-37`..`D-41`; working tree contains verified `D-42` Public Showcase Suite `PUB-01`..`PUB-04` awaiting explicit Gate 4 user commit/push authorization).
 - **Phase Status:**
   - Phase 1 MVP (`v1.0.0` — `D-01`..`D-15`), Phase 3 Baseline (`v2.0.0` — `D-16`..`D-26`), `v3.1` Microservices & RL Hardening (`D-27`..`D-30`, `REM-01`..`REM-04`), and `v4.0.0` Final Clean Baseline (`D-31`..`D-36`): Completed & merged to `main` (`0f8440f`, GitHub Actions Run `45935796283` SUCCESS).
   - **Plumora `v4.1` UX, RL Explainability, Admin RL Observability & Expert Streamlining (`D-37`..`D-41`):** **IMPLEMENTED, VERIFIED (7/7 `./scripts/ci_check.sh` + Live Docker 4-Microservices Rebuild + Real Chromium E2E + Gate 3 Independent 4-Axis Review: PASS — 0 Blocker / 0 Critical / 0 Major).**
@@ -10,6 +10,7 @@
     - **`D-39` (Closed-Loop RL Explainability & Adaptive Learner Journey):** Extended `POST /api/v2/recommendations` with 3-step `planned_next_steps` (`GNN-PPO` + `PolicyGuardrail` rollout) and `decision_factors`; displayed both on `MultiDomainRoadmapPage.tsx`; mounted closed-loop `AdaptiveNextStepCard` on `AdaptivePlacementPage.tsx`, `DepthProbePage.tsx`, and `CodeSandboxPage.tsx`; softened punitive wording.
     - **`D-40` (Admin RL Observability & Sidebar IA):** Implemented `GET /api/v2/admin/rl-analytics` reading `rec_ai_svc.recommendation_logs` (Admin RBAC); built `AdminRlObservabilityPage.tsx` (KPIs, Mode/Domain distributions, recent RL decisions table with empty-state handling); moved `Giám sát & MLOps RL` to top of Admin sidebar in `BackOfficeAppShell.tsx` while keeping `admin_online_rl` initial route & `bo-nav-*` test IDs intact.
     - **`D-41` (Expert Studio Workflow Streamlining):** Replaced `SimpleMarkdownPreview` with shared `MarkdownRenderer`; added `PATCH /api/v2/expert/concepts/{slug}/playbook` (with non-blank validator) + `"Lưu riêng Playbook"` button in `ExpertDomainsPage.tsx`; added `"Tự cân bằng = 1.0"` Rubric weight normalizer in `ExpertQuestionsPage.tsx`; added `POST /api/v2/expert/code-challenges/dry-run` (Dual Sandbox Verification without DB persist) + `"Chạy thử Sandbox (Dry-Run)"` button in `ExpertCodeChallengesPage.tsx`.
+    - **`D-42` (Public Showcase Suite `PUB-01`..`PUB-04`):** Implemented Botanical Editorial & Interactive Blueprint public introduction pages under `PublicShowcaseShell.tsx` (`/` `PublicHomePage.tsx` with interactive mini GNN-PPO DAG blueprint, `/how-it-works` `PublicHowItWorksPage.tsx`, `/curriculum` `PublicCurriculumPage.tsx` with interactive 3-domain switcher & 31 real seeded concepts, `/about` `PublicAboutPage.tsx` with 4-Microservices architecture & 3-role portal links). Verified `8/8` Vitest unit files (`19/19`), `7/7` `./scripts/ci_check.sh`, live Docker `http://localhost:3000`, and `8/8` Desktop (`1280px`) & Mobile (`390px`) Chromium screenshots (`0px` overflow, 0 emoji, 0 demo creds).
     - **Defense Docs:** Rewrote `docs/defense/DEMO_RUNBOOK.md` to `v4.0.0` (removed all `v1.0.0` MVP leftovers).
 - **Verification Evidence Summary (2026-11-27):**
   - Backend: `ruff`, `mypy` (85 files), `pytest` (`107/107` PASS including `test_v41_rl_observability_and_expert.py`).
@@ -18,4 +19,4 @@
   - Live Docker Stack & E2E: `docker compose up -d --build --remove-orphans --wait` + `./scripts/ci_check.sh` **7/7 Gates EXIT 0** (Real Chromium E2E Audit + Negative Control + Edge Security 403/404 + `k8s YAML` + `git diff --check`).
   - Gate 3 Independent 4-Axis Review (`37bb1ba0-5fdb-496f-95ba-e88b4f416556`): **PASS** (initial Major #1 + Minors #2, #3, #4, #6, #7 fixed and re-verified on disk; **0 Blocker, 0 Critical, 0 Major**).
 - **Next User Action Needed:**
-  - Explicit **Gate 4** authorization to `git commit` / `git merge` into `main` / `git push` `feat/v4.1-ux-rl-observability` (and tag `v4.1.0` if desired).
+  - Explicit **Gate 4** authorization to commit (either directly on `main` or via a task branch `feat/public-showcase-pages`) and push `D-42` (`PUB-01`..`PUB-04`).

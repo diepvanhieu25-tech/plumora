@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import {
   AlertTriangle,
+  ArrowLeft,
   ArrowRight,
   Eye,
   EyeOff,
@@ -19,6 +20,7 @@ export interface BackOfficeLoginPageProps {
   isLoading: boolean
   onSubmit: (e: React.FormEvent) => Promise<void>
   portalHint?: 'admin' | 'expert'
+  onBackHome?: () => void
 }
 
 export function BackOfficeLoginPage({
@@ -30,6 +32,7 @@ export function BackOfficeLoginPage({
   isLoading,
   onSubmit,
   portalHint = 'admin',
+  onBackHome,
 }: BackOfficeLoginPageProps) {
   const [showPassword, setShowPassword] = useState(false)
 
@@ -42,6 +45,18 @@ export function BackOfficeLoginPage({
         <div className="p-7 sm:p-8 space-y-6">
           {/* Header Brand */}
           <div className="space-y-3">
+            {onBackHome && (
+              <button
+                type="button"
+                onClick={onBackHome}
+                data-testid="backoffice-back-home-btn"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#3F5247] hover:text-[#15803D] transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>Quay về Trang chủ</span>
+              </button>
+            )}
+
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-[#F0FDF4] border border-[#16A34A] flex items-center justify-center text-[#15803D] shrink-0">
                 <Sprout className="w-5 h-5" aria-hidden="true" />

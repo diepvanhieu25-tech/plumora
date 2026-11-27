@@ -101,6 +101,19 @@ async function main() {
   try {
     const baseUrl = process.env.PLUMORA_FRONTEND_URL || 'http://localhost:3000';
     await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
+    await page.getByTestId('pub01-home-page').waitFor({ state: 'visible', timeout: 10000 });
+
+    // -1. Assert Public Showcase Home (PUB-01) clean visual & zero emoji / zero demo credentials
+    const pubHomeText = await page.getByTestId('pub01-home-page').innerText();
+    if (EMOJI_REGEX.test(pubHomeText)) {
+      throw new Error('INV-UI-01 violation: Unicode emoji detected on Public Home Page');
+    }
+    for (const forbidden of ['PlumoraDemo#2026', 'learner_new', 'admin_demo', 'expert_demo']) {
+      if (pubHomeText.includes(forbidden)) {
+        throw new Error(`De-demoing violation: Public Home Page exposes '${forbidden}'`);
+      }
+    }
+    await page.getByTestId('pub-nav-login-btn').click();
     await page.getByTestId('learner-auth-page').waitFor({ state: 'visible', timeout: 10000 });
 
     // 0. Assert De-Demoed Learner Auth Page (zero demo credentials / passwords)

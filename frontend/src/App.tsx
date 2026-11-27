@@ -6,9 +6,14 @@ import { useRouter } from './hooks/useRouter'
 import { BackOfficeLoginPage } from './pages/BackOfficeLoginPage'
 import { Forbidden403Page } from './pages/Forbidden403Page'
 import { LearnerAuthPage } from './pages/LearnerAuthPage'
+import { PublicAboutPage } from './pages/PublicAboutPage'
+import { PublicCurriculumPage } from './pages/PublicCurriculumPage'
+import { PublicHomePage } from './pages/PublicHomePage'
+import { PublicHowItWorksPage } from './pages/PublicHowItWorksPage'
 import { defaultPathForRole, loginPathForPortal } from './router'
 import { BackOfficeAppShell } from './shells/BackOfficeAppShell'
 import { LearnerAppShell } from './shells/LearnerAppShell'
+import { PublicShowcaseShell } from './shells/PublicShowcaseShell'
 import { defaultViewForRole } from './types'
 import type { ActiveView, LearnerUser, ToastNotification, ToastType } from './types'
 import type { BackOfficeView } from './types/expert'
@@ -27,7 +32,7 @@ export function App({ initialUser = null, initialView }: AppProps = {}) {
   const { route, navigate, pushPath } = useRouter()
   const [user, setUser] = useState<LearnerUser | null>(initialUser)
   const [isBootstrappingAuth, setIsBootstrappingAuth] = useState<boolean>(
-    () => !initialUser && !route.isLoginPath && !route.isRegisterPath,
+    () => !initialUser && !route.isLoginPath && !route.isRegisterPath && !route.publicPage,
   )
   const [authMode, setAuthMode] = useState<'login' | 'register'>(
     route.isRegisterPath ? 'register' : 'login',
@@ -71,6 +76,42 @@ export function App({ initialUser = null, initialView }: AppProps = {}) {
   }, [initialUser])
 
   const isBackOfficeRoute = route.portal === 'admin' || route.portal === 'expert'
+
+  function handlePublicNavigate(path: string): void {
+    if (path === '/register') {
+      setAuthMode('register')
+    } else if (path === '/login') {
+      setAuthMode('login')
+    }
+    pushPath(path)
+  }
+
+  function renderPublicShowcase(currentUser: LearnerUser | null) {
+    const activePublic = route.publicPage ?? 'home'
+    return (
+      <>
+        <Toast toast={toast} onClose={() => setToast(null)} />
+        <PublicShowcaseShell
+          activePage={activePublic}
+          user={currentUser}
+          onNavigatePath={handlePublicNavigate}
+        >
+          {activePublic === 'home' && (
+            <PublicHomePage onNavigatePath={handlePublicNavigate} />
+          )}
+          {activePublic === 'how_it_works' && (
+            <PublicHowItWorksPage onNavigatePath={handlePublicNavigate} />
+          )}
+          {activePublic === 'curriculum' && (
+            <PublicCurriculumPage onNavigatePath={handlePublicNavigate} />
+          )}
+          {activePublic === 'about' && (
+            <PublicAboutPage onNavigatePath={handlePublicNavigate} />
+          )}
+        </PublicShowcaseShell>
+      </>
+    )
+  }
 
   async function handleAuthSubmit(e: React.FormEvent): Promise<void> {
     e.preventDefault()
@@ -135,8 +176,11 @@ export function App({ initialUser = null, initialView }: AppProps = {}) {
     )
   }
 
-  // 1. UNAUTHENTICATED: Strict Dual-Portal Login Separation
+  // 1. UNAUTHENTICATED: Public Showcase Suite + Strict Dual-Portal Login Separation
   if (!user) {
+    if (route.publicPage) {
+      return renderPublicShowcase(null)
+    }
     if (isBackOfficeRoute) {
       return (
         <>
@@ -150,6 +194,7 @@ export function App({ initialUser = null, initialView }: AppProps = {}) {
             isLoading={isLoading}
             onSubmit={handleAuthSubmit}
             portalHint={route.portal === 'expert' ? 'expert' : 'admin'}
+            onBackHome={() => handlePublicNavigate('/')}
           />
         </>
       )
@@ -171,6 +216,7 @@ export function App({ initialUser = null, initialView }: AppProps = {}) {
             authError={authError}
             isLoading={isLoading}
             onSubmit={handleAuthSubmit}
+            onBackHome={() => handlePublicNavigate('/')}
           />
         </div>
         <footer className="w-full bg-white border-t border-outline-variant/50 py-3.5 px-6 text-xs text-outline">
@@ -185,6 +231,11 @@ export function App({ initialUser = null, initialView }: AppProps = {}) {
         </footer>
       </div>
     )
+  }
+
+  // 1b. AUTHENTICATED ON SECONDARY PUBLIC SHOWCASE PAGES (/how-it-works, /curriculum, /about)
+  if (route.publicPage && route.publicPage !== 'home') {
+    return renderPublicShowcase(user)
   }
 
   const role = user.role ?? 'learner'
