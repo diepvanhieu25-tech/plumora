@@ -1,7 +1,7 @@
 # Active Session Memory
 
 - **Project:** Plumora — Adaptive Personalized Learning-Path Recommendation & Management using RL.
-- **Current Branch:** `main` (`245c5e1` includes merged `v4.1` `D-37`..`D-41`; working tree contains verified `D-42` Public Showcase Suite `PUB-01`..`PUB-04` awaiting explicit Gate 4 user commit/push authorization).
+- **Current Branch:** `refactor/v4.2-hardening-and-maintainability` (branched from `main` `245c5e1`; contains verified `v4.2` Backend Clean Architecture + Hardening + Alembic + `core/`/`shared/`/`middleware/`/`dependencies/` + Frontend page modularization, awaiting Gate 3/Gate 4).
 - **Phase Status:**
   - Phase 1 MVP (`v1.0.0` — `D-01`..`D-15`), Phase 3 Baseline (`v2.0.0` — `D-16`..`D-26`), `v3.1` Microservices & RL Hardening (`D-27`..`D-30`, `REM-01`..`REM-04`), and `v4.0.0` Final Clean Baseline (`D-31`..`D-36`): Completed & merged to `main` (`0f8440f`, GitHub Actions Run `45935796283` SUCCESS).
   - **Plumora `v4.1` UX, RL Explainability, Admin RL Observability & Expert Streamlining (`D-37`..`D-41`):** **IMPLEMENTED, VERIFIED (7/7 `./scripts/ci_check.sh` + Live Docker 4-Microservices Rebuild + Real Chromium E2E + Gate 3 Independent 4-Axis Review: PASS — 0 Blocker / 0 Critical / 0 Major).**
@@ -12,11 +12,11 @@
     - **`D-41` (Expert Studio Workflow Streamlining):** Replaced `SimpleMarkdownPreview` with shared `MarkdownRenderer`; added `PATCH /api/v2/expert/concepts/{slug}/playbook` (with non-blank validator) + `"Lưu riêng Playbook"` button in `ExpertDomainsPage.tsx`; added `"Tự cân bằng = 1.0"` Rubric weight normalizer in `ExpertQuestionsPage.tsx`; added `POST /api/v2/expert/code-challenges/dry-run` (Dual Sandbox Verification without DB persist) + `"Chạy thử Sandbox (Dry-Run)"` button in `ExpertCodeChallengesPage.tsx`.
     - **`D-42` (Public Showcase Suite `PUB-01`..`PUB-04`):** Implemented Botanical Editorial & Interactive Blueprint public introduction pages under `PublicShowcaseShell.tsx` (`/` `PublicHomePage.tsx` with interactive mini GNN-PPO DAG blueprint, `/how-it-works` `PublicHowItWorksPage.tsx`, `/curriculum` `PublicCurriculumPage.tsx` with interactive 3-domain switcher & 31 real seeded concepts, `/about` `PublicAboutPage.tsx` with 4-Microservices architecture & 3-role portal links). Verified `8/8` Vitest unit files (`19/19`), `7/7` `./scripts/ci_check.sh`, live Docker `http://localhost:3000`, and `8/8` Desktop (`1280px`) & Mobile (`390px`) Chromium screenshots (`0px` overflow, 0 emoji, 0 demo creds).
     - **Defense Docs:** Rewrote `docs/defense/DEMO_RUNBOOK.md` to `v4.0.0` (removed all `v1.0.0` MVP leftovers).
-- **Verification Evidence Summary (2026-11-27):**
-  - Backend: `ruff`, `mypy` (85 files), `pytest` (`107/107` PASS including `test_v41_rl_observability_and_expert.py`).
-  - RL: `ruff`, `mypy`, `pytest` (`17/17` PASS; checkpoint untouched).
-  - Frontend: `eslint` (0 errors), `tsc --noEmit`, `tsc -b && vite build` PASS, Vitest unit (`7/7` files, `15/15` tests PASS including `v41_playbook_and_rl_ux.test.tsx`), Live Fullstack Integration (`1/1` PASS).
+- **Verification Evidence Summary (2026-11-28 — `v4.2` Direction A Clean Architecture & Hardening):**
+  - Architecture: Modular Monorepo deployed as 4 Isolated Runtime Services + API Gateway + 4 Isolated PostgreSQL Schemas; `alembic/` (`0001_v4_baseline` upgrade/downgrade verified + live in `db-migrate-seed`), `app/core/`, `app/shared/`, `app/middleware/`, `app/dependencies/`, per-context `models.py` + `repository.py` + `services/` (`<= 550` LOC/file, 0 allowlist).
+  - Backend: `ruff` (`E,F,I,S`), `mypy --strict` (127 files), `pytest` (`117/117` PASS including `17` architecture fitness tests & `test_v42_hardening_and_observability.py`).
+  - RL: `ruff`, `mypy`, `pytest` (`17/17` PASS; checkpoint `SHA-256 = 824bebf1...` untouched).
+  - Frontend: `eslint` (0 errors) + `npm audit --omit=dev --audit-level=high` (0 vulnerabilities), `tsc --noEmit`, `tsc -b && vite build` PASS, Vitest unit (`9/9` files, `23/23` tests PASS including `frontend_architecture_guard.test.ts`), Live Fullstack Integration (`1/1` PASS). Organized into `core/router.ts`, `pages/{public,auth,learner,expert,admin}/`, `components/{ui,learner,assessment,expert,admin}/` (removed dead `Header.tsx` & duplicate `components/common/`), every production file `<= 550` LOC (zero allowlist).
   - Live Docker Stack & E2E: `docker compose up -d --build --remove-orphans --wait` + `./scripts/ci_check.sh` **7/7 Gates EXIT 0** (Real Chromium E2E Audit + Negative Control + Edge Security 403/404 + `k8s YAML` + `git diff --check`).
-  - Gate 3 Independent 4-Axis Review (`37bb1ba0-5fdb-496f-95ba-e88b4f416556`): **PASS** (initial Major #1 + Minors #2, #3, #4, #6, #7 fixed and re-verified on disk; **0 Blocker, 0 Critical, 0 Major**).
 - **Next User Action Needed:**
-  - Explicit **Gate 4** authorization to commit (either directly on `main` or via a task branch `feat/public-showcase-pages`) and push `D-42` (`PUB-01`..`PUB-04`).
+  - Confirm Gate 3 independent review or explicit **Gate 4** commit/merge authorization for `refactor/v4.2-hardening-and-maintainability`.

@@ -10,7 +10,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 from sqlalchemy import delete, func, select, update
 
-from app.config import REPO_ROOT
+from app.core.config import REPO_ROOT
 from app.db.models import (
     AssessmentSessionModel,
     AttemptRecordModel,

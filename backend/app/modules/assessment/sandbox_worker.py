@@ -286,7 +286,7 @@ class BaseSubprocessSandboxRunner(ABC):
         cmd = self.build_command(source_code, test_cases, timeout_ms, memory_limit_mb, setup_sql)
         t0 = time.monotonic()
         try:
-            proc = subprocess.run(
+            proc = subprocess.run(  # noqa: S603
                 cmd,
                 capture_output=True,
                 text=True,

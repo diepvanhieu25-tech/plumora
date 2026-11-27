@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from app.modules.contracts.dtos import ConceptNodeDTO
+from app.shared.contracts.dtos import ConceptNodeDTO
 
 MAX_PLACEMENT_QUESTIONS: int = 6
 PLACEMENT_DEPTH_CAP: float = 0.75

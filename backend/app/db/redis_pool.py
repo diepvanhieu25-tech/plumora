@@ -7,7 +7,7 @@ from typing import ClassVar
 
 import redis
 
-from app.config import settings
+from app.core.config import settings
 
 
 class RedisConnectionProvider:

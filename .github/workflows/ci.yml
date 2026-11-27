@@ -58,11 +58,11 @@ jobs:
           cd ../rl && uv sync --frozen
           cd ../frontend && npm ci
 
-      - name: 1. Lint & Format Check (Ruff, ESLint, Git Diff)
+      - name: 1. Lint, SAST & Format Check (Ruff + Bandit Rules, ESLint, npm audit, Git Diff)
         run: |
           cd backend && uv run ruff check .
           cd ../rl && uv run ruff check .
-          cd ../frontend && npm run lint
+          cd ../frontend && npm run lint && npm audit --omit=dev --audit-level=high
           cd .. && git diff --check
 
       - name: 2. Type Check (Mypy & TypeScript)

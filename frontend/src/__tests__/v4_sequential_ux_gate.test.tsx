@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { MultiDomainKgNodeCard } from '../components/MultiDomainKgNodeCard'
+import { MultiDomainKgNodeCard } from '../components/learner/MultiDomainKgNodeCard'
 import type { DomainRoadmapNode } from '../types'
 
 function makeNode(overrides: Partial<DomainRoadmapNode> = {}): DomainRoadmapNode {

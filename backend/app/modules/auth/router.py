@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-import uuid
-
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from app.config import settings
-from app.db.models import DbSession, UserModel
+from app.core.config import settings
+from app.core.observability import emit_audit_event
+from app.dependencies.db import DbSession
+from app.modules.auth.repository import UserRepository
 from app.modules.auth.schemas import LoginRequest, RegisterRequest, serialize_user
 from app.modules.auth.security import (
     create_access_token,
@@ -31,8 +30,8 @@ def register_user(
     db: DbSession,
 ) -> JSONResponse:
     """Register a new learner account strictly inside auth_svc.users (PL-AUTH-01, Decision A1)."""
-    existing = db.scalar(select(UserModel).where(UserModel.username == payload.username))
-    if existing is not None:
+    repo = UserRepository(db)
+    if repo.get_by_username(payload.username) is not None:
         return JSONResponse(
             status_code=409,
             content={
@@ -42,15 +41,12 @@ def register_user(
             },
         )
 
-    user = UserModel(
-        id=uuid.uuid4(),
+    user = repo.create(
         username=payload.username,
         display_name=payload.display_name,
         password_hash=hash_password(payload.password),
-        state_version=1,
     )
     try:
-        db.add(user)
         db.commit()
     except IntegrityError:
         db.rollback()
@@ -79,8 +75,16 @@ def login_user(
     db: DbSession,
 ) -> JSONResponse:
     """Authenticate an account using Argon2id and issue HttpOnly session cookie."""
-    user = db.scalar(select(UserModel).where(UserModel.username == payload.username))
+    user = UserRepository(db).get_by_username(payload.username)
     if user is None or not verify_password(payload.password, user.password_hash):
+        emit_audit_event(
+            action="auth.login",
+            actor_id=str(user.id) if user else None,
+            role=getattr(user, "role", None) if user else None,
+            resource="/api/v1/auth/login",
+            outcome="failed",
+            details={"username": payload.username, "portal": payload.portal},
+        )
         return JSONResponse(
             status_code=401,
             content={
@@ -92,6 +96,14 @@ def login_user(
 
     user_role = getattr(user, "role", "learner")
     if payload.portal == "admin" and user_role != "admin":
+        emit_audit_event(
+            action="auth.login",
+            actor_id=str(user.id),
+            role=user_role,
+            resource="/api/v1/auth/login",
+            outcome="denied",
+            details={"portal": payload.portal},
+        )
         return JSONResponse(
             status_code=403,
             content={
@@ -101,6 +113,14 @@ def login_user(
             },
         )
     if payload.portal == "expert" and user_role not in ("expert", "admin"):
+        emit_audit_event(
+            action="auth.login",
+            actor_id=str(user.id),
+            role=user_role,
+            resource="/api/v1/auth/login",
+            outcome="denied",
+            details={"portal": payload.portal},
+        )
         return JSONResponse(
             status_code=403,
             content={
@@ -110,6 +130,14 @@ def login_user(
             },
         )
     if payload.portal == "learner" and user_role != "learner":
+        emit_audit_event(
+            action="auth.login",
+            actor_id=str(user.id),
+            role=user_role,
+            resource="/api/v1/auth/login",
+            outcome="denied",
+            details={"portal": payload.portal},
+        )
         return JSONResponse(
             status_code=403,
             content={
@@ -120,6 +148,14 @@ def login_user(
         )
 
     token = create_access_token(user.id, user.username, role=user.role)
+    emit_audit_event(
+        action="auth.login",
+        actor_id=str(user.id),
+        role=user_role,
+        resource="/api/v1/auth/login",
+        outcome="success",
+        details={"portal": payload.portal},
+    )
     res = JSONResponse(
         status_code=200,
         content={"user": serialize_user(user), "access_token": token},

@@ -21,7 +21,6 @@ ALLOWED_CROSS_IMPORTS: set[tuple[str, str]] = {
     ("recommendation", "app.modules.auth.rbac"),
     ("content", "app.modules.assessment.sandbox_worker"),
     ("content", "app.modules.assessment.rubric_grader"),
-    ("content", "app.modules.assessment.ebbinghaus"),
     ("content", "app.modules.assessment.depth_state_machine"),
     ("assessment", "app.modules.content.kg_service"),
     ("assessment", "app.modules.recommendation.service_v2"),
@@ -49,7 +48,7 @@ def test_arch_no_forbidden_cross_context_service_or_model_imports() -> None:
     for ctx in BOUNDED_CONTEXTS:
         ctx_dir = MODULES_ROOT / ctx
         assert ctx_dir.is_dir(), f"Missing bounded context directory: {ctx_dir}"
-        for py_file in sorted(ctx_dir.glob("*.py")):
+        for py_file in sorted(ctx_dir.rglob("*.py")):
             for mod in _collect_imported_modules(py_file):
                 for other in BOUNDED_CONTEXTS:
                     if other == ctx:

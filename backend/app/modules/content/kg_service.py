@@ -9,12 +9,13 @@ from plumora_rl.domain import EbbinghausMemoryModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config import settings
+from app.core.config import settings
 from app.db.models import (
     CodeChallengeModel,
     DomainConceptMapModel,
     DomainModel,
 )
+from app.modules.content.repository import ContentRepository
 from app.modules.content.schemas_v2 import (
     ConceptPlaybookDetailResponse,
     DomainListItem,
@@ -23,9 +24,9 @@ from app.modules.content.schemas_v2 import (
     DomainsListResponse,
     DomainUserSummary,
 )
-from app.modules.contracts.adapters import get_competency_reader_port
-from app.modules.contracts.dtos import UserCompetencySnapshotDTO, UserNodeCompetencyDTO
-from app.modules.contracts.ports import CompetencyReaderPort
+from app.shared.contracts.adapters import get_competency_reader_port
+from app.shared.contracts.dtos import UserCompetencySnapshotDTO, UserNodeCompetencyDTO
+from app.shared.contracts.ports import CompetencyReaderPort
 
 
 def _load_user_snapshot(
@@ -101,12 +102,7 @@ def list_domains_for_user(
     competency_port: CompetencyReaderPort | None = None,
 ) -> DomainsListResponse:
     """List all published domains with cross-domain node counts and user summary (read-only)."""
-    domains = db.scalars(
-        select(DomainModel)
-        .where(DomainModel.is_published.is_(True))
-        .order_by(DomainModel.slug)
-        .limit(100)
-    ).all()
+    domains = ContentRepository(db).list_published_domains(limit=100)
     snapshot, comp_map = _load_user_snapshot(db, user_id, competency_port)
     completed_placements = set(snapshot.completed_placement_domains)
 
@@ -186,7 +182,8 @@ def get_domain_roadmap_for_user(
     competency_port: CompetencyReaderPort | None = None,
 ) -> DomainRoadmapResponse:
     """Return full domain DAG roadmap with cross-domain competency & Ebbinghaus retention."""
-    domain = db.get(DomainModel, domain_slug)
+    repo = ContentRepository(db)
+    domain = repo.get_domain(domain_slug)
     if domain is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -202,24 +199,9 @@ def get_domain_roadmap_for_user(
         else 0.0
     )
 
-    nodes = db.scalars(
-        select(DomainConceptMapModel)
-        .where(DomainConceptMapModel.domain_slug == domain_slug)
-        .order_by(DomainConceptMapModel.node_idx)
-    ).all()
+    nodes = repo.list_domain_nodes(domain_slug)
     slugs = [n.concept_slug for n in nodes]
-    challenge_slugs = (
-        set(
-            db.scalars(
-                select(CodeChallengeModel.concept_slug).where(
-                    CodeChallengeModel.concept_slug.in_(slugs),
-                    CodeChallengeModel.is_active.is_(True),
-                )
-            ).all()
-        )
-        if slugs
-        else set()
-    )
+    challenge_slugs = repo.list_active_challenge_slugs(slugs)
     title_by_slug = {n.concept_slug: n.title for n in nodes}
     _, comp_map = _load_user_snapshot(db, user_id, competency_port)
 

@@ -31,7 +31,9 @@ RUN apt-get update && \
 # Copy virtual environment from builder
 COPY --from=builder --chown=plumora:plumora /app/.venv /app/.venv
 
-# Copy application code, microservices entrypoints, shared zero-Torch RL kernel, and RL artifacts
+# Copy application code, Alembic migrations, microservices entrypoints, shared zero-Torch RL kernel, and RL artifacts
+COPY --chown=plumora:plumora backend/alembic.ini /app/backend/alembic.ini
+COPY --chown=plumora:plumora backend/alembic /app/backend/alembic
 COPY --chown=plumora:plumora backend/app /app/backend/app
 COPY --chown=plumora:plumora backend/services /app/backend/services
 COPY --chown=plumora:plumora backend/pyproject.toml /app/backend/pyproject.toml

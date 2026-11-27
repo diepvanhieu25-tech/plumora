@@ -7,7 +7,7 @@ import uuid
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, inspect, text
 
-from app.config import settings
+from app.core.config import settings
 from app.db.migrations import run_database_migrations
 from app.db.models import engine as app_engine
 from app.main import app

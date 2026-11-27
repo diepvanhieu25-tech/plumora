@@ -26,13 +26,35 @@ spec:
       containers:
         - name: db-migrate-seed
           image: plumora-backend:4.0.0
-          command: ["python", "-m", "app.modules.content.seed_loader"]
+          command: ["sh", "-c", "alembic upgrade head && python -m app.modules.content.seed_loader"]
           env:
+            - name: APP_ENV
+              value: "production"
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
                   name: plumora-secrets
                   key: db-admin-url
+            - name: AUTH_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: plumora-secrets
+                  key: auth-db-password
+            - name: CONTENT_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: plumora-secrets
+                  key: content-db-password
+            - name: ASSESS_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: plumora-secrets
+                  key: assess-db-password
+            - name: REC_AI_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: plumora-secrets
+                  key: rec-ai-db-password
             - name: REDIS_URL
               value: "redis://redis:6379/0"
             - name: JWT_SECRET_KEY
@@ -93,12 +115,12 @@ spec:
               value: "http://assessment-grader-service:8003"
           livenessProbe:
             httpGet:
-              path: /health
+              path: /health/live
               port: 8001
             initialDelaySeconds: 10
           readinessProbe:
             httpGet:
-              path: /health
+              path: /health/ready
               port: 8001
             initialDelaySeconds: 5
           resources:
@@ -164,12 +186,12 @@ spec:
               value: "http://assessment-grader-service:8003"
           livenessProbe:
             httpGet:
-              path: /health
+              path: /health/live
               port: 8002
             initialDelaySeconds: 10
           readinessProbe:
             httpGet:
-              path: /health
+              path: /health/ready
               port: 8002
             initialDelaySeconds: 5
           resources:
@@ -235,12 +257,12 @@ spec:
               value: "http://content-kg-service:8002"
           livenessProbe:
             httpGet:
-              path: /health
+              path: /health/live
               port: 8003
             initialDelaySeconds: 10
           readinessProbe:
             httpGet:
-              path: /health
+              path: /health/ready
               port: 8003
             initialDelaySeconds: 5
           resources:
@@ -315,12 +337,12 @@ spec:
               mountPath: /app/rl/artifacts/candidates
           livenessProbe:
             httpGet:
-              path: /health
+              path: /health/live
               port: 8004
             initialDelaySeconds: 10
           readinessProbe:
             httpGet:
-              path: /health
+              path: /health/ready
               port: 8004
             initialDelaySeconds: 5
           resources:

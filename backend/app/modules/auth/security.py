@@ -17,7 +17,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.config import resolve_jwt_secret, settings
+from app.core.config import resolve_jwt_secret, settings
 from app.db.models import UserModel
 from app.db.redis_pool import get_redis_client
 

@@ -12,7 +12,7 @@ from app.main import app
 
 def test_pl3_memory_01_ebbinghaus_formula_decay_and_recovery() -> None:
     """Verify R(t) = exp(-dt / S) with S0=3.0, needs_review < 0.60, and S_new update rules."""
-    from app.modules.assessment.ebbinghaus import (
+    from app.shared.ebbinghaus import (
         INITIAL_STABILITY_DAYS,
         compute_retention,
         update_stability,

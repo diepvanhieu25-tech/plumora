@@ -11,7 +11,7 @@ from pathlib import Path
 
 from plumora_rl.inference import NumpyGnnPredictor
 
-from app.config import REPO_ROOT, settings
+from app.core.config import REPO_ROOT, settings
 
 DEFAULT_GNN_CKPT_PATH = REPO_ROOT / "rl" / "artifacts" / "gnn_ppo_v2_base.zip"
 DEFAULT_GNN_MANIFEST_PATH = REPO_ROOT / "rl" / "artifacts" / "manifest_phase3.json"

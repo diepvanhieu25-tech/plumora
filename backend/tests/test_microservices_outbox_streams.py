@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session
 
-from app.config import settings
+from app.core.config import settings
 from app.main import ensure_db_initialized
 
 
@@ -42,7 +42,7 @@ def test_pl3_arch_01_four_schemas_exist_and_cross_schema_query_blocked() -> None
 def test_pl3_arch_01_transactional_outbox_and_idempotent_event_consumption() -> None:
     """Consuming the same event_id 3 times writes exactly 1 row to rl_experience_buffer."""
     from app.db.models import RlExperienceBufferModel, engine
-    from app.modules.events.outbox import (
+    from app.shared.events.outbox import (
         consume_competency_event_idempotent,
         record_outbox_event_in_tx,
     )

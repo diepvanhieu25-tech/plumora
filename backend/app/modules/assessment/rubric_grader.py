@@ -208,6 +208,8 @@ class LlmRubricGraderAdapter(RubricGraderPort):
         api_key = os.environ.get("PLUMORA_LLM_API_KEY", "").strip()
         if not api_url or not api_key:
             raise ConnectionError("External LLM API is not configured in local/offline mode.")
+        if not api_url.startswith(("http://", "https://")):
+            raise ValueError("PLUMORA_LLM_API_URL must use http:// or https:// scheme.")
 
         request_payload = {
             "model": os.environ.get("PLUMORA_LLM_MODEL", "gpt-4o-mini"),
@@ -242,7 +244,7 @@ class LlmRubricGraderAdapter(RubricGraderPort):
                 },
             ],
         }
-        req = urllib.request.Request(
+        req = urllib.request.Request(  # noqa: S310
             api_url,
             method="POST",
             headers={
@@ -251,7 +253,7 @@ class LlmRubricGraderAdapter(RubricGraderPort):
             },
             data=json.dumps(request_payload).encode("utf-8"),
         )
-        with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
+        with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:  # noqa: S310
             if resp.status >= 400:
                 raise RuntimeError(f"LLM API returned HTTP {resp.status}")
             raw_bytes = resp.read()

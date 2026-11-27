@@ -33,7 +33,7 @@ def _register_user_and_token(client: TestClient) -> tuple[str, str]:
 
 def test_r3_03_competency_update_records_distinct_before_and_after_observations() -> None:
     """R3-03: Outbox -> stream -> buffer must record distinct obs_before and obs_after with real node_idx."""
-    from app.modules.events.outbox import (
+    from app.shared.events.outbox import (
         consume_competency_stream_once,
         relay_pending_outbox_events,
     )

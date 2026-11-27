@@ -9,8 +9,14 @@ from typing import Any
 def test_f12_admin_model_registry_page_does_not_hardcode_benchmark_numbers() -> None:
     """F12: AdminModelRegistryPage.tsx must bind benchmark table to real artifact data, not hardcoded 61.20/58.90."""
     repo_root = Path(__file__).resolve().parents[2]
-    page_text = (repo_root / "frontend" / "src" / "pages" / "AdminModelRegistryPage.tsx").read_text(
-        encoding="utf-8"
+    page_text = (
+        (repo_root / "frontend" / "src" / "pages" / "admin" / "AdminModelRegistryPage.tsx").read_text(
+            encoding="utf-8"
+        )
+        + "\n"
+        + (repo_root / "frontend" / "src" / "components" / "admin" / "SafetyGateScorecard.tsx").read_text(
+            encoding="utf-8"
+        )
     )
     for fake_num in ("61.20", "58.90", "54.10", "52.30"):
         assert fake_num not in page_text, f"Found hardcoded benchmark figure '{fake_num}' in AdminModelRegistryPage.tsx"
@@ -36,12 +42,13 @@ def test_f07_system_health_detects_dead_vs_alive_consumer_and_real_db_privileges
 
     import redis
 
-    from app.config import settings
+    from app.core.config import settings
     from app.db.models import SessionLocal
     from app.modules.recommendation import admin_service
+    from app.modules.recommendation.services import system_health as system_health_service
 
     isolated_hb_key = f"plumora:worker:test_{uuid.uuid4().hex[:8]}"
-    monkeypatch.setattr(admin_service, "WORKER_HEARTBEAT_KEY", isolated_hb_key)
+    monkeypatch.setattr(system_health_service, "WORKER_HEARTBEAT_KEY", isolated_hb_key)
 
     r_client = redis.Redis.from_url(settings.redis_url, decode_responses=True)
     try:

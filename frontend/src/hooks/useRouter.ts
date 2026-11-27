@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { parseRoute, pathForView } from '../router'
-import type { AssessmentSessionMode, ParsedRoute } from '../router'
+import { parseRoute, pathForView } from '../core/router'
+import type { AssessmentSessionMode, ParsedRoute } from '../core/router'
 import type { ActiveView } from '../types'
 
 function readCurrentRoute(): ParsedRoute {

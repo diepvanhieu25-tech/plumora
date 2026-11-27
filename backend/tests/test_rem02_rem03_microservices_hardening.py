@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from app.config import REPO_ROOT, settings
+from app.core.config import REPO_ROOT, settings
 from app.db.models import (
     CodeChallengeModel,
     DepthQuestionModel,
@@ -152,14 +152,14 @@ def test_rem02_gateway_never_persists_or_bleeds_upstream_session_cookies(
 def test_rem03_competency_state_version_monotonic_and_redis_first_cache_invalidation() -> None:
     """state_version must advance when existing competency updates, and _read_through_raw_competencies must read Redis first."""
     from app.modules.assessment.router_v2 import get_user_competencies_internal
-    from app.modules.contracts.dtos import (
-        ConceptNodeDTO,
-        DomainTopologyDTO,
-        UserCompetencySnapshotDTO,
-    )
     from app.modules.recommendation.service_v2 import (
         _raw_comp_redis_key,
         _read_through_raw_competencies,
+    )
+    from app.shared.contracts.dtos import (
+        ConceptNodeDTO,
+        DomainTopologyDTO,
+        UserCompetencySnapshotDTO,
     )
 
     with TestClient(app) as client:
@@ -326,7 +326,7 @@ def test_rem03_outbox_dynamic_consumer_name_and_integrity_error_acks_cleanly(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Outbox consumer must use dynamic {hostname}-{pid} consumer name and XACK duplicate IntegrityError without PEL hang."""
-    from app.modules.events import outbox as outbox_mod
+    from app.shared.events import outbox as outbox_mod
 
     assert hasattr(outbox_mod, "_default_consumer_name"), "outbox.py must define _default_consumer_name()"
     cname = outbox_mod._default_consumer_name()
@@ -450,14 +450,15 @@ def test_rem03_internal_cohort_and_outbox_aggregation_across_microservices(
 ) -> None:
     """Cohort analytics and Admin outbox health/relay must delegate via internal microservice APIs."""
     from app.modules.content import expert_service
-    from app.modules.events import internal_client
+    from app.modules.content.services import challenge_and_cohort
     from app.modules.recommendation import admin_service
+    from app.shared.events import internal_client
 
     monkeypatch.setenv("ASSESSMENT_SERVICE_URL", "http://assessment-grader-service:8003")
     monkeypatch.setenv("CONTENT_SERVICE_URL", "http://content-kg-service:8002")
 
     monkeypatch.setattr(
-        expert_service,
+        challenge_and_cohort,
         "fetch_cohort_analytics_data_internal",
         lambda slugs: {
             "competencies": [
@@ -487,8 +488,10 @@ def test_rem03_internal_cohort_and_outbox_aggregation_across_microservices(
         assert first_node["deep_count"] == 1
         assert first_node["bottleneck_tier"] == 3
 
+        from app.modules.recommendation.services import system_health as system_health_service
+
         monkeypatch.setattr(
-            admin_service,
+            system_health_service,
             "fetch_all_outbox_pending_internal",
             lambda: (5, {"CompetencyUpdatedEvent": 3, "DomainGraphUpdatedEvent": 2}),
         )
@@ -497,7 +500,7 @@ def test_rem03_internal_cohort_and_outbox_aggregation_across_microservices(
         assert health["outbox_pending_by_event_type"]["CompetencyUpdatedEvent"] == 3
         assert health["outbox_pending_by_event_type"]["DomainGraphUpdatedEvent"] == 2
 
-        monkeypatch.setattr(admin_service, "trigger_remote_outbox_relays_internal", lambda: 4)
+        monkeypatch.setattr(system_health_service, "trigger_remote_outbox_relays_internal", lambda: 4)
         relay_res = admin_service.trigger_manual_outbox_relay(db)
         assert relay_res["status"] == "ok"
         assert relay_res["relayed"] == 4
@@ -554,7 +557,7 @@ def test_rem03_kg_service_skips_cross_schema_mvp_query_in_microservice_mode(
 ) -> None:
     """In Microservice mode, kg_service must not query user_concept_mastery or trigger db.rollback()."""
     from app.modules.content import kg_service
-    from app.modules.contracts.dtos import UserCompetencySnapshotDTO
+    from app.shared.contracts.dtos import UserCompetencySnapshotDTO
 
     monkeypatch.setenv("ASSESSMENT_SERVICE_URL", "http://assessment-grader-service:8003")
 
@@ -614,7 +617,9 @@ def test_rem03_playbook_complete_invalidates_redis_cache_after_commit(
         events.append("invalidated")
         orig_inv(uid)
 
-    monkeypatch.setattr(service_v2, "_invalidate_user_competency_cache", _tracked_inv)
+    from app.modules.assessment.services import code_sandbox as code_sandbox_service
+
+    monkeypatch.setattr(code_sandbox_service, "_invalidate_user_competency_cache", _tracked_inv)
 
     with TestClient(app), SessionLocal() as db:
         user = db.scalar(select(UserModel).where(UserModel.username == "learner_new"))
@@ -677,7 +682,7 @@ def test_rem03_soft_deleted_questions_block_new_session_but_preserve_inflight_mi
         get_concept_bundle_internal,
         get_domain_bundle_internal,
     )
-    from app.modules.contracts.adapters import CachedHttpContentCatalogAdapter
+    from app.shared.contracts.adapters import CachedHttpContentCatalogAdapter
 
     with TestClient(app), SessionLocal() as db:
         uname = f"rem03_inflight_{uuid.uuid4().hex[:8]}"
@@ -729,11 +734,11 @@ def test_rem03_soft_deleted_questions_block_new_session_but_preserve_inflight_mi
 
             # Simulate Microservice CachedHttpContentCatalogAdapter backed by content-kg-service internal bundle
             monkeypatch.setattr(
-                "app.modules.contracts.adapters.fetch_concept_bundle_internal",
+                "app.shared.contracts.adapters.fetch_concept_bundle_internal",
                 lambda c_slug: get_concept_bundle_internal(c_slug, db, domain_slug=None),
             )
             monkeypatch.setattr(
-                "app.modules.contracts.adapters.fetch_domain_bundle_internal",
+                "app.shared.contracts.adapters.fetch_domain_bundle_internal",
                 lambda d_slug: get_domain_bundle_internal(d_slug, db),
             )
             ms_catalog = CachedHttpContentCatalogAdapter()
@@ -777,7 +782,7 @@ def test_rem03_soft_deleted_questions_block_new_session_but_preserve_inflight_mi
 
 def test_rem03_domain_events_stream_xautoclaims_orphaned_pel_messages() -> None:
     """consume_domain_events_stream_once must XAUTOCLAIM orphaned PEL messages from crashed worker PIDs."""
-    from app.modules.events import outbox as outbox_mod
+    from app.shared.events import outbox as outbox_mod
 
     stream_name = f"plumora:rem03_dom_pel_{uuid.uuid4().hex[:8]}"
     cg_name = "test_dom_pel_cg"

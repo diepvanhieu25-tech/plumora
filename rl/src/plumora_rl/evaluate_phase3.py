@@ -227,7 +227,8 @@ def evaluate_policy(
                     act_int = int(act_raw)
                     action = (act_int // NUM_MODES, act_int % NUM_MODES)
             else:
-                assert gnn_model is not None
+                if gnn_model is None:
+                    raise RuntimeError("gnn_model must be provided for non-baseline evaluation")
                 with torch.no_grad():
                     logits, _ = gnn_model(
                         torch.from_numpy(obs["node_features"]),
@@ -311,7 +312,8 @@ def run_training_and_evaluation(
             best_model = candidate
             best_seed = s
 
-    assert best_model is not None
+    if best_model is None:
+        raise RuntimeError("No GNN-PPO model was trained across TRAIN_SEEDS")
 
     # Train MLP baselines across TRAIN_SEEDS with the exact same environment timestep budget & VAL_SEED selection
     best_dqn_mlp: DQN | None = None

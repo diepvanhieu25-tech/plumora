@@ -39,7 +39,7 @@ def test_f3_production_refuses_to_start_without_valid_secret(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """F3/H3: In production, resolve_jwt_secret must refuse to start without a valid secret >= 32 chars."""
-    from app.config import resolve_jwt_secret
+    from app.core.config import resolve_jwt_secret
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("APP_ENV", "production")
@@ -65,7 +65,7 @@ def test_h3_settings_receives_production_from_dotenv_without_os_getenv_app_env(
     resolve_jwt_secret must still strictly enforce production requirements and refuse to start
     without a valid secret >= 32 chars (never silently generate ephemeral dev secret).
     """
-    from app.config import Settings, resolve_jwt_secret
+    from app.core.config import Settings, resolve_jwt_secret
 
     # Clear process env vars
     monkeypatch.delenv("APP_ENV", raising=False)
@@ -105,7 +105,7 @@ def test_h3_env_local_overrides_env_base_and_process_env_overrides_all(
     """H3: Precedence must strictly be: process environment > .env.local > .env."""
     from pydantic_settings import SettingsConfigDict
 
-    from app.config import Settings
+    from app.core.config import Settings
 
     env_base = tmp_path / ".env"
     env_local = tmp_path / ".env.local"

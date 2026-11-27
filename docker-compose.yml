@@ -37,12 +37,17 @@ services:
       dockerfile: backend/Dockerfile
     container_name: plumora-db-migrate-seed
     restart: "no"
-    command: ["python", "-c", "from app.modules.content.seed_loader import init_db_and_seed; init_db_and_seed()"]
+    command: ["sh", "-c", "alembic upgrade head && python -c 'from app.modules.content.seed_loader import init_db_and_seed; init_db_and_seed()'"]
     environment:
       APP_ENV: ${APP_ENV:-development}
       DATABASE_URL: postgresql+psycopg://${DB_USER:-plumora_app}:${DB_PASSWORD:-plumora_dev_pass_local_only}@postgres:5432/${DB_NAME:-plumora_dev}
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-plumora_local_dev_secret_key_min_32_chars_01}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:-plumora_dev_pass_local_only}
+      CONTENT_DB_PASSWORD: ${CONTENT_DB_PASSWORD:-plumora_dev_pass_local_only}
+      ASSESS_DB_PASSWORD: ${ASSESS_DB_PASSWORD:-plumora_dev_pass_local_only}
+      REC_AI_DB_PASSWORD: ${REC_AI_DB_PASSWORD:-plumora_dev_pass_local_only}
+      SEED_DEMO_ACCOUNTS: ${SEED_DEMO_ACCOUNTS:-true}
     depends_on:
       postgres:
         condition: service_healthy
@@ -73,7 +78,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:8001/health\")'"]
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:8001/health/ready\")'"]
       interval: 4s
       timeout: 4s
       retries: 5
@@ -102,7 +107,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:8002/health\")'"]
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:8002/health/ready\")'"]
       interval: 4s
       timeout: 4s
       retries: 5
@@ -131,7 +136,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:8003/health\")'"]
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:8003/health/ready\")'"]
       interval: 4s
       timeout: 4s
       retries: 5
@@ -163,7 +168,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:8004/health\")'"]
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:8004/health/ready\")'"]
       interval: 4s
       timeout: 4s
       retries: 5

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-DEMO_PASSWORD = "PlumoraDemo#2026"
+DEMO_PASSWORD = "PlumoraDemo#2026"  # noqa: S105
 
 PRESET_COMPETENCY_MAPS: dict[str, dict[str, float]] = {
     "new_learner": {},
