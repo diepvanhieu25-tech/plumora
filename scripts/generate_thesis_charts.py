@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import html
 import json
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
@@ -13,14 +15,16 @@ OUT_DIR = REPO_ROOT / "docs" / "assets" / "charts"
 
 
 def _svg_wrap(title: str, subtitle: str, body: str, width: int = 880, height: int = 440) -> str:
+    esc_title = html.escape(title, quote=True)
+    esc_sub = html.escape(subtitle, quote=True)
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
-        f'viewBox="0 0 {width} {height}" role="img" aria-label="{title}">\n'
+        f'viewBox="0 0 {width} {height}" role="img" aria-label="{esc_title}">\n'
         f'  <rect width="{width}" height="{height}" rx="12" fill="#FAFAF9" stroke="#E7E5E4"/>\n'
         f'  <text x="36" y="38" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18" '
-        f'font-weight="700" fill="#1C1917">{title}</text>\n'
+        f'font-weight="700" fill="#1C1917">{esc_title}</text>\n'
         f'  <text x="36" y="60" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="12" '
-        f'fill="#57534E">{subtitle}</text>\n'
+        f'fill="#57534E">{esc_sub}</text>\n'
         f"{body}\n"
         f"</svg>\n"
     )
@@ -195,7 +199,7 @@ def _render_fig4(bench: dict[str, Any] | None) -> str:
         cy = y_top + idx * row_h + 20
         w = min(val, max_ms) / max_ms * chart_w
         sla_x = x0 + (sla / max_ms) * chart_w
-        lines.append(f'<text x="{x0 - 12}" y="{cy + 18}" text-anchor="end" font-family="Inter, Arial, sans-serif" font-size="12" font-weight="600" fill="#1C1917">{label}</text>')
+        lines.append(f'<text x="{x0 - 12}" y="{cy + 18}" text-anchor="end" font-family="Inter, Arial, sans-serif" font-size="12" font-weight="600" fill="#1C1917">{html.escape(label)}</text>')
         lines.append(f'<rect x="{x0}" y="{cy}" width="{max(w, 4):.1f}" height="28" rx="5" fill="{color}"/>')
         lines.append(f'<line x1="{sla_x:.1f}" y1="{cy - 6}" x2="{sla_x:.1f}" y2="{cy + 34}" stroke="#DC2626" stroke-dasharray="4,3" stroke-width="1.5"/>')
         lines.append(f'<text x="{x0 + w + 8:.1f}" y="{cy + 19}" font-family="monospace" font-size="12" font-weight="700" fill="#1C1917">{val:.2f} ms</text>')
@@ -211,11 +215,16 @@ def main() -> int:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     report = json.loads(EVAL_REPORT.read_text(encoding="utf-8"))
     bench = json.loads(BENCH_REPORT.read_text(encoding="utf-8")) if BENCH_REPORT.exists() else None
-    (OUT_DIR / "fig1_4way_reward_and_completion.svg").write_text(_render_fig1(report), encoding="utf-8")
-    (OUT_DIR / "fig2_unmasked_violation_rate.svg").write_text(_render_fig2(report), encoding="utf-8")
-    (OUT_DIR / "fig3_learning_curve_ablation.svg").write_text(_render_fig3(report), encoding="utf-8")
-    (OUT_DIR / "fig4_microservices_20vu_latency.svg").write_text(_render_fig4(bench), encoding="utf-8")
-    print(f"Generated 4 SVG charts in {OUT_DIR}")
+    charts = {
+        "fig1_4way_reward_and_completion.svg": _render_fig1(report),
+        "fig2_unmasked_violation_rate.svg": _render_fig2(report),
+        "fig3_learning_curve_ablation.svg": _render_fig3(report),
+        "fig4_microservices_20vu_latency.svg": _render_fig4(bench),
+    }
+    for name, svg_txt in charts.items():
+        ET.fromstring(svg_txt)
+        (OUT_DIR / name).write_text(svg_txt, encoding="utf-8")
+    print(f"Generated and XML-validated 4 SVG charts in {OUT_DIR}")
     return 0
 
 

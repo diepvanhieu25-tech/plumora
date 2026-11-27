@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="880" height="440" viewBox="0 0 880 440" role="img" aria-label="Fig 3. GNN-PPO Ablation Study: Sample Budget & Message-Passing Depth">
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="440" viewBox="0 0 880 440" role="img" aria-label="Fig 3. GNN-PPO Ablation Study: Sample Budget &amp; Message-Passing Depth">
   <rect width="880" height="440" rx="12" fill="#FAFAF9" stroke="#E7E5E4"/>
-  <text x="36" y="38" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18" font-weight="700" fill="#1C1917">Fig 3. GNN-PPO Ablation Study: Sample Budget & Message-Passing Depth</text>
+  <text x="36" y="38" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18" font-weight="700" fill="#1C1917">Fig 3. GNN-PPO Ablation Study: Sample Budget &amp; Message-Passing Depth</text>
   <text x="36" y="60" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="12" fill="#57534E">Selected seed=101 | 500 evaluation episodes</text>
 <text x="65" y="92" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="700" fill="#15803D">A. Sample Budget Curve (Known Domains)</text>
   <line x1="65" y1="350" x2="415" y2="350" stroke="#A8A29E"/>

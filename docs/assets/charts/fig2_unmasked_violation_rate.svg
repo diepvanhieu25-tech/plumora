@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="880" height="440" viewBox="0 0 880 440" role="img" aria-label="Fig 2. Unmasked Invalid Action Rate (DAG & Sequential Invariants)">
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="440" viewBox="0 0 880 440" role="img" aria-label="Fig 2. Unmasked Invalid Action Rate (DAG &amp; Sequential Invariants)">
   <rect width="880" height="440" rx="12" fill="#FAFAF9" stroke="#E7E5E4"/>
-  <text x="36" y="38" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18" font-weight="700" fill="#1C1917">Fig 2. Unmasked Invalid Action Rate (DAG & Sequential Invariants)</text>
+  <text x="36" y="38" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18" font-weight="700" fill="#1C1917">Fig 2. Unmasked Invalid Action Rate (DAG &amp; Sequential Invariants)</text>
   <text x="36" y="60" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="12" fill="#57534E">Lower is better — measures intrinsic structural learning without Policy Guardrail mask</text>
 <line x1="80" y1="355" x2="820" y2="355" stroke="#A8A29E" stroke-width="1.2"/>
   <line x1="80" y1="342.5" x2="820" y2="342.5" stroke="#DC2626" stroke-dasharray="6,4" stroke-width="1.5"/>
