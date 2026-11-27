@@ -21,7 +21,6 @@ from app.db.models import (
     DomainModel,
     ModelRegistryModel,
     SessionLocal,
-    UserConceptMasteryModel,
     UserModel,
     UserNodeCompetencyModel,
 )
@@ -43,12 +42,11 @@ def test_rem02_auth_logout_secure_host_cookie_backoffice_msg_and_zero_v1_writes(
         assert reg.status_code == 201
         uid = uuid.UUID(reg.json()["user"]["id"])
 
-        # Decision A1: register must NOT write legacy UserConceptMasteryModel rows
-        with SessionLocal() as db:
-            legacy_rows = db.scalars(
-                select(UserConceptMasteryModel).where(UserConceptMasteryModel.user_id == uid)
-            ).all()
-            assert len(legacy_rows) == 0, "Auth register must not write legacy UserConceptMasteryModel rows"
+        # D-31: Legacy v1 ORM tables removed completely
+        import app.db.models as db_models
+
+        assert not hasattr(db_models, "UserConceptMasteryModel")
+        _ = uid
 
         # Staff logging into learner portal must be directed to /backoffice/login (not /admin/login)
         staff_login = client.post(

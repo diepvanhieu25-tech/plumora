@@ -146,7 +146,7 @@ sequenceDiagram
 
 ---
 
-## 4. Kịch Bản Thao Diễn Hệ Thống Thống Nhất `v3.1` (4 Microservices + API Gateway & 2 Cổng Ứng Dụng)
+## 4. Kịch Bản Thao Diễn Hệ Thống Thống Nhất `v4.0` (4 Microservices + API Gateway & 2 Cổng Ứng Dụng)
 
 ### 4.1. Khởi Chạy Cụm Docker 4 Microservices + API Gateway Thống Nhất (`D-27`)
 ```bash

@@ -267,9 +267,14 @@ export function LessonPlaybookPage({
               </div>
 
               <div className="pt-2 space-y-2.5">
+                {node.is_eligible && !isPlaybookCompleted && (
+                  <p className="text-[11px] font-medium text-tertiary">
+                    Cần đọc và xác nhận hoàn thành Bài giảng Lý thuyết trước khi mở kiểm tra.
+                  </p>
+                )}
                 <button
                   type="button"
-                  disabled={!node.is_eligible}
+                  disabled={!node.is_eligible || !isPlaybookCompleted}
                   onClick={() => onStartDepthProbe(node.slug)}
                   className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary hover:bg-primary-dim text-on-primary text-xs sm:text-sm font-bold shadow-sm disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer transition-colors"
                 >
@@ -279,7 +284,7 @@ export function LessonPlaybookPage({
                 {node.has_code_challenge && (
                   <button
                     type="button"
-                    disabled={!node.is_eligible}
+                    disabled={!node.is_eligible || !isPlaybookCompleted}
                     onClick={() => onStartCodeSandbox(node.slug)}
                     className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-bold disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer transition-colors"
                   >

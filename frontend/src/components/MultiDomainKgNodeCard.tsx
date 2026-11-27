@@ -188,6 +188,11 @@ export function MultiDomainKgNodeCard({
             <span>{node.playbook_completed ? 'Xem lại Bài giảng Lý thuyết' : 'Đọc Bài giảng Lý thuyết'}</span>
           </button>
         )}
+          {node.is_eligible && !node.playbook_completed && node.depth_level_norm < 0.25 && (
+            <p className="text-[11px] font-medium text-tertiary">
+              Cần đọc và xác nhận hoàn thành Bài giảng Lý thuyết trước
+            </p>
+          )}
         <div className="flex flex-wrap gap-2">
           {node.needs_review && (
             <button
@@ -201,7 +206,7 @@ export function MultiDomainKgNodeCard({
           )}
           <button
             type="button"
-            disabled={!node.is_eligible}
+            disabled={!node.is_eligible || (!node.playbook_completed && node.depth_level_norm < 0.25)}
             onClick={() => onStartDepthProbe(node.slug)}
             className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-primary text-on-primary hover:bg-primary-dim disabled:opacity-45 disabled:cursor-not-allowed shadow-sm cursor-pointer transition-colors"
           >
@@ -211,7 +216,7 @@ export function MultiDomainKgNodeCard({
           {node.has_code_challenge && (
             <button
               type="button"
-              disabled={!node.is_eligible}
+              disabled={!node.is_eligible || (!node.playbook_completed && node.depth_level_norm < 0.25)}
               onClick={() => onStartCodeSandbox(node.slug)}
               className="inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold bg-surface-container text-on-surface hover:bg-surface-container-high disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer transition-colors"
               title="Thực hành lập trình trực tiếp"

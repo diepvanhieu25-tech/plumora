@@ -130,12 +130,14 @@ def test_pl3_assess_01_five_depth_state_machine_ceiling_and_idempotency() -> Non
         assert r1_replay.status_code == 200
         assert r1_replay.json()["idempotent_replay"] is True
 
-        # Second consecutive fail at tier 1 -> ceiling_reached at d=0
+        # Second consecutive fail at tier 1 (rotated to 2nd Tier 1 question) -> ceiling_reached at d=0.25
+        q2 = r1.json()["next_step_item"]
+        assert q2["question_id"] != q1["question_id"]
         r2 = client.post(
             f"/api/v2/assessments/{session_id}/submit",
             json={
                 "submission_id": str(uuid.uuid4()),
-                "question_id": q1["question_id"],
+                "question_id": q2["question_id"],
                 "selected_option": "Z",
                 "written_explanation": None,
             },

@@ -27,12 +27,14 @@ interface CodeSandboxPageProps {
   domainSlug: string
   conceptSlug: string
   onBackToRoadmap: () => void
+  onStartDepthProbe?: (conceptSlug: string) => void
 }
 
 export function CodeSandboxPage({
   domainSlug,
   conceptSlug,
   onBackToRoadmap,
+  onStartDepthProbe,
 }: CodeSandboxPageProps) {
   const { data: challenge, loading, errorMessage: loadError, refetch } = useAsyncQuery(
     (signal) => apiGetCodeChallenge(conceptSlug, domainSlug, signal),
@@ -442,18 +444,31 @@ export function CodeSandboxPage({
                         <div className="flex items-center gap-2 text-xs font-bold text-on-primary-container">
                           <ShieldCheck className="w-4 h-4 text-primary shrink-0" aria-hidden="true" />
                           <span>
-                            Xuất sắc! Năng lực đã cập nhật lên {result.updated_competency.depth_label} (
-                            {Math.round(result.updated_competency.depth_level_norm * 100)}%)
+                            {result.updated_competency.depth_level_norm >= 1.0
+                              ? `Xuất sắc! Bạn đã đạt Làm chủ (100% Mastery) cho khái niệm này.`
+                              : `Đã vượt qua 100% Code Sandbox! Mức hiện tại: ${result.updated_competency.depth_label} (${Math.round(result.updated_competency.depth_level_norm * 100)}%). Hoàn thành Kiểm tra Đào sâu 5 tầng để đạt Làm chủ (100%).`}
                           </span>
                         </div>
-                        <button
-                          type="button"
-                          onClick={onBackToRoadmap}
-                          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:bg-primary-dim text-on-primary text-xs font-bold cursor-pointer shrink-0 transition-colors"
-                        >
-                          <span>Hoàn thành &amp; Tiếp tục Lộ trình</span>
-                          <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
-                        </button>
+                        <div className="flex flex-wrap gap-2 shrink-0">
+                          {result.updated_competency.depth_level_norm < 1.0 && onStartDepthProbe && (
+                            <button
+                              type="button"
+                              onClick={() => onStartDepthProbe(conceptSlug)}
+                              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-secondary hover:opacity-90 text-on-secondary text-xs font-bold cursor-pointer transition-opacity"
+                            >
+                              <span>Vào Kiểm tra Đào sâu 5 tầng để mở khóa Làm chủ (100%)</span>
+                              <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={onBackToRoadmap}
+                            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:bg-primary-dim text-on-primary text-xs font-bold cursor-pointer transition-colors"
+                          >
+                            <span>Hoàn thành &amp; Tiếp tục Lộ trình</span>
+                            <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>

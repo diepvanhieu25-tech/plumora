@@ -39,6 +39,7 @@ interface DepthProbePageProps {
   conceptSlug: string
   sessionMode: 'depth_probe' | 'spaced_review'
   onBackToRoadmap: () => void
+  onStartCodeSandbox?: (conceptSlug: string) => void
 }
 
 const TIER_NAMES: Record<
@@ -67,13 +68,13 @@ const TIER_NAMES: Record<
     short: 'Đánh đổi',
     label: 'Tầng 4: Đánh đổi Kiến trúc',
     desc: 'Phân tích ràng buộc & lựa chọn thiết kế',
-    depthTarget: '85%',
+    depthTarget: '75%',
   },
   5: {
     short: 'Bản chất',
     label: 'Tầng 5: Giải thích Bản chất Sâu',
     desc: 'Truyền đạt lại theo tư duy Feynman',
-    depthTarget: '100%',
+    depthTarget: '100% (với Code)',
   },
 }
 
@@ -90,6 +91,7 @@ export function DepthProbePage({
   conceptSlug,
   sessionMode,
   onBackToRoadmap,
+  onStartCodeSandbox,
 }: DepthProbePageProps) {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [stepItem, setStepItem] = useState<DepthStepItem | null>(null)
@@ -688,13 +690,26 @@ export function DepthProbePage({
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={onBackToRoadmap}
-                  className="w-full py-3 px-4 rounded-xl bg-primary text-on-primary font-bold text-sm hover:bg-primary-dim cursor-pointer transition-colors"
-                >
-                  Quay về Bản đồ Lộ trình
-                </button>
+                <div className="flex flex-col sm:flex-row gap-2.5">
+                  {updatedComp.depth_level_norm >= 0.75 &&
+                    updatedComp.depth_level_norm < 1.0 &&
+                    onStartCodeSandbox && (
+                      <button
+                        type="button"
+                        onClick={() => onStartCodeSandbox(conceptSlug)}
+                        className="flex-1 py-3 px-4 rounded-xl bg-secondary text-on-secondary font-bold text-sm hover:opacity-90 cursor-pointer transition-opacity"
+                      >
+                        Sang Phòng Thực hành Code để đạt Làm chủ (100%)
+                      </button>
+                    )}
+                  <button
+                    type="button"
+                    onClick={onBackToRoadmap}
+                    className="flex-1 py-3 px-4 rounded-xl bg-primary text-on-primary font-bold text-sm hover:bg-primary-dim cursor-pointer transition-colors"
+                  >
+                    Quay về Bản đồ Lộ trình
+                  </button>
+                </div>
               </div>
             )}
           </div>

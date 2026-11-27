@@ -28,11 +28,6 @@ from app.modules.contracts.dtos import UserCompetencySnapshotDTO, UserNodeCompet
 from app.modules.contracts.ports import CompetencyReaderPort
 
 
-def sync_mvp_mastery_to_v2_competency(db: Session, user_id: uuid.UUID) -> None:
-    """Backward-compatible no-op for read paths (MVP overlay is strictly read-only inside port)."""
-    _ = (db, user_id)
-
-
 def _load_user_snapshot(
     db: Session,
     user_id: uuid.UUID,

@@ -1,6 +1,6 @@
-# Kịch Bản Kiểm Thử Hệ Thống Thực (Manual System Testing Script — Plumora `v3.1`)
+# Kịch Bản Kiểm Thử Hệ Thống Thực (Manual System Testing Script — Plumora `v4.0`)
 
-> **Mục đích:** Hướng dẫn chủ dự án tự mở trình duyệt kiểm thử trực tiếp toàn bộ hệ thống Plumora (`v3.1`) đang chạy trên **cụm Docker 4 Microservices + API Gateway thống nhất** (`plumora-frontend`, `plumora-api-gateway`, `plumora-user-auth-service`, `plumora-content-kg-service`, `plumora-assessment-grader-service`, `plumora-recommendation-ai-service`, `plumora-postgres`, `plumora-redis`).
+> **Mục đích:** Hướng dẫn chủ dự án tự mở trình duyệt kiểm thử trực tiếp toàn bộ hệ thống Plumora (`v4.0`) đang chạy trên **cụm Docker 4 Microservices + API Gateway thống nhất** (`plumora-frontend`, `plumora-api-gateway`, `plumora-user-auth-service`, `plumora-content-kg-service`, `plumora-assessment-grader-service`, `plumora-recommendation-ai-service`, `plumora-postgres`, `plumora-redis`).
 
 ---
 

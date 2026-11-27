@@ -39,6 +39,7 @@ def map_depth_to_competency(
     abandoned: bool = False,
     steps_completed: int = 0,
     existing_depth: float = 0.0,
+    has_code_challenge: bool = True,
 ) -> CompetencyMappingResult:
     """Map 3D evidence (highest passed tier x task type x rubric/sandbox score) deterministically."""
     if abandoned and steps_completed < 2:
@@ -78,7 +79,24 @@ def map_depth_to_competency(
             is_mastered_for_dag=True,
         )
 
-    # Tier 5 passed: require Code Sandbox 100% or Rubric >= 0.85 for Mastery = 1.00
+    # Tier 5 passed (D-34 / INV-SEQ-02):
+    # - If concept has a Code Challenge, MUST pass Code Sandbox 100% for 1.00 Mastery
+    # - Only if concept has NO Code Challenge (pure theory Expert node) can Rubric >= 0.85 reach 1.00
+    if has_code_challenge:
+        if passed_code_sandbox:
+            return CompetencyMappingResult(
+                depth_level_norm=1.00,
+                depth_label="Mastery",
+                confidence=0.95,
+                is_mastered_for_dag=True,
+            )
+        return CompetencyMappingResult(
+            depth_level_norm=0.75,
+            depth_label="Deep Understanding",
+            confidence=0.90,
+            is_mastered_for_dag=True,
+        )
+
     if passed_code_sandbox or (rubric_score is not None and rubric_score >= 0.85):
         return CompetencyMappingResult(
             depth_level_norm=1.00,

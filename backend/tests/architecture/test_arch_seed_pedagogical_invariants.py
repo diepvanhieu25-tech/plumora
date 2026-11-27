@@ -24,16 +24,18 @@ def test_arch_seed_playbooks_rich_and_clean_markdown() -> None:
         concepts = data["concepts"]
         assert len(concepts) == expected_count, f"{fname}: expected {expected_count}, got {len(concepts)}"
         for c in concepts:
-            md = str(c.get("lesson_markdown", ""))
-            assert len(md) >= 1600, f"{fname}:{c['slug']} lesson_markdown too short ({len(md)} < 1600)"
+            md = str(c.get("lesson_markdown", "")).strip()
+            assert len(md) >= 2200, f"{fname}:{c['slug']} lesson_markdown too short ({len(md)} < 2200)"
+            for sec in ("## 1.", "## 2.", "## 3.", "## 4.", "## 5."):
+                assert sec in md, f"{fname}:{c['slug']} missing section {sec}"
             assert not RAW_LATEX_RE.search(md), f"{fname}:{c['slug']} contains raw LaTeX"
 
 
 def test_arch_seed_questions_balanced_mcq_and_distinct_rubrics() -> None:
-    """110 questions valid, balanced A/B/C/D <= 35% in Tiers 1-2, >= 6 code_review, distinct Tier 3-5 rubrics."""
+    """220 questions valid, balanced A/B/C/D <= 35% in Tiers 1-2, >= 6 code_review, distinct Tier 3-5 rubrics."""
     raw = json.loads((SEED_DIR / "depth_questions_and_rubrics.json").read_text(encoding="utf-8"))
     items = raw["questions"] if isinstance(raw, dict) else raw
-    assert len(items) == 110, f"Expected 110 seeded questions, got {len(items)}"
+    assert len(items) == 220, f"Expected 220 seeded questions, got {len(items)}"
 
     tier1_keys: Counter[str] = Counter()
     tier2_keys: Counter[str] = Counter()
@@ -65,7 +67,7 @@ def test_arch_seed_questions_balanced_mcq_and_distinct_rubrics() -> None:
 
     for tier_num, counts in ((1, tier1_keys), (2, tier2_keys)):
         total = sum(counts.values())
-        assert total == 22
+        assert total == 44
         for opt, cnt in counts.items():
             assert cnt / total <= 0.35, f"Tier {tier_num} option '{opt}' overrepresented: {cnt}/{total}"
 

@@ -24,6 +24,7 @@ from plumora_rl.domain import (
 )
 
 MAX_NODES_PAD: int = 16
+STEP_ELAPSED_DAYS: float = 0.25
 
 
 @dataclass(frozen=True)
@@ -128,11 +129,16 @@ class MultiDomainStudentSimulatorEnv(gym.Env[Any, Any]):
         domain_slug: str | None = "backend",
         seed: int | None = None,
         max_steps: int = 60,
+        *,
+        pad_observations: bool = False,
+        include_prior_states: bool = True,
     ) -> None:
         super().__init__()
         self.metadata = {"render_modes": []}
         self.fixed_domain_slug = domain_slug
         self.max_steps = max_steps
+        self.pad_observations = pad_observations
+        self.include_prior_states = include_prior_states
         self._rng = np.random.default_rng(seed)
 
         self.observation_space = spaces.Dict(
@@ -207,7 +213,21 @@ class MultiDomainStudentSimulatorEnv(gym.Env[Any, Any]):
         return GraphObservationBuilder.build(inputs)
 
     def _get_obs(self) -> dict[str, np.ndarray]:
-        return self.build_graph_observation().to_dict()
+        raw = self.build_graph_observation().to_dict()
+        if not self.pad_observations:
+            return raw
+        n = min(int(raw["node_features"].shape[0]), MAX_NODES_PAD)
+        x_pad = np.zeros((MAX_NODES_PAD, NODE_FEAT_DIM), dtype=np.float32)
+        in_pad = np.zeros((MAX_NODES_PAD, MAX_NODES_PAD), dtype=np.float32)
+        out_pad = np.zeros((MAX_NODES_PAD, MAX_NODES_PAD), dtype=np.float32)
+        x_pad[:n] = np.clip(raw["node_features"][:n], 0.0, 1.0)
+        in_pad[:n, :n] = np.clip(raw["adj_in"][:n, :n], 0.0, 1.0)
+        out_pad[:n, :n] = np.clip(raw["adj_out"][:n, :n], 0.0, 1.0)
+        return {
+            "node_features": x_pad,
+            "adj_in": in_pad,
+            "adj_out": out_pad,
+        }
 
     def get_action_mask(self) -> np.ndarray:
         """Return boolean mask of shape (N, 4) via shared PolicyGuardrailStrategy."""
@@ -243,25 +263,47 @@ class MultiDomainStudentSimulatorEnv(gym.Env[Any, Any]):
         self._lambda_forget = float(self._rng.uniform(0.80, 1.20))
         self._beta_code = float(self._rng.uniform(0.35, 0.80))
 
+        use_prior = self.include_prior_states
+        if options and "include_prior_states" in options:
+            use_prior = bool(options["include_prior_states"])
+        if use_prior and float(self._rng.random()) < 0.30:
+            # Adaptive Placement / Shared-Node Transfer prior state (valid topological prefix at 0.75)
+            k_prior = int(self._rng.integers(1, min(4, self._n_nodes)))
+            for _ in range(k_prior):
+                eligible_cands = [
+                    n.node_idx
+                    for n in self.graph.nodes
+                    if self._depth[n.node_idx] < 0.75
+                    and n.tier <= 2
+                    and all(self._depth[p] >= 0.75 for p in n.prerequisites)
+                ]
+                if not eligible_cands:
+                    break
+                c_idx = int(self._rng.choice(eligible_cands))
+                self._depth[c_idx] = 0.75
+                self._confidence[c_idx] = float(self._rng.uniform(0.70, 0.88))
+                self._stability[c_idx] = float(self._rng.uniform(3.0, 4.5))
+                self._dt[c_idx] = float(self._rng.uniform(0.25, 2.5))
+
         return self._get_obs(), {"domain_slug": slug, "n_nodes": self._n_nodes}
 
     def step(
         self,
-        action: tuple[int, int],
+        action: tuple[int, int] | np.ndarray,
     ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
         v, m = int(action[0]), int(action[1])
         self._step_count += 1
 
-        # Advance time dt = 1.0 day on all previously learned nodes u != v
+        # Advance time dt = STEP_ELAPSED_DAYS (0.25 days/step) on all previously learned nodes u != v (D-32)
         for u in range(self._n_nodes):
             if u != v and self._depth[u] >= EbbinghausMemoryModel.MIN_DEPTH_FOR_RETENTION:
-                self._dt[u] += 1.0
+                self._dt[u] += STEP_ELAPSED_DAYS
 
         if v < 0 or v >= self._n_nodes or m < 0 or m >= NUM_MODES:
-            truncated = self._step_count >= self.max_steps
+            truncated = bool(self._step_count >= self.max_steps)
             return (
                 self._get_obs(),
-                MultiObjectiveRewardCalculator.PREREQ_VIOLATION_PENALTY,
+                float(MultiObjectiveRewardCalculator.PREREQ_VIOLATION_PENALTY),
                 False,
                 truncated,
                 {"prerequisite_violation": True, "redundant_action": False, "invalid_pad": True},
@@ -269,10 +311,10 @@ class MultiDomainStudentSimulatorEnv(gym.Env[Any, Any]):
 
         elig = self._compute_eligible_vec()
         if elig[v] < 0.5:
-            truncated = self._step_count >= self.max_steps
+            truncated = bool(self._step_count >= self.max_steps)
             return (
                 self._get_obs(),
-                MultiObjectiveRewardCalculator.PREREQ_VIOLATION_PENALTY,
+                float(MultiObjectiveRewardCalculator.PREREQ_VIOLATION_PENALTY),
                 False,
                 truncated,
                 {"prerequisite_violation": True, "redundant_action": False, "invalid_pad": False},
@@ -281,10 +323,10 @@ class MultiDomainStudentSimulatorEnv(gym.Env[Any, Any]):
         ret_before_vec = self._compute_retention_vec()
         ret_before = float(ret_before_vec[v])
 
-        # Check redundant / out-of-sequence action (INV-SEQ-01, INV-SEQ-02)
+        # Check redundant / out-of-sequence action (INV-SEQ-01, INV-SEQ-02, D-34)
         if (
             (m == LearningMode.LEARN_NEW and self._depth[v] >= 0.50)
-            or (m == LearningMode.DEEP_PROBE and (self._depth[v] < 0.25 or self._depth[v] >= 1.0))
+            or (m == LearningMode.DEEP_PROBE and (self._depth[v] < 0.25 or self._depth[v] >= 0.75))
             or (
                 m == LearningMode.CODE_PRACTICE
                 and (
@@ -297,10 +339,10 @@ class MultiDomainStudentSimulatorEnv(gym.Env[Any, Any]):
             )
             or (m == LearningMode.SPACED_REVIEW and (self._depth[v] < 0.50 or ret_before >= 0.85))
         ):
-            truncated = self._step_count >= self.max_steps
+            truncated = bool(self._step_count >= self.max_steps)
             return (
                 self._get_obs(),
-                MultiObjectiveRewardCalculator.REDUNDANT_ACTION_PENALTY,
+                float(MultiObjectiveRewardCalculator.REDUNDANT_ACTION_PENALTY),
                 False,
                 truncated,
                 {"prerequisite_violation": False, "redundant_action": True, "invalid_pad": False},
@@ -371,11 +413,8 @@ class MultiDomainStudentSimulatorEnv(gym.Env[Any, Any]):
                 self._depth[v] = max(self._depth[v], target)
                 self._confidence[v] = max(self._confidence[v], 0.75 if target >= 0.50 else 0.65)
             elif m == LearningMode.DEEP_PROBE:
-                target = (
-                    1.00
-                    if (self._depth[v] >= 0.75 or self._code_score[v] >= 1.0)
-                    else 0.75
-                )
+                # D-34: Reaching 1.00 Mastery strictly requires BOTH depth >= 0.75 AND code_score >= 1.0
+                target = 1.00 if self._code_score[v] >= 1.0 else 0.75
                 self._depth[v] = max(self._depth[v], target)
                 self._confidence[v] = max(self._confidence[v], 0.95 if target >= 1.0 else 0.85)
                 self._stability[v] = EbbinghausMemoryModel.update_stability(
@@ -420,8 +459,8 @@ class MultiDomainStudentSimulatorEnv(gym.Env[Any, Any]):
             step_passed=passed,
             goal_mastered=goal_mastered,
         )
-        terminated = goal_mastered
-        truncated = (not terminated) and (self._step_count >= self.max_steps)
+        terminated = bool(goal_mastered)
+        truncated = bool((not terminated) and (self._step_count >= self.max_steps))
 
         return (
             self._get_obs(),
@@ -481,6 +520,7 @@ __all__ = [
     "MAX_NODES_PAD",
     "NODE_FEAT_DIM",
     "NUM_MODES",
+    "STEP_ELAPSED_DAYS",
     "TRAIN_DOMAINS",
     "DomainGraphSpec",
     "DomainNodeSpec",

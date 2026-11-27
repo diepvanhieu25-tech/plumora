@@ -3498,6 +3498,3313 @@
         ],
         "reference_explanation": "HTTPS dùng mã hóa lai: Chứng chỉ X.509 (ký bởi CA) xác thực danh tính server chống MITM; thuật toán bất đối xứng (ECDHE) giúp hai bên thỏa thuận chung một Khóa Phiên (Session Key) bí mật; sau đó toàn bộ dữ liệu HTTP được mã hóa bằng thuật toán đối xứng (AES-GCM/ChaCha20) vì mã hóa bất đối xứng chậm hơn hàng trăm lần và rất tốn CPU."
       }
+    },
+    {
+      "id": "91343518-ec5c-560f-9b46-7ca29b7fe322",
+      "concept_slug": "net-internet",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Biến thể] Giao thức nào chuyển đổi tên miền `api.plumora.vn` sang địa chỉ IP trước khi mở kết nối TCP?",
+      "options": {
+        "A": "DNS",
+        "B": "ARP",
+        "C": "ICMP",
+        "D": "DHCP"
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "c447dc6a-d10d-5144-a9db-53e5a4bd42cf",
+      "concept_slug": "net-internet",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 2 — Biến thể] Khi độ trễ RTT là 120ms, vì sao HTTP/3 (QUIC) thường giảm thời gian thiết lập kết nối đầu tiên so với HTTPS trên TCP?",
+      "options": {
+        "A": "Vì QUIC gộp bắt tay vận chuyển và TLS 1.3 trong 1 RTT (hoặc 0-RTT) và tránh Head-of-Line Blocking ở tầng TCP",
+        "B": "Vì QUIC không cần mã hóa dữ liệu",
+        "C": "Vì QUIC chạy trực tiếp trên ICMP",
+        "D": "Vì QUIC bỏ qua hoàn toàn DNS lookup"
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "ea78f189-5f69-5915-bc54-060539465263",
+      "concept_slug": "net-internet",
+      "depth_tier": 3,
+      "task_type": "code_review",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Biến thể] Một client báo lỗi `Connection timed out` sau 30s khi gọi API qua IPv4, trong khi DNS vẫn phân giải đúng IP. Hãy phân tích 2 nguyên nhân mạng có thể xảy ra ở tầng Transport/Network.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Kiểm tra tường lửa / gói SYN bị drop im lặng",
+            "weight": 0.5,
+            "required_keywords": [
+              "firewall",
+              "syn",
+              "drop",
+              "timeout",
+              "tường lửa",
+              "port"
+            ],
+            "socratic_hint": "Nếu server từ chối chủ động thì trả RST ngay, còn timeout thường do gói tin bị gì ở giữa đường?"
+          },
+          {
+            "name": "Kiểm tra định tuyến / Security Group / lắng nghe đúng interface",
+            "weight": 0.5,
+            "required_keywords": [
+              "route",
+              "routing",
+              "security group",
+              "0.0.0.0",
+              "127.0.0.1",
+              "listen"
+            ],
+            "socratic_hint": "Dịch vụ có thể đang chỉ bind `127.0.0.1` hoặc Security Group chặn cổng vào?"
+          }
+        ],
+        "reference_explanation": "Timeout (khác Connection Refused trả RST ngay) thường do Firewall/Security Group drop gói SYN im lặng hoặc định tuyến sai/dịch vụ bind nhầm loopback."
+      }
+    },
+    {
+      "id": "49dffad8-cad4-56f0-a53b-a872ac2999f7",
+      "concept_slug": "net-internet",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Biến thể] Hệ thống microservice nội bộ giao tiếp liên tục giữa API Gateway và 4 backend services trên cùng VPC. Bạn chọn TCP keep-alive connection pool hay mở kết nối TCP mới mỗi request? Đánh đổi là gì?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Chọn Persistent Connection Pool (keep-alive)",
+            "weight": 0.5,
+            "required_keywords": [
+              "keep-alive",
+              "pool",
+              "handshake",
+              "rtt",
+              "tái sử dụng"
+            ],
+            "socratic_hint": "Mở TCP/TLS mới mỗi request tốn bao nhiêu RTT và file descriptor?"
+          },
+          {
+            "name": "Phân tích đánh đổi: bộ nhớ socket, stale connection & load balancing",
+            "weight": 0.5,
+            "required_keywords": [
+              "stale",
+              "pool_size",
+              "load balancer",
+              "memory",
+              "timeout",
+              "đánh đổi"
+            ],
+            "socratic_hint": "Nếu giữ kết nối quá lâu qua L4 Load Balancer thì phân tải hoặc kết nối chết xử lý thế nào?"
+          }
+        ],
+        "reference_explanation": "Dùng Persistent Connection Pool để tránh tốn RTT bắt tay TCP/TLS lặp lại, nhưng cần cấu hình idle timeout và health-check để tránh kết nối stale hoặc lệch tải trên L4 LB."
+      }
+    },
+    {
+      "id": "1385bee7-817a-5dc1-bf17-7c27f89223f2",
+      "concept_slug": "net-internet",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Biến thể] Hãy giải thích cho kỹ sư mới: Tại sao một gói tin TCP bị mất trên đường truyền lại làm chậm cả các luồng HTTP/2 chạy chung trên kết nối đó (TCP Head-of-Line Blocking)?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Cơ chế tuần tự hóa byte stream của TCP",
+            "weight": 0.5,
+            "required_keywords": [
+              "byte stream",
+              "tuần tự",
+              "order",
+              "sequence",
+              "buffer",
+              "retransmit"
+            ],
+            "socratic_hint": "TCP đảm bảo dữ liệu giao cho tầng ứng dụng theo đúng thứ tự byte nào?"
+          },
+          {
+            "name": "Hệ quả chặn các stream HTTP/2 độc lập & cách QUIC khắc phục",
+            "weight": 0.5,
+            "required_keywords": [
+              "http/2",
+              "stream",
+              "quic",
+              "udp",
+              "độc lập",
+              "block"
+            ],
+            "socratic_hint": "Khi 1 gói TCP mất, các stream HTTP/2 khác nằm sau nó trong buffer OS có đọc được ngay không?"
+          }
+        ],
+        "reference_explanation": "TCP coi toàn bộ dữ liệu là 1 luồng byte tuần tự; khi 1 packet mất, kernel giữ lại các packet đến sau để chờ retransmit, làm tắc toàn bộ stream HTTP/2. QUIC tách từng stream độc lập trên UDP."
+      }
+    },
+    {
+      "id": "0a8976c1-f47e-5334-b2bb-bae568663945",
+      "concept_slug": "os-basics",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Biến thể] Trong Linux, cấu trúc nào được tiến trình dùng để tham chiếu tới file đang mở, pipe hoặc socket?",
+      "options": {
+        "A": "File Descriptor (FD)",
+        "B": "Inode Table",
+        "C": "Page Table",
+        "D": "MBR"
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "f83ac0fa-33d3-52ce-af0b-3d26faa0439e",
+      "concept_slug": "os-basics",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 2 — Biến thể] Vì sao container chạy ứng dụng Python/Node.js bị hệ điều hành tiêu diệt với mã `Exit Code 137 (OOMKilled)`?",
+      "options": {
+        "A": "Tiến trình vượt quá giới hạn bộ nhớ `cgroup memory limit` nên nhân Linux kích hoạt OOM Killer",
+        "B": "CPU sử dụng vượt 100% trong 1 giây",
+        "C": "Ổ đĩa còn dư quá nhiều dung lượng",
+        "D": "Cổng mạng TCP bị đóng"
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "71097d1a-18b0-5972-a32b-1516db2de0c4",
+      "concept_slug": "os-basics",
+      "depth_tier": 3,
+      "task_type": "code_review",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Biến thể] Một worker Python xử lý sandbox báo lỗi `Too many open files` (`EMFILE`) sau vài giờ chạy. Hãy chỉ ra nguyên nhân và cách kiểm tra/khắc phục trên Linux.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Rò rỉ File Descriptor (chưa đóng file/socket/pipe)",
+            "weight": 0.5,
+            "required_keywords": [
+              "file descriptor",
+              "fd",
+              "close",
+              "leak",
+              "rò rỉ",
+              "ulimit"
+            ],
+            "socratic_hint": "Mỗi lần mở file/socket không đóng sẽ tiêu tốn tài nguyên gì của tiến trình?"
+          },
+          {
+            "name": "Kiểm tra bằng lsof / /proc/<pid>/fd & dùng context manager + ulimit",
+            "weight": 0.5,
+            "required_keywords": [
+              "lsof",
+              "proc",
+              "with",
+              "context manager",
+              "ulimit",
+              "nofile"
+            ],
+            "socratic_hint": "Lệnh Linux nào liệt kê các FD đang mở và cấu trúc Python nào đảm bảo luôn đóng?"
+          }
+        ],
+        "reference_explanation": "Do rò rỉ File Descriptor không được đóng sau khi dùng hoặc giới hạn `ulimit -n` quá thấp. Kiểm tra bằng `lsof -p <pid>` hoặc `/proc/<pid>/fd`, luôn dùng `with` và đóng kết nối."
+      }
+    },
+    {
+      "id": "1e566492-8c09-5406-abd7-1d244112f3b5",
+      "concept_slug": "os-basics",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Biến thể] Khi triển khai backend Python FastAPI (I/O-bound + đôi khi có tác vụ CPU-bound nhẹ), bạn chọn mô hình **Multi-process (nhiều worker)** hay **Multi-thread** trong 1 process? Giải thích dựa trên GIL và bộ nhớ.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Giải thích tác động của GIL với CPU-bound vs I/O-bound",
+            "weight": 0.5,
+            "required_keywords": [
+              "gil",
+              "cpu-bound",
+              "i/o-bound",
+              "async",
+              "process",
+              "thread"
+            ],
+            "socratic_hint": "Global Interpreter Lock ảnh hưởng thế nào khi 2 thread Python cùng chạy code tính toán?"
+          },
+          {
+            "name": "Đánh đổi RAM (process cô lập) vs tận dụng đa nhân CPU",
+            "weight": 0.5,
+            "required_keywords": [
+              "ram",
+              "memory",
+              "core",
+              "đa nhân",
+              "cô lập",
+              "worker"
+            ],
+            "socratic_hint": "Mỗi worker process tốn thêm bao nhiêu RAM nhưng đổi lại lợi ích gì về CPU và cô lập lỗi?"
+          }
+        ],
+        "reference_explanation": "Chọn Multi-process (ví dụ Uvicorn/Gunicorn workers) để vượt qua GIL và tận dụng đa nhân CPU, đổi lại tốn thêm RAM cho từng process thay vì chia sẻ heap như thread."
+      }
+    },
+    {
+      "id": "6460c73b-8702-50c8-b29a-fb5543b471c0",
+      "concept_slug": "os-basics",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Biến thể] Giải thích cơ chế `Fork + Exec` và `Copy-on-Write (CoW)` khi tiến trình cha tạo tiến trình con trên Linux.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Phân biệt vai trò fork() (nhân bản) và exec() (nạp ảnh mới)",
+            "weight": 0.5,
+            "required_keywords": [
+              "fork",
+              "exec",
+              "pid",
+              "clone",
+              "replace"
+            ],
+            "socratic_hint": "Sau `fork()`, tiến trình con chạy code nào trước khi gọi `exec()`?"
+          },
+          {
+            "name": "Cơ chế Copy-on-Write tiết kiệm RAM cho tới khi ghi",
+            "weight": 0.5,
+            "required_keywords": [
+              "copy-on-write",
+              "cow",
+              "page",
+              "write",
+              "ram",
+              "read-only"
+            ],
+            "socratic_hint": "Khi `fork()` xong, Linux có sao chép ngay toàn bộ RAM của tiến trình cha không?"
+          }
+        ],
+        "reference_explanation": "`fork()` tạo tiến trình con chia sẻ trang nhớ chỉ đọc với cha qua Copy-on-Write (chỉ copy trang khi có bên ghi), sau đó `exec()` thay thế không gian địa chỉ bằng chương trình mới."
+      }
+    },
+    {
+      "id": "6f8e1704-40d7-51ac-9cc2-1494641c10f3",
+      "concept_slug": "web-http",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Biến thể] HTTP Status Code nào biểu thị tài nguyên không thay đổi kể từ lần cache trước (dùng kèm `ETag` / `If-None-Match`)?",
+      "options": {
+        "A": "304 Not Modified",
+        "B": "204 No Content",
+        "C": "200 OK",
+        "D": "412 Precondition Failed"
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "478c3de7-b4de-50e9-b70b-33813dc406c4",
+      "concept_slug": "web-http",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 2 — Biến thể] Vì sao trình duyệt gửi request `OPTIONS` (Preflight) trước khi gửi `POST` có header `Authorization` sang một domain khác?",
+      "options": {
+        "A": "Để kiểm tra chính sách CORS xem server đích có cho phép method và custom header đó từ Origin hiện tại không",
+        "B": "Để nén payload JSON trước khi gửi",
+        "C": "Để nâng cấp kết nối lên WebSocket",
+        "D": "Để kiểm tra chứng chỉ SSL của client"
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "b3a493fc-49ee-5c7e-92f3-4375a7d61ec0",
+      "concept_slug": "web-http",
+      "depth_tier": 3,
+      "task_type": "code_review",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Biến thể] Khi gọi API cross-origin với cookie phiên, trình duyệt báo lỗi CORS dù server đã trả `Access-Control-Allow-Origin: *`. Hãy sửa lỗi cấu hình này.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Không được dùng wildcard * khi gửi credentials/cookie",
+            "weight": 0.5,
+            "required_keywords": [
+              "wildcard",
+              "*",
+              "credentials",
+              "cookie",
+              "origin"
+            ],
+            "socratic_hint": "Đặc tả CORS có cho phép `Access-Control-Allow-Origin: *` đi kèm `withCredentials: true` không?"
+          },
+          {
+            "name": "Trả Origin cụ thể + Access-Control-Allow-Credentials: true + Vary: Origin",
+            "weight": 0.5,
+            "required_keywords": [
+              "allow-credentials",
+              "vary",
+              "origin",
+              "explicit",
+              "cụ thể"
+            ],
+            "socratic_hint": "Cần đặt hai header CORS nào và header `Vary` gì để cache proxy không trộn lẫn?"
+          }
+        ],
+        "reference_explanation": "Khi dùng `credentials: include`, server bắt buộc trả Origin cụ thể khớp allowlist, kèm `Access-Control-Allow-Credentials: true` và `Vary: Origin`."
+      }
+    },
+    {
+      "id": "df96946e-201b-51fd-be8f-134569252662",
+      "concept_slug": "web-http",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Biến thể] So sánh hai cơ chế cập nhật thời gian thực từ Server xuống Client: **Server-Sent Events (SSE)** và **WebSockets** cho tính năng hiển thị tiến độ chấm bài AI. Bạn chọn cái nào?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Phân tích chiều giao tiếp (1 chiều HTTP vs 2 chiều TCP full-duplex)",
+            "weight": 0.5,
+            "required_keywords": [
+              "1 chiều",
+              "one-way",
+              "full-duplex",
+              "http",
+              "websocket",
+              "sse"
+            ],
+            "socratic_hint": "Tiến độ chấm bài chỉ đi từ Server -> Client hay cần client stream liên tục?"
+          },
+          {
+            "name": "Đánh đổi vận hành: reconnect tự động, proxy/LB, overhead",
+            "weight": 0.5,
+            "required_keywords": [
+              "reconnect",
+              "proxy",
+              "http",
+              "overhead",
+              "load balancer"
+            ],
+            "socratic_hint": "SSE chạy trên HTTP chuẩn nên có lợi thế gì về reconnect và hạ tầng proxy?"
+          }
+        ],
+        "reference_explanation": "Chọn SSE vì chỉ cần đẩy dữ liệu 1 chiều từ server, chạy trên HTTP chuẩn, hỗ trợ tự động reconnect (`Last-Event-ID`) và ít phức tạp hơn WebSocket qua proxy/LB."
+      }
+    },
+    {
+      "id": "def765c0-1f1c-5c1f-b1fe-86dd48a1677f",
+      "concept_slug": "web-http",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Biến thể] Phân biệt rõ **Idempotency** và **Safety** trong HTTP Methods (`GET`, `POST`, `PUT`, `DELETE`). Tại sao `PUT` là idempotent còn `POST` thường không?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Định nghĩa Safe (không đổi trạng thái) vs Idempotent (lặp lại N lần cho kết quả trạng thái như 1 lần)",
+            "weight": 0.5,
+            "required_keywords": [
+              "safe",
+              "idempotent",
+              "trạng thái",
+              "state",
+              "side effect"
+            ],
+            "socratic_hint": "Gọi `GET` có làm thay đổi dữ liệu server không? Còn gọi `DELETE` 2 lần thì sao?"
+          },
+          {
+            "name": "Giải thích PUT thay thế toàn bộ tại URI cố định vs POST tạo mới",
+            "weight": 0.5,
+            "required_keywords": [
+              "put",
+              "post",
+              "uri",
+              "tạo mới",
+              "thay thế"
+            ],
+            "socratic_hint": "Nếu gửi cùng 1 request `POST /orders` 3 lần mà không có Idempotency-Key thì điều gì xảy ra?"
+          }
+        ],
+        "reference_explanation": "Safe (`GET`, `HEAD`) không làm đổi trạng thái tài nguyên. Idempotent (`PUT`, `DELETE`, `GET`) có thể lặp lại mà trạng thái cuối cùng trên server không đổi; `POST` tạo tài nguyên mới mỗi lần nên không tự idempotent."
+      }
+    },
+    {
+      "id": "0f1cdca1-077f-529d-97f3-139aa3c2011b",
+      "concept_slug": "db-relational",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Biến thể] Trong PostgreSQL, loại ràng buộc nào đảm bảo giá trị cột `email` không trùng lặp giữa các dòng?",
+      "options": {
+        "A": "UNIQUE",
+        "B": "FOREIGN KEY",
+        "C": "CHECK",
+        "D": "DEFAULT"
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "4e5b6ab0-fc46-5c29-977b-8bd23fa28ae5",
+      "concept_slug": "db-relational",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 2 — Biến thể] Khi bảng `orders` có Composite Index `(user_id, created_at DESC)`, truy vấn nào sau đây KHÔNG tận dụng được hiệu quả B-Tree Index đó?",
+      "options": {
+        "A": "WHERE created_at >= '2026-01-01'",
+        "B": "WHERE user_id = 42 AND created_at >= '2026-01-01'",
+        "C": "WHERE user_id = 42 ORDER BY created_at DESC",
+        "D": "WHERE user_id = 42"
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "fdabda92-cfd0-5f69-bb9e-80a13e407cd2",
+      "concept_slug": "db-relational",
+      "depth_tier": 3,
+      "task_type": "code_review",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Biến thể] Kết quả `EXPLAIN ANALYZE` cho thấy câu truy vấn `SELECT * FROM attempts WHERE status = 'pending' ORDER BY created_at LIMIT 20` đang chạy `Seq Scan` mất 450ms dù bảng có 2 triệu dòng (chỉ ~500 dòng `pending`). Hãy đề xuất tối ưu.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Đề xuất Partial Index cho tập dữ liệu nhỏ 'pending'",
+            "weight": 0.5,
+            "required_keywords": [
+              "partial index",
+              "where",
+              "pending",
+              "index"
+            ],
+            "socratic_hint": "Chỉ có 500 dòng `pending` trên 2 triệu dòng; loại index nào chỉ đánh trên đúng điều kiện đó?"
+          },
+          {
+            "name": "Giảm chi phí I/O & sort bằng thứ tự cột (created_at) và tránh SELECT *",
+            "weight": 0.5,
+            "required_keywords": [
+              "created_at",
+              "order by",
+              "select *",
+              "covering",
+              "io"
+            ],
+            "socratic_hint": "Đưa `created_at` vào index giúp tránh bước `Sort` trên RAM như thế nào?"
+          }
+        ],
+        "reference_explanation": "Tạo Partial Index `CREATE INDEX idx_attempts_pending ON attempts (created_at) WHERE status = 'pending'` và chỉ select các cột cần thiết để tránh Heap fetch dư thừa."
+      }
+    },
+    {
+      "id": "e030606c-657d-5723-b155-936053b5f311",
+      "concept_slug": "db-relational",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Biến thể] Khi thiết kế khóa chính cho bảng dữ liệu lớn trong PostgreSQL, bạn chọn **UUIDv4 ngẫu nhiên** hay **UUIDv7 (theo thời gian) / BIGINT**? Phân tích tác động lên B-Tree Index.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Tác động phân mảnh trang lá B-Tree (Page Split) của UUIDv4 ngẫu nhiên",
+            "weight": 0.5,
+            "required_keywords": [
+              "uuidv4",
+              "ngẫu nhiên",
+              "random",
+              "page split",
+              "phân mảnh",
+              "cache"
+            ],
+            "socratic_hint": "Chèn khóa ngẫu nhiên vào giữa cây B-Tree làm trang nhớ bị chia tách và rớt cache như thế nào?"
+          },
+          {
+            "name": "Ưu điểm chèn tuần tự cuối cây của UUIDv7 / BIGINT & đánh đổi lộ kích thước",
+            "weight": 0.5,
+            "required_keywords": [
+              "uuidv7",
+              "bigint",
+              "tuần tự",
+              "sequential",
+              "append",
+              "lộ"
+            ],
+            "socratic_hint": "Khóa tăng dần chèn vào cuối cây giúp WAL và Buffer Pool ra sao, nhưng BIGINT có nhược điểm bảo mật gì khi lộ trên URL?"
+          }
+        ],
+        "reference_explanation": "UUIDv4 gây chèn ngẫu nhiên, nhiều Page Split và giảm cache hit B-Tree. UUIDv7 vừa giữ tính toàn cục không lộ số thứ tự như BIGINT, vừa chèn tuần tự theo thời gian."
+      }
+    },
+    {
+      "id": "a07ec202-883e-5119-8b84-97ad53928f8b",
+      "concept_slug": "db-relational",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Biến thể] Giải thích quy tắc **Leftmost Prefix** của B-Tree Composite Index và sự khác nhau giữa `Index Scan` với `Index-Only Scan`.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Giải thích Leftmost Prefix theo thứ tự sắp xếp từ trái sang phải",
+            "weight": 0.5,
+            "required_keywords": [
+              "leftmost",
+              "prefix",
+              "trái",
+              "thứ tự",
+              "b-tree"
+            ],
+            "socratic_hint": "Vì sao cây B-Tree sắp xếp theo `(A, B)` lại không tìm nhanh được nếu chỉ biết `B`?"
+          },
+          {
+            "name": "Phân biệt Index Scan (chạm Heap) vs Index-Only Scan (Visibility Map / INCLUDE)",
+            "weight": 0.5,
+            "required_keywords": [
+              "index-only",
+              "heap",
+              "include",
+              "visibility map",
+              "covering"
+            ],
+            "socratic_hint": "Khi nào PostgreSQL không cần quay về bảng gốc (Heap) để lấy dữ liệu?"
+          }
+        ],
+        "reference_explanation": "Composite Index sắp xếp theo cột 1 trước rồi mới tới cột 2 nên chỉ lọc hiệu quả từ tiền tố bên trái. Index-Only Scan đọc đủ cột ngay từ lá index (nhờ `INCLUDE` + Visibility Map) mà không cần đọc Heap."
+      }
+    },
+    {
+      "id": "56b7f8d4-d8d4-5abf-8363-9fb254fc17ad",
+      "concept_slug": "db-transactions",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Biến thể] Tính chất nào trong ACID đảm bảo rằng một giao dịch gồm 3 lệnh `UPDATE` sẽ hoặc thành công cả 3, hoặc hủy bỏ hoàn toàn nếu lệnh thứ 3 gặp lỗi?",
+      "options": {
+        "A": "Atomicity",
+        "B": "Consistency",
+        "C": "Isolation",
+        "D": "Durability"
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "f1bfd168-15a5-5e9f-b11f-ee330da7f9bb",
+      "concept_slug": "db-transactions",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 2 — Biến thể] Trong PostgreSQL, cơ chế nào cho phép các giao dịch `SELECT` đọc dữ liệu nhất quán mà không bị chặn bởi giao dịch `UPDATE` đang chạy song song?",
+      "options": {
+        "A": "MVCC (Multi-Version Concurrency Control)",
+        "B": "Table-level Exclusive Lock",
+        "C": "Dirty Read",
+        "D": "Two-Phase Commit"
+      },
+      "correct_option_key": "A",
+      "rubric": null
+    },
+    {
+      "id": "f7eb9e7d-f7a1-5da1-90f8-dc6a6627515c",
+      "concept_slug": "db-transactions",
+      "depth_tier": 3,
+      "task_type": "code_review",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Biến thể] Hai request đồng thời chạy `SELECT balance FROM wallets WHERE id = 1`, cùng thấy `100`, rồi request A ghi `100 - 30 = 70` và request B ghi `100 - 20 = 80`. Cuối cùng số dư thành `80` (mất 30!). Hãy sửa lỗi **Lost Update** này.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Nhận diện Lost Update ở mức Read Committed",
+            "weight": 0.5,
+            "required_keywords": [
+              "lost update",
+              "race condition",
+              "read committed",
+              "snapshot"
+            ],
+            "socratic_hint": "Vì sao cả 2 giao dịch đều đọc ra `100` trước khi trừ?"
+          },
+          {
+            "name": "Khắc phục bằng Atomic UPDATE / SELECT FOR UPDATE / Optimistic version",
+            "weight": 0.5,
+            "required_keywords": [
+              "for update",
+              "atomic",
+              "update wallets set balance = balance -",
+              "version",
+              "optimistic"
+            ],
+            "socratic_hint": "Viết câu lệnh SQL trừ trực tiếp hoặc khóa dòng thế nào để không bị ghi đè?"
+          }
+        ],
+        "reference_explanation": "Đây là Lost Update. Sửa bằng `UPDATE wallets SET balance = balance - :amt WHERE id = 1 AND balance >= :amt`, hoặc dùng `SELECT ... FOR UPDATE`, hoặc Optimistic Locking với cột `version`."
+      }
+    },
+    {
+      "id": "d8648539-6f9c-5418-835e-61f56c5da88d",
+      "concept_slug": "db-transactions",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Biến thể] Dịch vụ chấm điểm cần gọi OpenAI mất 5 giây rồi mới lưu điểm vào PostgreSQL. So sánh việc mở `@transaction` bao trùm cả lúc gọi OpenAI với mô hình **3-Phase Unit of Work**. Tại sao phương án bao trùm nguy hiểm?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Tác hại giữ DB Connection & Lock trong 5 giây (cạn Pool, nghẽn hàng)",
+            "weight": 0.5,
+            "required_keywords": [
+              "connection pool",
+              "cạn",
+              "lock",
+              "timeout",
+              "5 giây",
+              "chặn"
+            ],
+            "socratic_hint": "Nếu 50 user nộp bài cùng lúc và pool chỉ có 20 kết nối thì điều gì xảy ra?"
+          },
+          {
+            "name": "Mô hình 3-Phase UoW: Read -> External Call -> Short Atomic Commit + Idempotency",
+            "weight": 0.5,
+            "required_keywords": [
+              "3-phase",
+              "idempotency",
+              "submission_id",
+              "ngắn",
+              "advisory lock"
+            ],
+            "socratic_hint": "Sau khi gọi LLM xong mới mở transaction ngắn, làm sao chống 2 request trùng ghi đúp?"
+          }
+        ],
+        "reference_explanation": "Giữ DB transaction qua lời gọi HTTP 5s làm cạn Connection Pool và giữ lock lâu. 3-Phase UoW tách đọc kiểm tra, gọi ngoài không giữ lock, rồi mở transaction cực ngắn kèm `submission_id` idempotency."
+      }
+    },
+    {
+      "id": "ec462849-e4c2-5e74-a5c7-da15b77f47fd",
+      "concept_slug": "db-transactions",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Biến thể] Giải thích cơ chế hoạt động của **Transactional Outbox Pattern** và tại sao nó loại bỏ được lỗi mất đồng bộ giữa PostgreSQL và Redis Streams.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Ghi dữ liệu nghiệp vụ & bản ghi outbox trong cùng 1 ACID transaction",
+            "weight": 0.5,
+            "required_keywords": [
+              "cùng transaction",
+              "atomic",
+              "outbox",
+              "commit",
+              "rollback"
+            ],
+            "socratic_hint": "Nếu ghi DB thành công mà server sập trước khi gọi Redis thì chuyện gì xảy ra nếu không có Outbox?"
+          },
+          {
+            "name": "Worker Relay đọc bảng outbox và phát hành với cơ chế Idempotent / XAUTOCLAIM",
+            "weight": 0.5,
+            "required_keywords": [
+              "relay",
+              "worker",
+              "redis streams",
+              "published_at",
+              "at-least-once"
+            ],
+            "socratic_hint": "Tiến trình Relay xử lý gửi lại khi rớt mạng thế nào để đảm bảo không mất sự kiện?"
+          }
+        ],
+        "reference_explanation": "Transactional Outbox lưu event vào bảng `outbox_events` trong cùng DB transaction với dữ liệu chính (đảm bảo atomicity). Một relay worker bất đồng bộ sẽ đọc và đẩy sang Redis Streams theo cơ chế at-least-once."
+      }
+    },
+    {
+      "id": "92a60f9d-7eb8-5ef2-9122-734577ef46a8",
+      "concept_slug": "db-nosql",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Biến thể] Trong mô hình cặp Key-Value như Redis, cấu trúc dữ liệu nào phù hợp nhất để lưu bảng xếp hạng điểm số tự động sắp xếp theo thứ tự?",
+      "options": {
+        "A": "String",
+        "B": "Sorted Set (ZSET)",
+        "C": "List",
+        "D": "HyperLogLog"
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "1b06e477-81d6-5343-af65-1748ab0785c3",
+      "concept_slug": "db-nosql",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 2 — Biến thể] Theo định lý **CAP**, khi một cụm cơ sở dữ liệu phân tán gặp sự cố đứt mạng giữa các node (*Network Partition*), hệ thống buộc phải đánh đổi giữa hai yếu tố nào?",
+      "options": {
+        "A": "Latency và Throughput",
+        "B": "Consistency (Nhất quán) và Availability (Sẵn sàng)",
+        "C": "SQL và NoSQL",
+        "D": "RAM và SSD"
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "c5c804af-5e32-54eb-b278-a8561d731783",
+      "concept_slug": "db-nosql",
+      "depth_tier": 3,
+      "task_type": "code_review",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Biến thể] Một API tra cứu cache trên Redis đặt đồng loạt TTL = `3600` giây cho 10.000 khóa cấu hình lúc khởi động. Đúng 1 giờ sau, PostgreSQL bị quá tải đột ngột (*Cache Stampede*). Hãy đề xuất 2 cách khắc phục.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Thêm Jitter (TTL ngẫu nhiên) để tránh hết hạn đồng loạt",
+            "weight": 0.5,
+            "required_keywords": [
+              "jitter",
+              "ngẫu nhiên",
+              "ttl",
+              "thời gian"
+            ],
+            "socratic_hint": "Thay vì cùng đặt 3600s, có thể cộng thêm khoảng lệch gì?"
+          },
+          {
+            "name": "Dùng Singleflight / Distributed Lock khi rebuild cache",
+            "weight": 0.5,
+            "required_keywords": [
+              "singleflight",
+              "lock",
+              "mutex",
+              "rebuild",
+              "stale"
+            ],
+            "socratic_hint": "Khi cache hết hạn, làm sao chỉ cho 1 request đi hỏi DB thay vì 1000 request cùng lúc?"
+          }
+        ],
+        "reference_explanation": "Thêm Jitter ngẫu nhiên vào TTL (ví dụ `3600 + rand(0, 300)`) và dùng Singleflight/Distributed Lock (`SET NX`) để chỉ 1 worker truy vấn DB tái tạo cache."
+      }
+    },
+    {
+      "id": "7aa7ea66-f06b-5e0d-931d-736a6e747cfa",
+      "concept_slug": "db-nosql",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Biến thể] Khi cần lưu cấu trúc `GradingRubric` linh hoạt cho từng câu hỏi trong hệ thống đã có sẵn PostgreSQL, bạn chọn dùng cột **`JSONB` trong PostgreSQL** hay dựng thêm cụm **MongoDB**? Phân tích đánh đổi.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Ưu điểm PostgreSQL JSONB: giữ ACID, JOIN được với bảng câu hỏi, giảm độ phức tạp vận hành",
+            "weight": 0.5,
+            "required_keywords": [
+              "jsonb",
+              "acid",
+              "gin",
+              "vận hành",
+              "join",
+              "đơn giản"
+            ],
+            "socratic_hint": "Dùng `JSONB` có giúp nối khóa ngoại và tránh phải bảo trì thêm một hệ CSDL thứ hai không?"
+          },
+          {
+            "name": "Khi nào nên tách MongoDB: khối lượng ghi ngang cực lớn / Sharding đa vùng",
+            "weight": 0.5,
+            "required_keywords": [
+              "sharding",
+              "scale",
+              "throughput",
+              "mongodb",
+              "nhược điểm"
+            ],
+            "socratic_hint": "Nếu hệ thống có hàng tỷ document cần auto-sharding ghi ngang thì `JSONB` gặp giới hạn gì?"
+          }
+        ],
+        "reference_explanation": "Chọn PostgreSQL `JSONB` (kèm GIN Index) để giữ ACID, khóa ngoại và đơn giản hóa hạ tầng khi quy mô vừa/lớn; chỉ tách MongoDB khi thực sự cần auto-sharding ghi ngang quy mô khổng lồ."
+      }
+    },
+    {
+      "id": "b33c013f-695b-5559-86f4-3b22186e8c22",
+      "concept_slug": "db-nosql",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Biến thể] Giải thích nguyên tắc **Query-Driven Data Modeling** trong NoSQL và sự khác biệt giữa **Embedding (Nhúng)** với **Referencing (Tham chiếu)**.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Thiết kế cấu trúc lưu trữ theo mẫu truy vấn đọc/ghi thực tế",
+            "weight": 0.5,
+            "required_keywords": [
+              "query-driven",
+              "access pattern",
+              "truy vấn",
+              "đọc"
+            ],
+            "socratic_hint": "Khác với SQL chuẩn hóa trước rồi mới viết query, NoSQL bắt đầu thiết kế từ đâu?"
+          },
+          {
+            "name": "Quy tắc chọn Embed (1-ít, đọc cùng nhau) vs Reference (1-nhiều vô hạn, cập nhật độc lập)",
+            "weight": 0.5,
+            "required_keywords": [
+              "embed",
+              "nhúng",
+              "reference",
+              "tham chiếu",
+              "16mb",
+              "tăng trưởng"
+            ],
+            "socratic_hint": "Nếu nhúng mảng log/comment tăng vô hạn vào 1 document thì gặp rủi ro gì?"
+          }
+        ],
+        "reference_explanation": "NoSQL thiết kế theo Access Pattern: Embed dữ liệu 1-vài luôn đọc cùng nhau vào 1 document để đọc trong 1 lần; Reference dữ liệu tăng trưởng không giới hạn (1-N lớn) để tránh phình vượt giới hạn document."
+      }
+    },
+    {
+      "id": "aa738611-706a-584a-a5ba-4a96b054b27c",
+      "concept_slug": "api-rest",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Biến thể] Để cập nhật **một phần** thông tin hồ sơ người dùng (chỉ đổi `display_name`), HTTP method nào đúng chuẩn REST nhất?",
+      "options": {
+        "A": "GET",
+        "B": "PATCH",
+        "C": "POST",
+        "D": "DELETE"
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "fc937b7b-ad47-5f45-aff3-8421a1779e0f",
+      "concept_slug": "api-rest",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 2 — Biến thể] Trong thiết kế API phân trang danh sách lớn, vì sao **Cursor / Keyset Pagination** ổn định hơn **Offset Pagination** (`?page=100&limit=20`) khi có dữ liệu mới liên tục được thêm vào?",
+      "options": {
+        "A": "Vì Cursor không cần `ORDER BY`",
+        "B": "Vì Cursor neo vào vị trí bản ghi cụ thể nên không bị trùng hoặc bỏ sót dòng khi trang trước có thêm dòng mới, đồng thời DB không phải quét bỏ các dòng đầu",
+        "C": "Vì Offset chỉ hỗ trợ tối đa 10 trang",
+        "D": "Vì Cursor tự động mã hóa JSON"
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "87ebd7c7-550f-560f-ad3d-37754d6be378",
+      "concept_slug": "api-rest",
+      "depth_tier": 3,
+      "task_type": "code_review",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Biến thể] Xem thiết kế endpoint sau: `POST /api/v1/getUserById?id=123` trả về `200 OK` kể cả khi không tìm thấy user (body `{\"error\": \"not found\"}`). Hãy chỉ ra 3 điểm vi phạm chuẩn REST và sửa lại.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Dùng danh từ tài nguyên & đúng method GET /users/{id} thay cho động từ POST",
+            "weight": 0.5,
+            "required_keywords": [
+              "get",
+              "/users/",
+              "danh từ",
+              "method",
+              "động từ"
+            ],
+            "socratic_hint": "URI REST nên biểu diễn hành động (`getUser`) hay tài nguyên (`users`)?"
+          },
+          {
+            "name": "Trả đúng HTTP status code 404 Not Found thay vì 200 OK cho lỗi",
+            "weight": 0.5,
+            "required_keywords": [
+              "404",
+              "status code",
+              "not found",
+              "200"
+            ],
+            "socratic_hint": "Khi tài nguyên không tồn tại, mã trạng thái HTTP chuẩn là gì?"
+          }
+        ],
+        "reference_explanation": "Sửa thành `GET /api/v2/users/{id}` (dùng danh từ số nhiều và đúng method `GET`) và trả HTTP `404 Not Found` khi không tồn tại thay vì gói lỗi trong `200 OK`."
+      }
+    },
+    {
+      "id": "f7bc7849-e2a1-5047-b39e-fd931765cff5",
+      "concept_slug": "api-rest",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Biến thể] So sánh hai cách đánh phiên bản API (**URI Versioning `/api/v2/...`** vs **Header Versioning `Accept: application/vnd...`**) cho một hệ thống có Web SPA và Nginx Gateway.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Ưu điểm URI Versioning: tường minh, dễ test/cache/route trên Nginx & API Gateway",
+            "weight": 0.5,
+            "required_keywords": [
+              "uri",
+              "/api/v2",
+              "gateway",
+              "cache",
+              "dễ",
+              "tường minh"
+            ],
+            "socratic_hint": "Trên Nginx hoặc trình duyệt, định tuyến theo `/api/v2/` dễ hơn kiểm tra custom header ở điểm nào?"
+          },
+          {
+            "name": "Nhược điểm URI (thay đổi URL tài nguyên) & lý do vẫn chọn cho thực tế",
+            "weight": 0.5,
+            "required_keywords": [
+              "url",
+              "đánh đổi",
+              "header",
+              "tài nguyên",
+              "thực tế"
+            ],
+            "socratic_hint": "Vì sao nhiều hệ thống lớn (GitHub/Stripe/Plumora) vẫn chọn URI hoặc Header có chủ đích?"
+          }
+        ],
+        "reference_explanation": "URI Versioning (`/api/v2/`) dễ định tuyến ở API Gateway, dễ debug và cache theo URL; dù về mặt lý thuyết thuần REST thay đổi định danh URI, nó là lựa chọn thực dụng và rõ ràng nhất."
+      }
+    },
+    {
+      "id": "41c12a11-0065-5ae0-9413-4e2740e9f63e",
+      "concept_slug": "api-rest",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Biến thể] Giải thích cơ chế **Idempotency-Key (`submission_id`)** trong `POST /api/v2/assessments/{id}/submit` khi mạng di động của người dùng bị chập chờn và tự retry.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Server lưu khóa submission_id gắn với user_id + response_json đã commit",
+            "weight": 0.5,
+            "required_keywords": [
+              "submission_id",
+              "user_id",
+              "unique",
+              "response_json",
+              "lưu"
+            ],
+            "socratic_hint": "Khi request đầu tiên thành công, server cần lưu lại gì để lần retry sau không chạy lại logic?"
+          },
+          {
+            "name": "Kiểm tra xung đột payload (409) & trả lại response cũ không tính điểm lần 2",
+            "weight": 0.5,
+            "required_keywords": [
+              "409",
+              "conflict",
+              "replay",
+              "không tính",
+              "idempotent"
+            ],
+            "socratic_hint": "Nếu cùng `submission_id` nhưng gửi cho câu hỏi khác thì server phải trả mã gì?"
+          }
+        ],
+        "reference_explanation": "Client gửi UUID `submission_id` duy nhất cho mỗi hành động. Server lưu ràng buộc `(user_id, submission_id)`: nếu trùng câu hỏi thì trả lại `response_json` cũ (`idempotent_replay=True`), nếu khác câu hỏi thì trả `409 Conflict`."
+      }
+    },
+    {
+      "id": "d66cc215-3fe8-50c9-ab50-cc7f89d88957",
+      "concept_slug": "api-validation",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Biến thể] Mã trạng thái HTTP nào chuẩn nhất khi payload JSON gửi lên bị thiếu trường bắt buộc hoặc sai kiểu dữ liệu theo Schema?",
+      "options": {
+        "A": "401 Unauthorized",
+        "B": "422 Unprocessable Content",
+        "C": "403 Forbidden",
+        "D": "500 Internal Server Error"
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "dba59953-b1f8-551f-9899-77e8d03587c6",
+      "concept_slug": "api-validation",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 2 — Biến thể] Vì sao khi dùng Pydantic Schema cho API cập nhật hồ sơ, tuyệt đối không nên cho phép client truyền trường `role` hoặc `is_admin` vào Schema đầu vào?",
+      "options": {
+        "A": "Vì Pydantic không hỗ trợ kiểu bool",
+        "B": "Để ngăn lỗ hổng Mass Assignment khiến người dùng tự nâng quyền thành Admin",
+        "C": "Vì SQL không lưu được chuỗi role",
+        "D": "Để giảm kích thước file CSS"
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "7d693f01-dc31-51bf-95eb-2b8c56261bc7",
+      "concept_slug": "api-validation",
+      "depth_tier": 3,
+      "task_type": "code_review",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Biến thể] Một API Gateway dùng biểu thức `if '..' in request.url.path: return 400` để chặn Path Traversal, nhưng kẻ tấn công gửi `/api/v2/%252e%252e/internal/health` vẫn lọt qua lớp đầu. Giải thích lỗi và cách vá.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Nhận diện Double/Multi-layer Percent Encoding (%252e -> %2e -> .)",
+            "weight": 0.5,
+            "required_keywords": [
+              "%252e",
+              "percent",
+              "double",
+              "decode",
+              "mã hóa",
+              "unquote"
+            ],
+            "socratic_hint": "Khi lớp đầu unquote 1 lần, `%252e` biến thành gì, và khi đi sâu hơn nữa biến thành gì?"
+          },
+          {
+            "name": "Giải mã lặp (hoặc chặn mọi %25 / kiểm tra sau canonicalize) không làm hỏng path chuyển tiếp",
+            "weight": 0.5,
+            "required_keywords": [
+              "canonical",
+              "loop",
+              "vòng lặp",
+              "chặn",
+              "400",
+              "normpath"
+            ],
+            "socratic_hint": "Làm sao kiểm tra an toàn cả dạng thô lẫn dạng đã giải mã nhiều vòng?"
+          }
+        ],
+        "reference_explanation": "`%252e` là dấu `.` bị mã hóa 2 lớp (`%25` -> `%`). Nếu chỉ kiểm tra `..` thô hoặc decode 1 lần thì bị lọt. Cần kiểm tra qua vòng lặp unquote (tối đa vài lớp) và chuẩn hóa đường dẫn trước khi cho qua."
+      }
+    },
+    {
+      "id": "cca7b795-46a3-5f7d-a1cc-ffd9ef16faec",
+      "concept_slug": "api-validation",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Biến thể] Khi định nghĩa Schema đầu vào với Pydantic v2, nên đặt `extra='forbid'` hay `extra='ignore'`? Đánh đổi giữa bảo mật nghiêm ngặt và khả năng tương thích tiến hóa API (*Backward Compatibility*) là gì?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "So sánh extra='forbid' (bắt lỗi typo/trường lạ ngay 422) vs extra='ignore' (bỏ qua âm thầm)",
+            "weight": 0.5,
+            "required_keywords": [
+              "forbid",
+              "ignore",
+              "422",
+              "typo",
+              "field"
+            ],
+            "socratic_hint": "Nếu frontend gửi nhầm tên trường tùy chọn, hai chế độ này phản hồi khác nhau ra sao?"
+          },
+          {
+            "name": "Đánh đổi tương thích ngược khi rollout client/server lệch phiên bản",
+            "weight": 0.5,
+            "required_keywords": [
+              "tương thích",
+              "backward",
+              "client",
+              "phiên bản",
+              "đánh đổi"
+            ],
+            "socratic_hint": "Khi server bỏ bớt 1 field cũ mà client cũ vẫn gửi lên, `extra='forbid'` gây rủi ro gì?"
+          }
+        ],
+        "reference_explanation": "`extra='forbid'` phát hiện lỗi client sớm và chặt chẽ, nhưng dễ làm gãy client cũ khi API thay đổi; `extra='ignore'` vẫn chống Mass Assignment an toàn mà giữ tương thích ngược tốt hơn."
+      }
+    },
+    {
+      "id": "21561764-4e76-5363-9519-7977dff05f6d",
+      "concept_slug": "api-validation",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Biến thể] Phân biệt **Syntactic Validation** (tại Schema Pydantic) và **Semantic Validation** (tại Service/Domain) thông qua một luồng nộp bài Code Sandbox trong Plumora.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Syntactic: kiểm tra kiểu dữ liệu, độ dài code, language nằm trong allowlist -> 422",
+            "weight": 0.5,
+            "required_keywords": [
+              "syntactic",
+              "schema",
+              "pydantic",
+              "422",
+              "allowlist",
+              "kiểu"
+            ],
+            "socratic_hint": "Kiểm tra `language in ('python', 'javascript', 'sql')` và `source_code` không rỗng thuộc tầng nào?"
+          },
+          {
+            "name": "Semantic: kiểm tra đủ điều kiện DAG, đã hoàn thành Playbook, khớp challenge_id -> 403/404/409",
+            "weight": 0.5,
+            "required_keywords": [
+              "semantic",
+              "playbook",
+              "dag",
+              "409",
+              "403",
+              "nghiệp vụ"
+            ],
+            "socratic_hint": "Kiểm tra `playbook_completed` hoặc `submission_id` không xung đột thuộc tầng nào và trả mã gì?"
+          }
+        ],
+        "reference_explanation": "Syntactic Validation kiểm tra cấu trúc/định dạng JSON không cần tra DB (`422`); Semantic Validation kiểm tra trạng thái và bất biến nghiệp vụ với DB (`403`, `404`, `409`)."
+      }
+    },
+    {
+      "id": "dbfcaa21-5641-54cc-ad49-57e292238282",
+      "concept_slug": "api-data",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Biến thể] Trong SQLAlchemy, vì sao bật `pool_pre_ping=True` trên Engine lại giúp tránh lỗi `500` sau khi cơ sở dữ liệu PostgreSQL khởi động lại?",
+      "options": {
+        "A": "Nó tắt hoàn toàn Connection Pool",
+        "B": "Nó tự động kiểm tra kết nối còn sống trước khi cấp cho request, nếu chết sẽ tạo kết nối mới",
+        "C": "Nó nén toàn bộ câu SQL",
+        "D": "Nó tự động tạo Index cho mọi bảng"
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "0da64dac-4b4b-5615-a75d-923d638b26f7",
+      "concept_slug": "api-data",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 2 — Biến thể] Khi trả dữ liệu từ tầng Service về FastAPI Router, vì sao nên ánh xạ sang **DTO / Pydantic Schema** thay vì trả trực tiếp SQLAlchemy ORM Model?",
+      "options": {
+        "A": "Vì FastAPI không thể serialize dictionary",
+        "B": "Tránh lộ cột nhạy cảm, tránh lỗi DetachedInstanceError hoặc Lazy Loading ngoài ý muốn khi serialize",
+        "C": "Vì DTO tự động xóa bảng trong DB",
+        "D": "Để buộc DB phải chạy `Seq Scan`"
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "0bff5ec9-3353-5f20-909d-e33352b94b07",
+      "concept_slug": "api-data",
+      "depth_tier": 3,
+      "task_type": "code_review",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Biến thể] Một API lấy danh sách 30 khái niệm kèm điều kiện tiên quyết đang mất 450ms vì chạy 31 câu SQL (`1 + 30`). Hãy sửa bằng kỹ thuật tải dữ liệu tối ưu trong SQLAlchemy.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Nhận diện N+1 Query",
+            "weight": 0.5,
+            "required_keywords": [
+              "n+1",
+              "31",
+              "vòng lặp",
+              "query"
+            ],
+            "socratic_hint": "31 câu SQL cho 30 khái niệm chính là biểu hiện của lỗi kinh điển nào?"
+          },
+          {
+            "name": "Dùng selectinload / batch query IN (...) + dict mapping",
+            "weight": 0.5,
+            "required_keywords": [
+              "selectinload",
+              "in_",
+              "batch",
+              "join",
+              "dict",
+              "map"
+            ],
+            "socratic_hint": "Dùng tùy chọn eager loading nào hoặc truy vấn gom lô nào để giảm xuống còn 1-2 queries?"
+          }
+        ],
+        "reference_explanation": "Thay vòng lặp truy vấn lẻ bằng `selectinload(...)` hoặc truy vấn batch `WHERE concept_id IN (...)` rồi ánh xạ vào dict `O(1)` trong bộ nhớ."
+      }
+    },
+    {
+      "id": "ef1194fe-2378-5126-bf3c-35e3adb5fdf5",
+      "concept_slug": "api-data",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Biến thể] Trong kiến trúc Microservices của Plumora (`content-service` và `assessment-grader-service`), tại sao lại chọn giao tiếp qua **Port (`ContentCatalogPort`) + HTTP/Redis Cache** thay vì cho `assessment` `SELECT` trực tiếp vào schema `content_svc`?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Đảm bảo cô lập vật lý Schema / Bounded Context & tránh gãy ngầm khi đổi lược đồ",
+            "weight": 0.5,
+            "required_keywords": [
+              "cô lập",
+              "schema",
+              "bounded context",
+              "port",
+              "adapter",
+              "tách"
+            ],
+            "socratic_hint": "Nếu cả 2 service cùng đọc thẳng 1 bảng thì việc đổi cấu trúc bảng sẽ gây rủi ro gì?"
+          },
+          {
+            "name": "Đánh đổi: thêm độ trễ mạng / cần cơ chế invalidation cache (plumora:kg:epoch)",
+            "weight": 0.5,
+            "required_keywords": [
+              "độ trễ",
+              "latency",
+              "cache",
+              "epoch",
+              "invalidation",
+              "http"
+            ],
+            "socratic_hint": "Giao tiếp qua HTTP/Cache tốn thêm bước gì khi dữ liệu bên Content thay đổi?"
+          }
+        ],
+        "reference_explanation": "Cô lập schema bảo vệ ranh giới Bounded Context để từng service tiến hóa độc lập (ép buộc bằng DB role & Fitness Test), đổi lại phải quản lý cache invalidation (`plumora:kg:epoch`) và xử lý lỗi mạng."
+      }
+    },
+    {
+      "id": "f39bad58-e54e-53ff-bd5e-76a7864796bb",
+      "concept_slug": "api-data",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Biến thể] Giải thích nguyên lý **Ports & Adapters (Hexagonal Architecture)** và cách nó giúp kiểm thử đơn vị (`Unit Test`) tầng nghiệp vụ nhanh mà không cần dựng PostgreSQL thật.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Đảo ngược phụ thuộc: Domain/Service chỉ phụ thuộc Interface (Port) & DTO",
+            "weight": 0.5,
+            "required_keywords": [
+              "port",
+              "interface",
+              "protocol",
+              "dto",
+              "đảo ngược",
+              "dependency"
+            ],
+            "socratic_hint": "Tầng nghiệp vụ gọi trực tiếp SQLAlchemy hay gọi qua một `Protocol` trừu tượng?"
+          },
+          {
+            "name": "Adapter thật (SQL/HTTP) vs Fake/In-Memory Adapter trong Unit Test",
+            "weight": 0.5,
+            "required_keywords": [
+              "adapter",
+              "in-memory",
+              "mock",
+              "fake",
+              "unit test",
+              "nhanh"
+            ],
+            "socratic_hint": "Khi test logic nghiệp vụ, ta có thể thay `SqlContentCatalogAdapter` bằng cái gì?"
+          }
+        ],
+        "reference_explanation": "Tầng nghiệp vụ chỉ phụ thuộc vào `Port` (`Protocol`) và `DTO` bất biến; `SqlAdapter` / `HttpAdapter` nằm ở vòng ngoài. Khi unit test chỉ cần truyền `InMemoryAdapter` thực thi đúng `Port`."
+      }
+    },
+    {
+      "id": "4b4bc665-a077-5b9e-aa0b-b76516c48190",
+      "concept_slug": "cache-redis",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Biến thể] Trong Redis Streams, lệnh nào giúp lấy lại các tin nhắn bị worker cũ nhận nhưng chưa `XACK` (do worker bị sập giữa chừng)?",
+      "options": {
+        "A": "XADD",
+        "B": "FLUSHDB",
+        "C": "XLEN",
+        "D": "XAUTOCLAIM"
+      },
+      "correct_option_key": "D",
+      "rubric": null
+    },
+    {
+      "id": "4db83668-2825-51d6-83a9-38f39569979f",
+      "concept_slug": "cache-redis",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 2 — Biến thể] Chính sách loại bỏ bộ nhớ (*Eviction Policy*) nào trong Redis nên dùng khi Redis chỉ đóng vai trò Cache (không phải hàng đợi sự kiện)?",
+      "options": {
+        "A": "noeviction",
+        "B": "allkeys-lru (hoặc allkeys-lfu)",
+        "C": "appendonly",
+        "D": "rdb-save"
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "f23fd7ba-1cd1-5e0f-ad47-a06c7778b844",
+      "concept_slug": "cache-redis",
+      "depth_tier": 3,
+      "task_type": "code_review",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Biến thể] Khi chuyên gia cập nhật bài học ở `content-service`, worker `recommendation-ai-service` vẫn giữ bản cũ trong biến toàn cục Python `_BUNDLE_CACHE`. Hãy thiết kế cơ chế vô hiệu hóa cache đa worker bằng Redis.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Dùng khóa phiên bản chung trên Redis (vd: plumora:kg:epoch / INCR)",
+            "weight": 0.5,
+            "required_keywords": [
+              "epoch",
+              "version",
+              "incr",
+              "redis",
+              "chung",
+              "shared"
+            ],
+            "socratic_hint": "Làm sao tất cả các worker khác nhau biết dữ liệu bên `content-service` vừa thay đổi?"
+          },
+          {
+            "name": "So sánh epoch cục bộ với epoch trên Redis trước khi dùng cache trong RAM",
+            "weight": 0.5,
+            "required_keywords": [
+              "so sánh",
+              "invalidate",
+              "clear",
+              "reload",
+              "ram"
+            ],
+            "socratic_hint": "Khi phát hiện `redis_epoch != local_epoch`, worker cần làm gì với `_BUNDLE_CACHE`?"
+          }
+        ],
+        "reference_explanation": "Mỗi khi Content CRUD thành công, `content-service` gọi `INCR plumora:kg:epoch`. Các service khác kiểm tra giá trị epoch trên Redis: nếu khác epoch đang giữ trong RAM thì xóa `_BUNDLE_CACHE` và tải lại."
+      }
+    },
+    {
+      "id": "3362d58d-5428-5344-a466-dd983665ccd3",
+      "concept_slug": "cache-redis",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Biến thể] Để vừa làm **Cache đọc nhanh** vừa làm **Message Broker (Redis Streams)**, tại sao trong hệ thống lớn người ta thường tách 2 instance Redis riêng với cấu hình `eviction policy` khác nhau?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Cache cần allkeys-lru (tự xóa khi đầy RAM), còn Streams/Revocation cần noeviction",
+            "weight": 0.5,
+            "required_keywords": [
+              "allkeys-lru",
+              "noeviction",
+              "eviction",
+              "mất",
+              "stream",
+              "revocation"
+            ],
+            "socratic_hint": "Nếu Redis chứa `jti` bị thu hồi hoặc `Redis Streams` bị đầy RAM mà dùng `allkeys-lru` thì rủi ro gì xảy ra?"
+          },
+          {
+            "name": "Đánh đổi chi phí hạ tầng vs an toàn dữ liệu hàng đợi & AOF persistence",
+            "weight": 0.5,
+            "required_keywords": [
+              "aof",
+              "persistence",
+              "hạ tầng",
+              "an toàn",
+              "tách"
+            ],
+            "socratic_hint": "Tách 2 Redis giúp cấu hình AOF/Eviction tối ưu cho từng vai trò như thế nào?"
+          }
+        ],
+        "reference_explanation": "Cache ưu tiên `allkeys-lru` để không bao giờ lỗi ghi; nhưng `Redis Streams` hay `jti` revocation list bắt buộc `noeviction` + `AOF` để không bị xóa nhầm dữ liệu bảo mật/sự kiện khi đầy RAM."
+      }
+    },
+    {
+      "id": "bfd78f00-a9ad-5e22-b086-c60918f1018d",
+      "concept_slug": "cache-redis",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Biến thể] Giải thích cơ chế **Cache-Aside (Lazy Loading)** kết hợp **Post-Commit Invalidation** và lý do không nên xóa cache *trước* khi DB commit.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Luồng Cache-Aside: Đọc Redis -> Miss thì đọc DB -> Ghi lại Redis kèm TTL",
+            "weight": 0.5,
+            "required_keywords": [
+              "cache-aside",
+              "miss",
+              "hit",
+              "ttl",
+              "db"
+            ],
+            "socratic_hint": "Khi Cache Miss xảy ra, ứng dụng lấy dữ liệu từ đâu và làm gì tiếp theo?"
+          },
+          {
+            "name": "Tại sao phải xóa cache SAU khi DB commit (Post-Commit)",
+            "weight": 0.5,
+            "required_keywords": [
+              "post-commit",
+              "sau commit",
+              "stale",
+              "race",
+              "cũ"
+            ],
+            "socratic_hint": "Nếu xóa cache *trước* khi DB commit, một request đọc song song có thể nạp lại dữ liệu gì vào cache?"
+          }
+        ],
+        "reference_explanation": "Cache-Aside đọc cache trước, miss mới đọc DB rồi ghi vào cache kèm TTL. Phải xóa cache *sau* khi DB commit xong để tránh một request đọc song song nạp lại dữ liệu cũ trước khi transaction commit."
+      }
+    },
+    {
+      "id": "fc209687-7268-53b7-9f8f-1cd840263de0",
+      "concept_slug": "sec-authn",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Biến thể] Thuật toán băm mật khẩu nào được khuyến nghị hàng đầu hiện nay nhờ khả năng kháng GPU/ASIC bằng cả độ phức tạp thời gian lẫn bộ nhớ?",
+      "options": {
+        "A": "SHA-256",
+        "B": "Argon2id",
+        "C": "MD5",
+        "D": "Base64"
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "13cc80cc-5677-5038-9aed-f0527aada2a2",
+      "concept_slug": "sec-authn",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 2 — Biến thể] Vì sao thuộc tính **`HttpOnly`** trên cookie phiên giúp bảo vệ token khỏi bị đánh cắp bởi lỗ hổng XSS?",
+      "options": {
+        "A": "Vì `HttpOnly` chặn mọi request GET",
+        "B": "Vì `HttpOnly` tự động mã hóa mật khẩu người dùng",
+        "C": "Vì JavaScript trên trình duyệt (`document.cookie`) không thể đọc được cookie có cờ `HttpOnly`",
+        "D": "Vì `HttpOnly` lưu cookie vào `localStorage`"
+      },
+      "correct_option_key": "C",
+      "rubric": null
+    },
+    {
+      "id": "9c210e1e-d06e-5f44-ac0a-441f0a2a6c2c",
+      "concept_slug": "sec-authn",
+      "depth_tier": 3,
+      "task_type": "code_review",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Biến thể] Khi user bấm **Đăng xuất**, hệ thống hiện chỉ xóa cookie phía trình duyệt mà không thu hồi JWT trên server. Nếu kẻ tấn công đã sao chép được JWT trước đó, chuyện gì xảy ra và bạn sửa thế nào?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Nhận diện JWT vẫn còn hiệu lực cho tới khi hết exp",
+            "weight": 0.5,
+            "required_keywords": [
+              "stateless",
+              "còn hiệu lực",
+              "exp",
+              "chưa thu hồi",
+              "replay"
+            ],
+            "socratic_hint": "Xóa cookie ở trình duyệt có làm chữ ký của JWT cũ hết hiệu lực trên server không?"
+          },
+          {
+            "name": "Lưu jti vào Redis Revocation List với TTL bằng thời gian sống còn lại",
+            "weight": 0.5,
+            "required_keywords": [
+              "jti",
+              "redis",
+              "revoke",
+              "blacklist",
+              "ttl",
+              "thu hồi"
+            ],
+            "socratic_hint": "Cần thêm claim nào vào JWT và lưu vào Redis với TTL bao lâu khi logout?"
+          }
+        ],
+        "reference_explanation": "JWT vẫn hợp lệ cho đến lúc hết `exp`. Cần gắn `jti` (UUID) vào JWT; khi logout, ghi `jti` vào Redis Revocation List với TTL = `exp - now`, và middleware phải kiểm tra `jti` này trên mỗi request."
+      }
+    },
+    {
+      "id": "0da7b67f-5996-5332-a615-19f1aff16e30",
+      "concept_slug": "sec-authn",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Biến thể] So sánh **JWT (Stateless + Redis `jti` Revocation)** với **Opaque Session ID trên Redis** cho ứng dụng web có yêu cầu đăng xuất tức thì và kiểm tra RBAC.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "JWT tự mang claims (role, sub), nhưng muốn logout tức thì vẫn phải tra Redis jti",
+            "weight": 0.5,
+            "required_keywords": [
+              "jwt",
+              "claims",
+              "role",
+              "jti",
+              "redis",
+              "stateless"
+            ],
+            "socratic_hint": "Khi đã phải kiểm tra `jti` trên Redis thì JWT còn thuần túy zero-lookup không?"
+          },
+          {
+            "name": "Opaque Session ID gọn nhẹ, dễ hủy/đổi role tức thì & không lộ payload",
+            "weight": 0.5,
+            "required_keywords": [
+              "opaque",
+              "session",
+              "gọn",
+              "hủy",
+              "lộ",
+              "payload"
+            ],
+            "socratic_hint": "Opaque Session ID có ưu thế gì về kích thước cookie và khả năng cập nhật quyền?"
+          }
+        ],
+        "reference_explanation": "JWT tự mang claims nhưng khi thêm `jti` revocation vẫn cần 1 lượt tra Redis nhanh; Opaque Session ID không lộ claims ra ngoài và dễ cập nhật quyền/thu hồi hàng loạt trên server."
+      }
+    },
+    {
+      "id": "76ec460d-1007-5d0e-97cf-1ec7804d93fa",
+      "concept_slug": "sec-authn",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Biến thể] Phân biệt **Authentication (Xác thực)** và **Authorization (Phân quyền — RBAC/IDOR)**, và giải thích cách chống lỗ hổng **IDOR** trên API `/api/v2/assessments/{session_id}/submit`.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Phân biệt AuthN (Bạn là ai? 401) vs AuthZ (Bạn có quyền làm gì? 403)",
+            "weight": 0.5,
+            "required_keywords": [
+              "authentication",
+              "authorization",
+              "401",
+              "403",
+              "rbac"
+            ],
+            "socratic_hint": "Token hợp lệ nhưng learner gọi endpoint của Admin thì trả 401 hay 403?"
+          },
+          {
+            "name": "Chống IDOR bằng cách ràng buộc session.user_id == current_user.id từ server",
+            "weight": 0.5,
+            "required_keywords": [
+              "idor",
+              "current_user",
+              "user_id",
+              "ownership",
+              "sở hữu"
+            ],
+            "socratic_hint": "Nếu user A truyền `session_id` của user B vào URL, server kiểm tra điều kiện gì?"
+          }
+        ],
+        "reference_explanation": "AuthN xác minh danh tính (`401`), AuthZ kiểm tra quyền (`403`). Để chống IDOR, không bao giờ tin `user_id` client gửi; luôn đối chiếu `resource.user_id == current_user.id` trích từ token phía server."
+      }
+    },
+    {
+      "id": "6fc165cf-de6c-5741-a428-398a5e80b788",
+      "concept_slug": "sec-api",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Biến thể] Cơ chế nào ở API Gateway giúp bảo vệ endpoint `/api/v1/auth/login` trước tấn công dò mật khẩu tự động (Brute-force)?",
+      "options": {
+        "A": "Gzip Compression",
+        "B": "SQL JOIN",
+        "C": "Rate Limiting (Giới hạn tần suất)",
+        "D": "CORS Wildcard"
+      },
+      "correct_option_key": "C",
+      "rubric": null
+    },
+    {
+      "id": "f347b30b-60b9-5869-b873-f6afbac8e5ec",
+      "concept_slug": "sec-api",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 2 — Biến thể] Tại sao mọi API nội bộ giữa các microservice (`/api/v2/internal/*`) phải bị API Gateway chặn tuyệt đối từ mạng công cộng (`403 Forbidden`)?",
+      "options": {
+        "A": "Vì FastAPI không định tuyến được quá 2 dấu gạch chéo",
+        "B": "Vì trình duyệt không hỗ trợ gọi `/internal`",
+        "C": "Vì chúng phục vụ giao tiếp nội bộ tin cậy giữa các service và không dành cho người dùng cuối gọi trực tiếp",
+        "D": "Để giảm kích thước bundle React"
+      },
+      "correct_option_key": "C",
+      "rubric": null
+    },
+    {
+      "id": "bedeeea1-ef20-5ebf-812a-b5bf208585be",
+      "concept_slug": "sec-api",
+      "depth_tier": 3,
+      "task_type": "code_review",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Biến thể] Trong `api_gateway.py`, một lập trình viên dùng `httpx.AsyncClient()` dùng chung toàn cục cho mọi user mà không tắt `cookies`. Điều gì cực kỳ nguy hiểm có thể xảy ra giữa User A và User B?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Rò rỉ Session Cookie giữa các user qua shared CookieJar",
+            "weight": 0.5,
+            "required_keywords": [
+              "cookiejar",
+              "rò rỉ",
+              "leak",
+              "user a",
+              "user b",
+              "session"
+            ],
+            "socratic_hint": "`httpx.AsyncClient` mặc định có lưu `Set-Cookie` từ response vào bộ nhớ dùng chung không?"
+          },
+          {
+            "name": "Khắc phục bằng Stateless No-Op CookieJar & chuyển tiếp Set-Cookie nguyên bản",
+            "weight": 0.5,
+            "required_keywords": [
+              "stateless",
+              "noop",
+              "set-cookie",
+              "header",
+              "chuyển tiếp"
+            ],
+            "socratic_hint": "Làm sao tắt hoàn toàn việc client tự giữ cookie trên Gateway?"
+          }
+        ],
+        "reference_explanation": "`httpx.AsyncClient` mặc định chia sẻ CookieJar sẽ vô tình gửi cookie của User A sang request của User B! Phải gắn `_StatelessNoOpCookieJar` và forward từng header `Set-Cookie` riêng biệt."
+      }
+    },
+    {
+      "id": "08030a12-1eb0-5388-9b2f-0649c0c7a7e0",
+      "concept_slug": "sec-api",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Biến thể] So sánh thuật toán **Fixed Window** và **Sliding Window (hoặc Token Bucket)** khi thiết kế Rate Limiter trên Redis ở API Gateway.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Nhược điểm Fixed Window: bùng nổ gấp đôi ngưỡng ở ranh giới phút (Boundary Burst)",
+            "weight": 0.5,
+            "required_keywords": [
+              "fixed window",
+              "boundary",
+              "ranh giới",
+              "gấp đôi",
+              "burst"
+            ],
+            "socratic_hint": "Nếu giới hạn 60 req/phút, gửi 60 req lúc 00:59 và 60 req lúc 01:01 thì điều gì xảy ra?"
+          },
+          {
+            "name": "Ưu điểm Sliding Window / ZSET hoặc Token Bucket: làm mượt lưu lượng chính xác",
+            "weight": 0.5,
+            "required_keywords": [
+              "sliding window",
+              "token bucket",
+              "zset",
+              "mượt",
+              "chính xác"
+            ],
+            "socratic_hint": "Sliding Window tính cửa sổ thời gian trôi theo thời điểm hiện tại như thế nào?"
+          }
+        ],
+        "reference_explanation": "Fixed Window dễ bị lỗ hổng gấp đôi lưu lượng tại ranh giới chuyển cửa sổ. Sliding Window (dùng Redis ZSET hoặc bộ đếm trượt) đo chính xác trong T giây gần nhất."
+      }
+    },
+    {
+      "id": "41c9f485-c7f5-540d-91ce-31beaff6a768",
+      "concept_slug": "sec-api",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Biến thể] Giải thích nguyên tắc **Defense in Depth (Phòng thủ nhiều lớp)** khi thực thi mã nguồn người dùng trong Code Sandbox (`Python / JS / SQL`).",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Lớp 1 (Static/AST/Authorizer): chặn import nguy hiểm, dunder, PRAGMA trước khi chạy",
+            "weight": 0.5,
+            "required_keywords": [
+              "ast",
+              "authorizer",
+              "import",
+              "dunder",
+              "static",
+              "chặn"
+            ],
+            "socratic_hint": "Trước khi thực thi code, bước kiểm tra tĩnh loại bỏ những cú pháp nguy hiểm nào?"
+          },
+          {
+            "name": "Lớp 2 (Runtime Isolation): tiến trình con không đặc quyền uid=10001, env sạch, RAM 128MB, timeout <=3s",
+            "weight": 0.5,
+            "required_keywords": [
+              "subprocess",
+              "uid",
+              "non-root",
+              "timeout",
+              "128mb",
+              "memory",
+              "cô lập"
+            ],
+            "socratic_hint": "Nếu mã vượt qua kiểm tra tĩnh mà chạy vòng lặp vô tận hoặc ngốn RAM thì lớp nào cắt nó?"
+          }
+        ],
+        "reference_explanation": "Defense in Depth kết hợp nhiều lớp độc lập: Lớp kiểm tra tĩnh (AST/SQLite authorizer) + Lớp cô lập thực thi (subprocess không đặc quyền, xóa biến môi trường bí mật, giới hạn `RLIMIT_AS` 128MB và timeout `<= 3000ms`)."
+      }
+    },
+    {
+      "id": "92320da8-bb43-5ada-9e7c-9acc285a7bb4",
+      "concept_slug": "fe-dom-events",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Biến thể] Phương thức nào của đối tượng `Event` ngăn không cho sự kiện nổi bọt (*Event Bubbling*) lên các phần tử cha?",
+      "options": {
+        "A": "event.preventDefault()",
+        "B": "event.stopImmediate()",
+        "C": "event.stopPropagation()",
+        "D": "event.cancelBubble = false"
+      },
+      "correct_option_key": "C",
+      "rubric": null
+    },
+    {
+      "id": "acb25250-4d0d-54a1-9a8a-40f50e5b8e6b",
+      "concept_slug": "fe-dom-events",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 2 — Biến thể] Kỹ thuật **Event Delegation** đặt trình lắng nghe sự kiện ở đâu để tối ưu bộ nhớ cho danh sách 500 phần tử?",
+      "options": {
+        "A": "Dùng `setInterval` kiểm tra DOM mỗi 10ms",
+        "B": "Gắn 500 listener riêng lẻ cho từng phần tử",
+        "C": "Đặt một listener duy nhất trên phần tử cha chung và kiểm tra `event.target.closest(...)`",
+        "D": "Lưu tất cả DOM node vào `localStorage`"
+      },
+      "correct_option_key": "C",
+      "rubric": null
+    },
+    {
+      "id": "be05aa46-0a3a-5d63-9836-c327a6aba72c",
+      "concept_slug": "fe-dom-events",
+      "depth_tier": 3,
+      "task_type": "code_review",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Biến thể] Trong một bảng có 100 hàng nút xóa, click vào icon `<svg>` bên trong `<button data-id='5'>` khiến `event.target` là thẻ `<path>` chứ không phải `<button>`, làm `event.target.dataset.id` bị `undefined`. Hãy sửa.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Dùng event.target.closest('button[data-id]')",
+            "weight": 0.5,
+            "required_keywords": [
+              "closest",
+              "target",
+              "svg",
+              "button",
+              "dataset"
+            ],
+            "socratic_hint": "Phương thức DOM nào đi ngược lên tổ tiên gần nhất khớp selector?"
+          },
+          {
+            "name": "Giải thích sự khác nhau giữa event.target và event.currentTarget",
+            "weight": 0.5,
+            "required_keywords": [
+              "currenttarget",
+              "target",
+              "bubbling",
+              "nổi bọt"
+            ],
+            "socratic_hint": "`event.target` trỏ vào phần tử thực sự được click hay phần tử gắn listener?"
+          }
+        ],
+        "reference_explanation": "`event.target` là phần tử sâu nhất được click (`<path>`). Dùng `const btn = (event.target as Element).closest('button[data-id]')` để lấy đúng nút cha."
+      }
+    },
+    {
+      "id": "c362e59d-2ac3-5571-904c-cad40f905b72",
+      "concept_slug": "fe-dom-events",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Biến thể] Khi nào cần gọi `event.preventDefault()` vs `event.stopPropagation()`? Việc lạm dụng `stopPropagation()` trên mọi nút trong ứng dụng React gây ra hệ quả gì?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Phân biệt: preventDefault (hành vi mặc định trình duyệt) vs stopPropagation (lan truyền DOM)",
+            "weight": 0.5,
+            "required_keywords": [
+              "preventdefault",
+              "stoppropagation",
+              "mặc định",
+              "submit",
+              "lan truyền"
+            ],
+            "socratic_hint": "Chặn reload trang khi submit `<form>` dùng hàm nào?"
+          },
+          {
+            "name": "Hệ quả lạm dụng stopPropagation: hỏng click-outside dropdown, analytics, delegation",
+            "weight": 0.5,
+            "required_keywords": [
+              "click-outside",
+              "dropdown",
+              "analytics",
+              "delegation",
+              "hỏng"
+            ],
+            "socratic_hint": "Nếu một nút chặn sự kiện nổi lên `document`, các hook đóng modal/dropdown khi click ra ngoài sẽ bị gì?"
+          }
+        ],
+        "reference_explanation": "`preventDefault()` tắt hành vi mặc định (submit form, mở link); `stopPropagation()` chặn nổi bọt. Lạm dụng `stopPropagation()` làm hỏng global click-outside handlers và tracking."
+      }
+    },
+    {
+      "id": "96dbab58-6868-5aa1-9ae8-02e890b9cd23",
+      "concept_slug": "fe-dom-events",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Biến thể] Trình bày 3 pha của luồng sự kiện DOM (**Capture $\rightarrow$ Target $\rightarrow$ Bubble**) và cách trình duyệt xử lý **Critical Rendering Path** (DOM + CSSOM $\rightarrow$ Layout $\rightarrow$ Paint).",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "3 pha sự kiện: Capturing từ window xuống, Target tại đích, Bubbling ngược lên",
+            "weight": 0.5,
+            "required_keywords": [
+              "capture",
+              "target",
+              "bubble",
+              "bubbling",
+              "pha"
+            ],
+            "socratic_hint": "Mặc định `addEventListener` lắng nghe ở pha nào?"
+          },
+          {
+            "name": "Tránh Layout Thrashing (đọc offsetHeight rồi ghi style lặp lại trong vòng lặp)",
+            "weight": 0.5,
+            "required_keywords": [
+              "layout",
+              "paint",
+              "reflow",
+              "thrashing",
+              "cssom",
+              "render tree"
+            ],
+            "socratic_hint": "Việc đọc thuộc tính hình học rồi sửa style liên tục trong vòng lặp gây ra hiện tượng gì?"
+          }
+        ],
+        "reference_explanation": "Sự kiện đi qua Capture -> Target -> Bubble. Trong render, DOM + CSSOM tạo Render Tree -> Layout -> Paint -> Composite; cần gom thao tác đọc và ghi DOM riêng để tránh Layout Thrashing."
+      }
+    },
+    {
+      "id": "eb859cac-142c-59e9-acea-7ec37c959294",
+      "concept_slug": "fe-js-async",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Biến thể] Trong JavaScript Event Loop, hàng đợi nào luôn được rút cạn hoàn toàn trước khi trình duyệt sang tác vụ tiếp theo của Macrotask Queue?",
+      "options": {
+        "A": "Macrotask Queue",
+        "B": "Render Queue",
+        "C": "Microtask Queue (Promise.then / queueMicrotask)",
+        "D": "Network Queue"
+      },
+      "correct_option_key": "C",
+      "rubric": null
+    },
+    {
+      "id": "6a04ef80-c230-5321-b089-7db55b9193be",
+      "concept_slug": "fe-js-async",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 2 — Biến thể] Khi cần gọi song song 3 API độc lập và vẫn muốn nhận kết quả của 2 API thành công kể cả khi 1 API bị lỗi, bạn dùng phương thức `Promise` nào?",
+      "options": {
+        "A": "Promise.all",
+        "B": "Promise.race",
+        "C": "Promise.allSettled",
+        "D": "Promise.reject"
+      },
+      "correct_option_key": "C",
+      "rubric": null
+    },
+    {
+      "id": "6c4cdfc0-303b-5dc6-9363-08b50767e73c",
+      "concept_slug": "fe-js-async",
+      "depth_tier": 3,
+      "task_type": "code_review",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Biến thể] Đoạn code sau làm đơ UI trình duyệt và chạy tuần tự mất 6 giây dù 3 API độc lập:\n```ts\nconst a = await fetchA(); const b = await fetchB(); const c = await fetchC();\n```\nHãy sửa để chạy song song và có thể hủy khi component unmount.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Dùng Promise.all([fetchA(signal), fetchB(signal), fetchC(signal)])",
+            "weight": 0.5,
+            "required_keywords": [
+              "promise.all",
+              "song song",
+              "parallel",
+              "concurrent"
+            ],
+            "socratic_hint": "Thay vì `await` tuần tự từng dòng, dùng hàm nào để bắn 3 request cùng lúc?"
+          },
+          {
+            "name": "Truyền AbortController.signal để hủy request khi unmount",
+            "weight": 0.5,
+            "required_keywords": [
+              "abortcontroller",
+              "signal",
+              "abort",
+              "unmount",
+              "race"
+            ],
+            "socratic_hint": "Làm sao hủy các request đang bay nếu người dùng chuyển trang?"
+          }
+        ],
+        "reference_explanation": "Khởi tạo cả 3 Promise cùng lúc với `Promise.all` (giảm từ 6s xuống max 2s) và truyền `AbortController.signal` vào `fetch` để cleanup khi unmount."
+      }
+    },
+    {
+      "id": "50b8d28a-8ec2-5476-81b5-6d36fc99a4c4",
+      "concept_slug": "fe-js-async",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Biến thể] Trong thanh tìm kiếm gõ tới đâu gọi API tới đó (*Search-as-you-type*), so sánh **Debounce** với **Throttle**, và giải thích vì sao vẫn cần **AbortController** dù đã Debounce.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Debounce (chờ ngừng gõ X ms mới gọi) vs Throttle (tối đa 1 lần mỗi X ms)",
+            "weight": 0.5,
+            "required_keywords": [
+              "debounce",
+              "throttle",
+              "ngừng gõ",
+              "chu kỳ"
+            ],
+            "socratic_hint": "Với ô tìm kiếm, ta muốn chờ user gõ xong từ khóa rồi mới gọi hay gọi đều đặn khi đang gõ?"
+          },
+          {
+            "name": "AbortController chống Race Condition phản hồi cũ về sau phản hồi mới",
+            "weight": 0.5,
+            "required_keywords": [
+              "abortcontroller",
+              "race condition",
+              "cũ",
+              "thứ tự",
+              "out-of-order"
+            ],
+            "socratic_hint": "Nếu request cho chữ 're' chậm hơn request cho chữ 'react' và về sau thì UI bị gì nếu không abort?"
+          }
+        ],
+        "reference_explanation": "Search dùng Debounce để giảm số request, nhưng vẫn phải kết hợp `AbortController` để hủy request trước đó, tránh kết quả cũ về chậm ghi đè kết quả mới."
+      }
+    },
+    {
+      "id": "d46243bc-c6ff-54e0-9f2b-6b234fda1988",
+      "concept_slug": "fe-js-async",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Biến thể] Giải thích thứ tự in ra của đoạn mã Event Loop gồm `console.log`, `setTimeout(..., 0)` và `Promise.resolve().then(...)`.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Call Stack đồng bộ chạy trước hoàn toàn",
+            "weight": 0.5,
+            "required_keywords": [
+              "call stack",
+              "đồng bộ",
+              "synchronous"
+            ],
+            "socratic_hint": "Các lệnh `console.log` bình thường nằm ở đâu và chạy khi nào?"
+          },
+          {
+            "name": "Microtask Queue (Promise) chạy hết trước Macrotask Queue (setTimeout)",
+            "weight": 0.5,
+            "required_keywords": [
+              "microtask",
+              "macrotask",
+              "promise",
+              "settimeout",
+              "ưu tiên"
+            ],
+            "socratic_hint": "Sau khi Call Stack rỗng, Event Loop kiểm tra hàng đợi nào trước?"
+          }
+        ],
+        "reference_explanation": "Call Stack chạy hết code đồng bộ -> Event Loop rút sạch Microtask Queue (`Promise.then`) -> sau đó mới lấy 1 tác vụ từ Macrotask Queue (`setTimeout`)."
+      }
+    },
+    {
+      "id": "ec03eda1-6711-5528-83d0-36afe14d0717",
+      "concept_slug": "fe-component-state",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Biến thể] Trong React, vì sao không nên dùng **chỉ số mảng (`index`)** làm prop `key` cho danh sách có thể thêm, xóa hoặc sắp xếp lại?",
+      "options": {
+        "A": "Vì `index` làm trình duyệt không render thẻ `<li>`",
+        "B": "Vì `key` chỉ chấp nhận chuỗi UUID",
+        "C": "Vì `index` thay đổi khi thêm/xóa đầu mảng, làm React ghép nhầm state nội bộ của phần tử cũ sang phần tử mới",
+        "D": "Vì TypeScript cấm kiểu `number` cho `key`"
+      },
+      "correct_option_key": "C",
+      "rubric": null
+    },
+    {
+      "id": "701a37e6-ec1d-5288-9f3f-730328f1ca7b",
+      "concept_slug": "fe-component-state",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 2 — Biến thể] Khi một state có thể tính toán trực tiếp từ `props` hoặc `state` khác (ví dụ `fullName = firstName + lastName`), thực hành tốt nhất trong React là gì?",
+      "options": {
+        "A": "Lưu vào `window.localStorage`",
+        "B": "Tạo thêm `useState` và đồng bộ bằng `useEffect`",
+        "C": "Tính trực tiếp trong quá trình render (Derived State), không lưu thêm `useState` + `useEffect` dư thừa",
+        "D": "Gọi API backend để nối chuỗi"
+      },
+      "correct_option_key": "C",
+      "rubric": null
+    },
+    {
+      "id": "4ea15aef-29bb-5b33-a689-ca6ea1d2c3d0",
+      "concept_slug": "fe-component-state",
+      "depth_tier": 3,
+      "task_type": "code_review",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Biến thể] Một component `LessonPlaybookPage` gọi `useEffect` để đăng ký phím tắt `window.addEventListener('keydown', handler)` nhưng quên trả về hàm dọn dẹp (*cleanup*). Điều gì xảy ra khi chuyển trang qua lại 5 lần?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Rò rỉ bộ nhớ & listener chồng chéo gọi handler 5 lần mỗi lần bấm phím",
+            "weight": 0.5,
+            "required_keywords": [
+              "memory leak",
+              "rò rỉ",
+              "nhiều lần",
+              "chồng",
+              "listener"
+            ],
+            "socratic_hint": "Mỗi lần mount lại, listener mới được gắn thêm mà listener cũ có tự mất không?"
+          },
+          {
+            "name": "Trả về cleanup `() => window.removeEventListener('keydown', handler)`",
+            "weight": 0.5,
+            "required_keywords": [
+              "removeeventlistener",
+              "cleanup",
+              "return",
+              "unmount"
+            ],
+            "socratic_hint": "Cần trả về hàm gì trong `useEffect` để gỡ bỏ listener?"
+          }
+        ],
+        "reference_explanation": "Gây rò rỉ bộ nhớ và gắn trùng nhiều listener. Phải trả về `() => window.removeEventListener('keydown', handler)` trong `useEffect`."
+      }
+    },
+    {
+      "id": "230a0094-8ec1-5000-9f62-dbd22814690a",
+      "concept_slug": "fe-component-state",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Biến thể] Khi quản lý dữ liệu tải từ API (danh sách khái niệm, trạng thái loading/error, cache) trong React SPA, so sánh việc tự viết `useEffect + useState` với việc dùng **Server-State Library (TanStack Query)** hoặc tập trung ở Shell.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Khó khăn của useEffect thuần: race condition, deduplication, stale cache, retry",
+            "weight": 0.5,
+            "required_keywords": [
+              "race condition",
+              "cache",
+              "deduplication",
+              "retry",
+              "useeffect"
+            ],
+            "socratic_hint": "Nếu 2 component cùng mount và gọi `useEffect` fetch cùng 1 API thì có bị gọi 2 lần không?"
+          },
+          {
+            "name": "Lợi ích gom server state & tách biệt khỏi UI local state",
+            "weight": 0.5,
+            "required_keywords": [
+              "server state",
+              "ui state",
+              "tách",
+              "loading",
+              "error",
+              "invalidation"
+            ],
+            "socratic_hint": "Tách biệt Server State khỏi Local UI State (như modal open/close) giúp gì?"
+          }
+        ],
+        "reference_explanation": "Tự viết `useEffect` dễ dính race condition, gọi trùng request và thiếu cache invalidation. Tách Server State giúp quản lý cache, đồng bộ và trạng thái loading/error nhất quán."
+      }
+    },
+    {
+      "id": "4508b6c3-ba21-546b-ae01-8a795c1d70a9",
+      "concept_slug": "fe-component-state",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Biến thể] Giải thích cơ chế **Reconciliation & Virtual DOM** của React và khi nào việc tối ưu bằng `useMemo`/`React.memo` thực sự cần thiết vs phản tác dụng.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Cơ chế diff theo type & key giữa Virtual DOM cũ và mới",
+            "weight": 0.5,
+            "required_keywords": [
+              "reconciliation",
+              "virtual dom",
+              "diff",
+              "key",
+              "type"
+            ],
+            "socratic_hint": "React dùng gì để nhận biết 1 node trong danh sách là cũ hay mới?"
+          },
+          {
+            "name": "Chi phí so sánh props của memo khi đặt tràn lan cho component nhẹ",
+            "weight": 0.5,
+            "required_keywords": [
+              "memo",
+              "usememo",
+              "chi phí",
+              "overhead",
+              "profiler"
+            ],
+            "socratic_hint": "Nếu bọc `React.memo` cho component rất nhẹ mà props là hàm inline mới mỗi lần render thì sao?"
+          }
+        ],
+        "reference_explanation": "React đối chiếu cây Virtual DOM theo `type` và `key`. Chỉ dùng `React.memo`/`useMemo` sau khi đo bằng Profiler cho phép tính nặng hoặc cây con lớn, vì memo có chi phí so sánh và giữ bộ nhớ."
+      }
+    },
+    {
+      "id": "15b69263-ef9a-5764-8cb7-02107d053f93",
+      "concept_slug": "fe-data-fetching",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Biến thể] Khi gửi request `fetch` tới API cùng domain hoặc có cookie phiên `__Host-plumora_session`, tùy chọn nào đảm bảo trình duyệt luôn đính kèm cookie?",
+      "options": {
+        "A": "cache: 'no-store'",
+        "B": "mode: 'no-cors'",
+        "C": "credentials: 'include'",
+        "D": "keepalive: false"
+      },
+      "correct_option_key": "C",
+      "rubric": null
+    },
+    {
+      "id": "0b368546-8390-5295-8c9c-c5b51311f44c",
+      "concept_slug": "fe-data-fetching",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 2 — Biến thể] Vì sao khi nhận dữ liệu lỗi từ API (`status = 400` hoặc `500`), hàm `fetch()` của trình duyệt KHÔNG tự động ném lỗi (`reject Promise`)?",
+      "options": {
+        "A": "Vì JavaScript không hỗ trợ `try/catch` với `async`",
+        "B": "Vì `fetch()` luôn trả về `200 OK`",
+        "C": "`fetch()` chỉ reject khi lỗi mạng/DNS; với HTTP 4xx/5xx vẫn resolve với `response.ok === false`",
+        "D": "Vì JSON không chứa được mã lỗi"
+      },
+      "correct_option_key": "C",
+      "rubric": null
+    },
+    {
+      "id": "4b801317-61dc-5308-8adc-9e8d3783eeb5",
+      "concept_slug": "fe-data-fetching",
+      "depth_tier": 3,
+      "task_type": "code_review",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Biến thể] Trong `App.tsx`, khi người dùng nhấn `F5` trên `/backoffice/admin`, ứng dụng chớp màn hình `/login` rồi mới chuyển vào Admin (**FOUC**). Hãy chỉ ra nguyên nhân và cách sửa.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Render route guard trước khi hoàn tất bootstrapAuth (/auth/me)",
+            "weight": 0.5,
+            "required_keywords": [
+              "bootstrap",
+              "isbootstrappingauth",
+              "fouc",
+              "flash",
+              "loading",
+              "/auth/me"
+            ],
+            "socratic_hint": "Trong lúc `/api/v1/auth/me` chưa trả về, `user` đang là `null` nên router tưởng chưa đăng nhập?"
+          },
+          {
+            "name": "Chặn điều hướng bằng cờ isBootstrappingAuth (hiển thị trạng thái chờ trung tính)",
+            "weight": 0.5,
+            "required_keywords": [
+              "spinner",
+              "loading",
+              "chờ",
+              "guard",
+              "flag",
+              "cờ"
+            ],
+            "socratic_hint": "Cần giữ màn hình chờ cho tới khi `finally` của `bootstrapAuth` kết thúc ra sao?"
+          }
+        ],
+        "reference_explanation": "Do router kiểm tra `user === null` trước khi `/auth/me` hoàn tất. Cần thêm state `isBootstrappingAuth = true` ban đầu và chỉ render route guard sau khi kiểm tra phiên xong."
+      }
+    },
+    {
+      "id": "230f53e1-e712-57b4-8826-48c326cc6c4e",
+      "concept_slug": "fe-data-fetching",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Biến thể] So sánh chiến lược **Optimistic UI Update** (cập nhật giao diện ngay rồi mới gọi API) với **Pessimistic Update** (đợi API trả `200` mới cập nhật) cho nút *\"Hoàn thành Playbook\"*.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Optimistic cho cảm giác tức thì nhưng phải viết logic rollback nếu API lỗi",
+            "weight": 0.5,
+            "required_keywords": [
+              "optimistic",
+              "rollback",
+              "tức thì",
+              "lỗi"
+            ],
+            "socratic_hint": "Nếu cập nhật UI thành công trước mà server trả `409` hoặc `500` thì phải làm gì?"
+          },
+          {
+            "name": "Pessimistic an toàn cho bước chuyển trạng thái quan trọng / mở khóa DAG",
+            "weight": 0.5,
+            "required_keywords": [
+              "pessimistic",
+              "an toàn",
+              "nhất quán",
+              "mở khóa",
+              "server"
+            ],
+            "socratic_hint": "Với hành động mở khóa node mới và nhận điểm RL, tại sao chờ xác nhận từ server lại an toàn hơn?"
+          }
+        ],
+        "reference_explanation": "Optimistic tăng độ mượt nhưng phức tạp khi rollback lỗi; Pessimistic phù hợp cho bước chuyển trạng thái quan trọng (như mở khóa DAG, chấm điểm) để đảm bảo UI phản ánh đúng chân lý server."
+      }
+    },
+    {
+      "id": "eadb4816-3248-5886-add7-0de85acc15a4",
+      "concept_slug": "fe-data-fetching",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Biến thể] Trình bày đầy đủ **5+2 trạng thái UX** chuẩn cho một trang tải dữ liệu bất đồng bộ (`Loading`, `Empty`, `Error`, `Success`, `Stale/Disabled`, `Unauthorized`, `Forbidden`).",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Đủ các trạng thái dữ liệu: Loading (Skeleton), Empty (CTA), Error (Retry), Success",
+            "weight": 0.5,
+            "required_keywords": [
+              "loading",
+              "empty",
+              "error",
+              "success",
+              "skeleton",
+              "retry"
+            ],
+            "socratic_hint": "Khi mảng trả về rỗng `[]` khác gì với khi API lỗi `500`?"
+          },
+          {
+            "name": "Trạng thái phiên & quyền: 401 -> Login, 403 -> Forbidden, Disabled/Locked có giải thích",
+            "weight": 0.5,
+            "required_keywords": [
+              "401",
+              "403",
+              "unauthorized",
+              "forbidden",
+              "disabled",
+              "locked"
+            ],
+            "socratic_hint": "Khi gặp `401` vs `403`, UI phải điều hướng và thông báo khác nhau thế nào?"
+          }
+        ],
+        "reference_explanation": "Mỗi màn hình phải xử lý rõ: Loading (skeleton, không chớp), Empty (hướng dẫn hành động), Error (thông báo thân thiện + nút Retry), Success, Locked/Disabled (lý do khóa), 401 (về Login) và 403 (báo thiếu quyền)."
+      }
+    },
+    {
+      "id": "b7885971-14e2-5e8c-b178-ea2a9a874075",
+      "concept_slug": "fe-xss-csrf",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Biến thể] Thuộc tính cookie nào giúp ngăn phần lớn tấn công **CSRF** từ các liên kết hoặc form bên thứ ba bằng cách không gửi cookie trong các request `POST` cross-site?",
+      "options": {
+        "A": "Max-Age=0",
+        "B": "SameSite=Lax (hoặc Strict)",
+        "C": "Domain=*",
+        "D": "Path=/tmp"
+      },
+      "correct_option_key": "B",
+      "rubric": null
+    },
+    {
+      "id": "383e91a6-5b58-5488-a819-9864e923d324",
+      "concept_slug": "fe-xss-csrf",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 2 — Biến thể] Vì sao lưu JWT vào `localStorage` kém an toàn hơn lưu trong Cookie `HttpOnly`?",
+      "options": {
+        "A": "Vì trình duyệt tự gửi `localStorage` sang mọi trang web khác",
+        "B": "Vì `localStorage` tự xóa sau 5 giây",
+        "C": "Vì `localStorage` không hoạt động trên HTTPS",
+        "D": "Vì bất kỳ đoạn mã JavaScript nào (kể cả script XSS hoặc thư viện bên thứ 3 bị nhiễm độc) đều đọc được `localStorage`"
+      },
+      "correct_option_key": "D",
+      "rubric": null
+    },
+    {
+      "id": "8f3d1b0e-cc55-5a93-b6c2-4734af1ca849",
+      "concept_slug": "fe-xss-csrf",
+      "depth_tier": 3,
+      "task_type": "code_review",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Biến thể] Một component React hiển thị nội dung Markdown bài học bằng `dangerouslySetInnerHTML={{ __html: rawHtml }}`. Nếu một chuyên gia hoặc dữ liệu bị chèn `<img src=x onerror=alert(1)>`, chuyện gì xảy ra và cách khắc phục trong React?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Nhận diện lỗ hổng Stored XSS qua dangerouslySetInnerHTML",
+            "weight": 0.5,
+            "required_keywords": [
+              "xss",
+              "stored xss",
+              "dangerouslysetinnerhtml",
+              "script",
+              "onerror"
+            ],
+            "socratic_hint": "React có tự động escape HTML khi dùng `dangerouslySetInnerHTML` không?"
+          },
+          {
+            "name": "Dùng trình render Markdown an toàn (react-markdown) hoặc sanitize bằng DOMPurify + CSP",
+            "weight": 0.5,
+            "required_keywords": [
+              "react-markdown",
+              "dompurify",
+              "sanitize",
+              "csp",
+              "escape"
+            ],
+            "socratic_hint": "Thay vì chèn HTML thô, dùng thư viện nào hoặc hàm làm sạch nào?"
+          }
+        ],
+        "reference_explanation": "Gây lỗ hổng Stored XSS thực thi JS tùy ý. Tuyệt đối tránh `dangerouslySetInnerHTML`: dùng `react-markdown` (tự escape HTML mặc định) hoặc làm sạch bằng `DOMPurify` kèm header `Content-Security-Policy`."
+      }
+    },
+    {
+      "id": "f218d33a-665f-58b5-8592-c450c0b648c7",
+      "concept_slug": "fe-xss-csrf",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Biến thể] Chính sách **Content-Security-Policy (CSP)** có thể chặn kịch bản XSS ngay cả khi ứng dụng lỡ bị chèn thẻ `<script>` như thế nào? Tại sao Swagger `/docs` lại cần CSP nới lỏng riêng so với ứng dụng chính?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "CSP chặn inline script & giới hạn nguồn script-src 'self'",
+            "weight": 0.5,
+            "required_keywords": [
+              "csp",
+              "script-src",
+              "self",
+              "inline",
+              "object-src"
+            ],
+            "socratic_hint": "Directive `script-src 'self'` và `object-src 'none'` ngăn chặn điều gì?"
+          },
+          {
+            "name": "Tách CSP chặt cho app chính và CSP phạm vi hẹp cho /docs Swagger UI",
+            "weight": 0.5,
+            "required_keywords": [
+              "swagger",
+              "/docs",
+              "tách",
+              "scoped",
+              "unsafe-inline"
+            ],
+            "socratic_hint": "Vì sao không mở `unsafe-inline` trên toàn bộ API mà chỉ giới hạn riêng đường dẫn `/docs`?"
+          }
+        ],
+        "reference_explanation": "CSP chặn thực thi inline script và script từ domain lạ (`script-src 'self'`). Vì Swagger UI cần style/script riêng, chỉ áp dụng CSP nới lỏng đúng phạm vi `/docs` để không hạ thấp hàng rào bảo vệ toàn app."
+      }
+    },
+    {
+      "id": "569fbb9f-d17d-5c76-874c-f53b8fbe5302",
+      "concept_slug": "fe-xss-csrf",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Biến thể] Giải thích cơ chế của tiền tố cookie **`__Host-`** (như `__Host-plumora_session`) và các điều kiện bắt buộc để trình duyệt chấp nhận nó.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "3 điều kiện bắt buộc: Secure=True, Path=/, KHÔNG đặt thuộc tính Domain",
+            "weight": 0.5,
+            "required_keywords": [
+              "secure",
+              "path=/",
+              "domain",
+              "__host-",
+              "https"
+            ],
+            "socratic_hint": "Tiền tố `__Host-` yêu cầu gì về `Domain`, `Path` và `Secure`?"
+          },
+          {
+            "name": "Ngăn tấn công Cookie Tossing từ các subdomain cùng domain cha",
+            "weight": 0.5,
+            "required_keywords": [
+              "subdomain",
+              "cookie tossing",
+              "ghi đè",
+              "tên miền con"
+            ],
+            "socratic_hint": "Tại sao không cho phép đặt `Domain` lại bảo vệ khỏi subdomain bị chiếm quyền?"
+          }
+        ],
+        "reference_explanation": "Cookie `__Host-` bắt buộc có `Secure`, `Path=/` và không có `Domain`, khóa chặt cookie vào đúng origin hiện tại, ngăn subdomain lân cận ghi đè (*Cookie Tossing*)."
+      }
+    },
+    {
+      "id": "3fa71a1b-bcfc-5abb-ab99-22fcf4ed579e",
+      "concept_slug": "fe-perf-caching",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Biến thể] Chỉ số **Core Web Vitals** nào đo độ trễ phản hồi trực quan khi người dùng tương tác (nhấn nút, gõ phím) trên trang web?",
+      "options": {
+        "A": "LCP (Largest Contentful Paint)",
+        "B": "CLS (Cumulative Layout Shift)",
+        "C": "TTFB",
+        "D": "INP (Interaction to Next Paint)"
+      },
+      "correct_option_key": "D",
+      "rubric": null
+    },
+    {
+      "id": "1031b28e-e7b2-5fe1-88b9-95ebef909e6b",
+      "concept_slug": "fe-perf-caching",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 2 — Biến thể] Trong cấu hình Nginx phục vụ React Vite SPA, vì sao file `index.html` cần `Cache-Control: no-cache` trong khi các file `/assets/*.js` có hash lại đặt `max-age=31536000, immutable`?",
+      "options": {
+        "A": "Để vô hiệu hóa HTTPS",
+        "B": "Để trình duyệt không bao giờ tải file JS",
+        "C": "Vì Nginx không nén được file HTML",
+        "D": "Để trình duyệt luôn kiểm tra bản `index.html` mới nhất trỏ tới đúng tên file JS hash mới sau mỗi lần deploy, còn file có hash thì cache vĩnh viễn"
+      },
+      "correct_option_key": "D",
+      "rubric": null
+    },
+    {
+      "id": "56443444-90aa-5874-8378-0c4208b8104d",
+      "concept_slug": "fe-perf-caching",
+      "depth_tier": 3,
+      "task_type": "code_review",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Biến thể] Khi build Vite production, gói `main.js` phình to lên `2.5 MB` vì gộp chung cả màn hình `AdminPortal`, `CodeEditor` và `Charts` vào trang đăng nhập đầu tiên. Hãy đề xuất cách tối ưu.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Áp dụng Code Splitting / Lazy Loading theo Route (React.lazy + Suspense)",
+            "weight": 0.5,
+            "required_keywords": [
+              "code splitting",
+              "lazy",
+              "react.lazy",
+              "suspense",
+              "dynamic import",
+              "chunk"
+            ],
+            "socratic_hint": "Dùng cú pháp nào của React/ESModule để tách màn hình Admin và CodeEditor thành chunk riêng?"
+          },
+          {
+            "name": "Giảm thời gian parse/execute JS ban đầu & cải thiện LCP/INP",
+            "weight": 0.5,
+            "required_keywords": [
+              "lcp",
+              "inp",
+              "parse",
+              "bundle",
+              "tải ban đầu"
+            ],
+            "socratic_hint": "Tách chunk giúp trang `/login` không phải tải và biên dịch mã của ai?"
+          }
+        ],
+        "reference_explanation": "Dùng `React.lazy(() => import(...))` + `<Suspense>` để tách các route nặng (`Admin`, `Expert`, `CodeSandbox`) thành chunk riêng tải theo nhu cầu."
+      }
+    },
+    {
+      "id": "183006fd-7c42-59da-b430-16b814dd9042",
+      "concept_slug": "fe-perf-caching",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Biến thể] Để tránh lỗi **CLS (Cumulative Layout Shift)** làm trang bị giật nhảy khi tải danh sách khái niệm hoặc ảnh, bạn chọn kỹ thuật nào và đánh đổi công sức là gì?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Dùng Skeleton có kích thước cố định & khai báo width/height (aspect-ratio) cho media",
+            "weight": 0.5,
+            "required_keywords": [
+              "skeleton",
+              "width",
+              "height",
+              "aspect-ratio",
+              "cls",
+              "giữ chỗ"
+            ],
+            "socratic_hint": "Làm sao trình duyệt biết trước chiều cao vùng chứa trước khi dữ liệu/ảnh tải xong?"
+          },
+          {
+            "name": "Đánh đổi: phải duy trì khung Skeleton khớp bố cục thật khi giao diện thay đổi",
+            "weight": 0.5,
+            "required_keywords": [
+              "bảo trì",
+              "khớp",
+              "layout",
+              "đánh đổi"
+            ],
+            "socratic_hint": "Nhược điểm của việc viết Skeleton thủ công cho từng card phức tạp là gì?"
+          }
+        ],
+        "reference_explanation": "Đặt `aspect-ratio`/`width`/`height` cho ảnh và dùng Skeleton có chiều cao tương đương nội dung thật để giữ CLS ~ 0, đổi lại tốn công bảo trì Skeleton khớp bố cục."
+      }
+    },
+    {
+      "id": "76df29f1-973f-57ae-9664-dc2049184231",
+      "concept_slug": "fe-perf-caching",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Biến thể] Giải thích cơ chế **Content-Hash Cache Busting** của Vite kết hợp với `ETag` / `Cache-Control` trên Nginx.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Vite sinh tên file chứa hash nội dung (app.a1b2c3.js); nội dung đổi -> tên đổi",
+            "weight": 0.5,
+            "required_keywords": [
+              "hash",
+              "content-hash",
+              "vite",
+              "tên file",
+              "immutable"
+            ],
+            "socratic_hint": "Nếu sửa 1 dòng code trong `App.tsx`, tên file JS sau build thay đổi như thế nào?"
+          },
+          {
+            "name": "index.html dùng no-cache (304 nếu chưa đổi) làm điểm neo trỏ tới các asset immutable",
+            "weight": 0.5,
+            "required_keywords": [
+              "index.html",
+              "no-cache",
+              "304",
+              "etag",
+              "immutable"
+            ],
+            "socratic_hint": "Tại sao không thể đặt `immutable` 1 năm cho `index.html`?"
+          }
+        ],
+        "reference_explanation": "`index.html` không có hash nên đặt `no-cache` (hợp lệ hóa qua ETag/304). Khi deploy bản mới, `index.html` mới trỏ tới các file JS/CSS có content-hash mới nên không bao giờ bị kẹt cache cũ."
+      }
+    },
+    {
+      "id": "65df0fa4-9168-5afc-bb12-7e519258c63e",
+      "concept_slug": "docker-containers",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Biến thể] Trong `Dockerfile`, lệnh nào chạy tiến trình với user không đặc quyền thay cho `root`?",
+      "options": {
+        "A": "FROM",
+        "B": "WORKDIR",
+        "C": "EXPOSE",
+        "D": "USER"
+      },
+      "correct_option_key": "D",
+      "rubric": null
+    },
+    {
+      "id": "c6367be9-793a-5e3c-a787-18524f1ac579",
+      "concept_slug": "docker-containers",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 2 — Biến thể] Vì sao dùng **Multi-stage Build** trong `Dockerfile` (ví dụ build React bằng `node:20` rồi copy `dist/` sang `nginx:alpine`) lại giảm mạnh kích thước image và bề mặt tấn công?",
+      "options": {
+        "A": "Vì Docker chỉ cho phép 1 layer trên mỗi container",
+        "B": "Vì Multi-stage tự động tắt toàn bộ port mạng",
+        "C": "Vì `nginx:alpine` tự biên dịch TypeScript lúc runtime",
+        "D": "Vì image cuối cùng không chứa Node.js, npm, mã nguồn gốc hay công cụ biên dịch mà chỉ chứa tệp tĩnh cần thiết"
+      },
+      "correct_option_key": "D",
+      "rubric": null
+    },
+    {
+      "id": "9a9143d1-bafc-5b38-a8d5-9c46e4c8db79",
+      "concept_slug": "docker-containers",
+      "depth_tier": 3,
+      "task_type": "code_review",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Biến thể] Trong `Dockerfile` Python sau:\n```dockerfile\nCOPY . .\nRUN uv sync --frozen\n```\nMỗi lần sửa 1 dòng trong `README.md` hoặc `app/main.py`, Docker lại phải tải và cài lại toàn bộ thư viện mất 3 phút. Hãy sửa thứ tự để tận dụng Layer Cache.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Copy pyproject.toml / uv.lock trước rồi mới RUN uv sync",
+            "weight": 0.5,
+            "required_keywords": [
+              "pyproject.toml",
+              "uv.lock",
+              "trước",
+              "cache",
+              "layer"
+            ],
+            "socratic_hint": "File nào khai báo danh sách thư viện ít thay đổi hơn mã nguồn `app/`?"
+          },
+          {
+            "name": "Copy mã nguồn sau bước cài dependencies + dùng .dockerignore",
+            "weight": 0.5,
+            "required_keywords": [
+              "copy . .",
+              "sau",
+              "dockerignore",
+              "tầng",
+              "layer"
+            ],
+            "socratic_hint": "Nên đặt `COPY . .` ở phía trên hay phía dưới lệnh cài thư viện?"
+          }
+        ],
+        "reference_explanation": "Copy `pyproject.toml` và `uv.lock` trước, chạy `uv sync --frozen`, rồi mới `COPY . .` (kèm `.dockerignore` loại bỏ `.git`, `node_modules`, `__pycache__`)."
+      }
+    },
+    {
+      "id": "295a45e4-aa7c-5128-b724-0f39039cf6c8",
+      "concept_slug": "docker-containers",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Biến thể] Khi chạy container **Nginx không đặc quyền (`USER nginx`, UID 101)**, tại sao không thể lắng nghe cổng `80` mặc định và cần giải pháp gì trong `docker-compose.yml` / `Dockerfile`?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Cổng < 1024 (privileged ports) cần quyền root/CAP_NET_BIND_SERVICE",
+            "weight": 0.5,
+            "required_keywords": [
+              "1024",
+              "privileged",
+              "80",
+              "root",
+              "8080"
+            ],
+            "socratic_hint": "Hệ điều hành Linux có cho user thường bind cổng 80 không?"
+          },
+          {
+            "name": "Đổi Nginx sang lắng nghe cổng >= 1024 (như :8080) & cấp quyền thư mục /var/cache/nginx, /tmp",
+            "weight": 0.5,
+            "required_keywords": [
+              "8080",
+              "chown",
+              "/var/cache/nginx",
+              "/tmp",
+              "non-root"
+            ],
+            "socratic_hint": "Ngoài đổi sang `:8080`, Nginx còn cần quyền ghi vào các thư mục tạm nào?"
+          }
+        ],
+        "reference_explanation": "User thường không bind được port `< 1024`. Chuyển Nginx sang lắng nghe `:8080` (map `3000:8080` ở host), cấp quyền ghi thư mục cache/pid/conf.d cho user `nginx`."
+      }
+    },
+    {
+      "id": "372f5605-5eec-5034-919e-664bc16e7c65",
+      "concept_slug": "docker-containers",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Biến thể] Phân biệt vai trò của **Linux Namespaces** và **cgroups (Control Groups)** trong cách Container cô lập tiến trình, và giải thích vì sao dữ liệu trong container bị mất khi xóa container nếu không dùng **Named Volume**.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Namespaces cô lập tầm nhìn (PID, NET, MNT); cgroups giới hạn tài nguyên (CPU, RAM)",
+            "weight": 0.5,
+            "required_keywords": [
+              "namespace",
+              "cgroup",
+              "pid",
+              "ram",
+              "cpu",
+              "cô lập"
+            ],
+            "socratic_hint": "Cơ chế nào của nhân Linux giới hạn 1 container không ăn quá 512MB RAM?"
+          },
+          {
+            "name": "Container writable layer gắn với vòng đời container; Named Volume tách dữ liệu bền vững",
+            "weight": 0.5,
+            "required_keywords": [
+              "writable layer",
+              "volume",
+              "named volume",
+              "ephemeral",
+              "bền vững"
+            ],
+            "socratic_hint": "Dữ liệu PostgreSQL/RL candidates nếu ghi thẳng vào lớp FS của container sẽ đi đâu khi `docker compose down`?"
+          }
+        ],
+        "reference_explanation": "Namespaces cô lập góc nhìn (PID/Net/FS), cgroups giới hạn CPU/RAM. Lớp ghi của container là tạm thời (ephemeral); dữ liệu bền vững (DB, RL candidates) bắt buộc gắn vào Named Volume."
+      }
+    },
+    {
+      "id": "651340cb-2305-59e1-8930-285983d0158d",
+      "concept_slug": "reverse-proxy-caching",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Biến thể] Header HTTP nào cho phép Reverse Proxy truyền địa chỉ IP thực của người dùng cuối xuống cho Backend Service?",
+      "options": {
+        "A": "ETag",
+        "B": "Content-Type",
+        "C": "Accept-Encoding",
+        "D": "X-Forwarded-For"
+      },
+      "correct_option_key": "D",
+      "rubric": null
+    },
+    {
+      "id": "50e869f9-368d-5205-b57b-bed6305a2311",
+      "concept_slug": "reverse-proxy-caching",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 2 — Biến thể] Trong cấu hình Nginx làm Reverse Proxy cho Single Page Application (SPA) React, lệnh `try_files $uri $uri/ /index.html;` giải quyết vấn đề gì?",
+      "options": {
+        "A": "Tắt hoàn toàn API Gateway",
+        "B": "Tự động nén ảnh PNG sang WebP",
+        "C": "Chuyển đổi PostgreSQL sang Redis",
+        "D": "Tránh lỗi `404` khi người dùng F5 trực tiếp ở các route client-side như `/domains/backend`"
+      },
+      "correct_option_key": "D",
+      "rubric": null
+    },
+    {
+      "id": "9d48d7c8-c85b-5a30-a1fe-db8d558d8359",
+      "concept_slug": "reverse-proxy-caching",
+      "depth_tier": 3,
+      "task_type": "code_review",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Biến thể] Một người dùng F5 ở `/api/v2/auth/login` hoặc gửi request tới `/api/v2/domains`, nhưng Nginx lại trả về `index.html` (`200 OK`) thay vì chuyển cho API Gateway. Hãy chỉ ra lỗi trong cấu hình `location` của Nginx.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Khối `location /api/` thiếu hoặc bị `location /` có `try_files ... /index.html` nuốt mất",
+            "weight": 0.5,
+            "required_keywords": [
+              "location /api",
+              "try_files",
+              "index.html",
+              "proxy_pass",
+              "thứ tự"
+            ],
+            "socratic_hint": "Nếu không có block `location /api/` riêng dùng `proxy_pass`, request `/api/...` sẽ rơi vào block nào?"
+          },
+          {
+            "name": "Khai báo `location /api/` dùng `proxy_pass` tới upstream `api-gateway:8000`",
+            "weight": 0.5,
+            "required_keywords": [
+              "upstream",
+              "api-gateway",
+              "proxy_pass",
+              "location"
+            ],
+            "socratic_hint": "Cần trỏ `proxy_pass` của `/api/` về đâu?"
+          }
+        ],
+        "reference_explanation": "Request `/api/` bị rơi vào `location /` chứa `try_files ... /index.html`. Cần khai báo `location /api/ { proxy_pass http://api-gateway:8000; ... }` để Nginx chuyển tiếp đúng."
+      }
+    },
+    {
+      "id": "9cd659a0-e37a-5c21-a7e4-eea973dfb743",
+      "concept_slug": "reverse-proxy-caching",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Biến thể] Trong kiến trúc 2 tầng Edge (**Nginx Frontend** đứng trước **API Gateway Python**), tại sao vẫn cần **API Gateway** thay vì để Nginx định tuyến thẳng tới 4 Microservices?",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Nginx mạnh ở static files, gzip, TLS termination, buffer chậm",
+            "weight": 0.5,
+            "required_keywords": [
+              "nginx",
+              "static",
+              "tls",
+              "gzip",
+              "c-level"
+            ],
+            "socratic_hint": "Nginx xử lý tệp tĩnh và kết nối mạng chậm tốt hơn Python ở điểm nào?"
+          },
+          {
+            "name": "API Gateway xử lý logic ứng dụng: Rate Limit Redis, chuẩn hóa lỗi, bảo mật path, X-Request-ID",
+            "weight": 0.5,
+            "required_keywords": [
+              "api gateway",
+              "rate limit",
+              "x-request-id",
+              "bảo mật",
+              "403",
+              "internal"
+            ],
+            "socratic_hint": "Các quy tắc động như chặn `/internal`, trượt cửa sổ Redis Rate Limit và gắn `X-Request-ID` đặt ở đâu dễ kiểm thử hơn?"
+          }
+        ],
+        "reference_explanation": "Nginx tối ưu cho tệp tĩnh, nén và kết nối biên; API Gateway đảm nhiệm định tuyến động theo miền nghiệp vụ, rate limit Redis, chặn `/internal` và chuẩn hóa lỗi."
+      }
+    },
+    {
+      "id": "c399c116-9c50-5040-870c-36148d0fd89d",
+      "concept_slug": "reverse-proxy-caching",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Biến thể] Giải thích cơ chế **Upstream Health Check & Proxy Timeouts** (`proxy_connect_timeout`, `proxy_read_timeout`) để tránh hiệu ứng tuyết lở (*Cascading Failure*) khi 1 microservice bị treo.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Timeout ngăn worker Nginx/Gateway bị giữ vô hạn chờ upstream chết",
+            "weight": 0.5,
+            "required_keywords": [
+              "timeout",
+              "proxy_read_timeout",
+              "treo",
+              "worker",
+              "504"
+            ],
+            "socratic_hint": "Nếu không đặt `read_timeout` và 1 service bị deadlock, tất cả worker của Gateway sẽ bị gì?"
+          },
+          {
+            "name": "Trả 502/504 có cấu trúc rõ ràng thay vì sập toàn bộ cụm",
+            "weight": 0.5,
+            "required_keywords": [
+              "502",
+              "504",
+              "cascading",
+              "tuyết lở",
+              "fail fast"
+            ],
+            "socratic_hint": "Fail-fast trả `504 Gateway Timeout` giúp bảo vệ các service còn khỏe khác như thế nào?"
+          }
+        ],
+        "reference_explanation": "Đặt `connect_timeout` và `read_timeout` chặt chẽ buộc Gateway fail-fast (`502/504`) khi 1 service treo, giải phóng worker kịp thời để không kéo sập các tuyến dịch vụ khác."
+      }
+    },
+    {
+      "id": "2716fea8-c897-5c7c-a091-bea5810a6396",
+      "concept_slug": "ci-cd-pipelines",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Biến thể] Công cụ nào thường dùng để kiểm tra tĩnh kiểu dữ liệu Python (*Static Type Checking*) trong pipeline CI?",
+      "options": {
+        "A": "Ruff",
+        "B": "Docker",
+        "C": "ESLint",
+        "D": "Mypy"
+      },
+      "correct_option_key": "D",
+      "rubric": null
+    },
+    {
+      "id": "fbfc3386-652d-5294-88d2-39610b3a7d41",
+      "concept_slug": "ci-cd-pipelines",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 2 — Biến thể] Vì sao bước chạy kiểm thử hành vi trên **cụm Docker Compose thật** (bao gồm PostgreSQL, Redis, Microservices và Chromium) lại quan trọng hơn việc chỉ chạy Unit Test có Mock?",
+      "options": {
+        "A": "Để bỏ qua bước kiểm tra TypeScript",
+        "B": "Vì Unit Test không chạy được trên Linux",
+        "C": "Vì Docker chạy nhanh hơn `1 + 1` trong bộ nhớ",
+        "D": "Vì nó phát hiện được lỗi cấu hình mạng, SQL migration, phân quyền schema, CORS và hành vi trình duyệt thực tế mà Mock che giấu"
+      },
+      "correct_option_key": "D",
+      "rubric": null
+    },
+    {
+      "id": "031020a6-1776-5eeb-a818-8f26e62639e9",
+      "concept_slug": "ci-cd-pipelines",
+      "depth_tier": 3,
+      "task_type": "code_review",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Biến thể] Một pipeline CI chạy `docker compose up -d` rồi ngay lập tức gọi `curl http://localhost:3000/api/v1/health`, dẫn đến lỗi chập chờn `Connection refused` (Flaky CI). Hãy sửa lỗi này.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Container đã Started chưa chắc đã Ready (DB migrate / app boot chưa xong)",
+            "weight": 0.5,
+            "required_keywords": [
+              "started",
+              "ready",
+              "race",
+              "flaky",
+              "boot"
+            ],
+            "socratic_hint": "Lệnh `docker compose up -d` có mặc định chờ ứng dụng bên trong khởi động xong không?"
+          },
+          {
+            "name": "Dùng healthcheck + wait --wait hoặc vòng lặp poll /health có timeout",
+            "weight": 0.5,
+            "required_keywords": [
+              "healthcheck",
+              "--wait",
+              "condition: service_healthy",
+              "poll",
+              "retry"
+            ],
+            "socratic_hint": "Trong `docker-compose.yml` và script CI dùng cơ chế nào để đợi service thực sự healthy?"
+          }
+        ],
+        "reference_explanation": "Dùng `healthcheck` kết hợp `depends_on: { condition: service_healthy }` trong Compose và `--wait` (hoặc vòng lặp poll `/api/v1/health` có timeout) trong script CI."
+      }
+    },
+    {
+      "id": "29ce0edd-8c64-57be-a903-a4f227202e12",
+      "concept_slug": "ci-cd-pipelines",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Biến thể] So sánh chiến lược triển khai **Rolling Update** và **Blue-Green Deployment** khi phát hành phiên bản mới có thay đổi lược đồ cơ sở dữ liệu.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Rolling Update thay dần từng pod (2 phiên bản chạy song song tạm thời)",
+            "weight": 0.5,
+            "required_keywords": [
+              "rolling",
+              "song song",
+              "backward compatible",
+              "expand-contract"
+            ],
+            "socratic_hint": "Trong lúc Rolling Update chạy nửa chừng, code cũ và code mới cùng đọc 1 DB nên migration phải đảm bảo gì?"
+          },
+          {
+            "name": "Blue-Green chuyển traffic tức thì & rollback nhanh nhưng tốn gấp đôi tài nguyên",
+            "weight": 0.5,
+            "required_keywords": [
+              "blue-green",
+              "rollback",
+              "tài nguyên",
+              "gấp đôi",
+              "traffic"
+            ],
+            "socratic_hint": "Blue-Green dễ rollback hơn ở điểm nào nhưng chi phí hạ tầng ra sao?"
+          }
+        ],
+        "reference_explanation": "Rolling Update tiết kiệm tài nguyên nhưng bắt buộc migration tương thích ngược (*Expand-Contract*) vì 2 phiên bản chạy song song. Blue-Green chuyển lưu lượng tức thì và rollback ngay, nhưng tốn x2 compute."
+      }
+    },
+    {
+      "id": "0762e942-6045-5869-a80c-76430901630c",
+      "concept_slug": "ci-cd-pipelines",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Biến thể] Giải thích nguyên tắc **Fail-Fast & Quality Gates** khi thiết kế pipeline CI/CD nhiều tầng (`Lint/Typecheck` $\rightarrow$ `Unit/Arch Tests` $\rightarrow$ `Docker Build & E2E`).",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Tầng rẻ, nhanh (Lint/Typecheck) chạy trước để phản hồi trong vài giây",
+            "weight": 0.5,
+            "required_keywords": [
+              "fail-fast",
+              "lint",
+              "typecheck",
+              "nhanh",
+              "phản hồi"
+            ],
+            "socratic_hint": "Tại sao không build Docker image và chạy Chromium E2E ngay từ giây đầu tiên?"
+          },
+          {
+            "name": "Architectural Fitness Tests chặn vi phạm ranh giới ngay ở CI",
+            "weight": 0.5,
+            "required_keywords": [
+              "fitness",
+              "architecture",
+              "gate",
+              "chặn",
+              "merge"
+            ],
+            "socratic_hint": "Các bài test kiến trúc (như cấm import chéo bounded context) đóng vai trò gì trong Gate?"
+          }
+        ],
+        "reference_explanation": "Sắp xếp các cổng từ nhanh/rẻ đến chậm/đắt (Lint/Mypy/TSC -> Unit/Fitness Tests -> Live Docker Compose + Chromium E2E) giúp báo lỗi sớm trong vài giây và tiết kiệm tài nguyên CI."
+      }
+    },
+    {
+      "id": "a2cf0d23-58b1-53b4-9509-66dbdd97aac2",
+      "concept_slug": "k8s-orchestration",
+      "depth_tier": 1,
+      "task_type": "mcq",
+      "is_placement_eligible": true,
+      "prompt": "[Tầng 1 — Biến thể] Đối tượng Kubernetes nào đảm bảo luôn duy trì đúng số lượng bản sao Pod đang chạy và hỗ trợ cập nhật cuốn chiếu (*Rolling Update*)?",
+      "options": {
+        "A": "ConfigMap",
+        "B": "Ingress",
+        "C": "Secret",
+        "D": "Deployment"
+      },
+      "correct_option_key": "D",
+      "rubric": null
+    },
+    {
+      "id": "eebc7bf9-1378-59da-b11c-6b4c0a2fa53a",
+      "concept_slug": "k8s-orchestration",
+      "depth_tier": 2,
+      "task_type": "mcq",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 2 — Biến thể] Sự khác biệt cốt lõi giữa **`livenessProbe`** và **`readinessProbe`** trong Kubernetes là gì?",
+      "options": {
+        "A": "Cả hai đều giống hệt nhau",
+        "B": "`readinessProbe` xóa luôn PersistentVolumeClaim",
+        "C": "`livenessProbe` chỉ chạy 1 lần lúc tạo cluster",
+        "D": "`livenessProbe` thất bại sẽ khởi động lại Container; `readinessProbe` thất bại chỉ tạm ngắt Pod khỏi Service Load Balancer"
+      },
+      "correct_option_key": "D",
+      "rubric": null
+    },
+    {
+      "id": "7c4584ab-6a7f-58f7-883d-598324821cbd",
+      "concept_slug": "k8s-orchestration",
+      "depth_tier": 3,
+      "task_type": "code_review",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 3 — Biến thể] Một Pod `recommendation-ai-service` trong Kubernetes bị lỗi `CrashLoopBackOff` vì thử đọc bảng trước khi `db-migrate-seed` chạy xong, và khi scale lên 2 replicas lại báo lỗi `Multi-Attach error` trên Volume. Hãy chỉ ra 2 lỗi cấu hình YAML.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Cần Job db-migrate-seed / initContainer chạy migration trước khi Pod nhận tải",
+            "weight": 0.5,
+            "required_keywords": [
+              "job",
+              "initcontainer",
+              "migrate",
+              "crashloopbackoff",
+              "trước"
+            ],
+            "socratic_hint": "Làm sao đảm bảo schema DB đã tồn tại trước khi ứng dụng chạy?"
+          },
+          {
+            "name": "Volume ReadWriteOnce (RWO) không gắn được cho nhiều Pod trên các node khác nhau -> cần RWX hoặc external storage",
+            "weight": 0.5,
+            "required_keywords": [
+              "readwriteonce",
+              "rwo",
+              "readwritemany",
+              "rwx",
+              "multi-attach",
+              "pvc"
+            ],
+            "socratic_hint": "Nếu dùng PVC `ReadWriteOnce` mà scale Deployment lên 2 Pod trên 2 Node thì gặp lỗi gì?"
+          }
+        ],
+        "reference_explanation": "1) Dùng `Job`/`initContainer` chạy migration trước; 2) PVC `ReadWriteOnce` chỉ gắn được 1 Node (nếu scale đa replica cần `ReadWriteMany` hoặc lưu artifact trên Object Storage như S3/MinIO)."
+      }
+    },
+    {
+      "id": "ca33cffd-d8ce-5c36-8440-e7bc0785f2f8",
+      "concept_slug": "k8s-orchestration",
+      "depth_tier": 4,
+      "task_type": "constraint_shifting",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 4 — Biến thể] Khi cấu hình **HPA (HorizontalPodAutoscaler)** cho `assessment-grader-service`, nên scale theo **CPU / Memory** hay kết hợp thêm **Custom Metrics (độ dài hàng đợi / request latency)**? Phân tích.",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "CPU-only chậm phản ứng với tác vụ I/O-bound (chờ LLM / DB)",
+            "weight": 0.5,
+            "required_keywords": [
+              "cpu",
+              "i/o-bound",
+              "llm",
+              "latency",
+              "chậm"
+            ],
+            "socratic_hint": "Khi worker đang chờ OpenAI phản hồi 5 giây, mức CPU của Pod cao hay thấp?"
+          },
+          {
+            "name": "Custom Metrics (RPS / queue depth / p95 latency) phản ánh đúng nghẽn thực tế hơn",
+            "weight": 0.5,
+            "required_keywords": [
+              "custom metrics",
+              "latency",
+              "queue",
+              "rps",
+              "hpa"
+            ],
+            "socratic_hint": "Thước đo nào phản ánh chính xác việc service đang bị quá tải yêu cầu I/O?"
+          }
+        ],
+        "reference_explanation": "Vì dịch vụ gọi LLM/DB chủ yếu là I/O-bound nên CPU có thể thấp dù request đang dồn ứ. Kết hợp Custom Metrics (RPS, p95 latency hoặc độ dài hàng đợi) giúp HPA scale chính xác hơn."
+      }
+    },
+    {
+      "id": "87c5c45a-14d0-50d7-b95f-41356711e682",
+      "concept_slug": "k8s-orchestration",
+      "depth_tier": 5,
+      "task_type": "teach_back",
+      "is_placement_eligible": false,
+      "prompt": "[Tầng 5 — Biến thể] Giải thích vai trò của **NetworkPolicy** trong mô hình *Zero-Trust* nội bộ Kubernetes (ví dụ chỉ cho phép `api-gateway` gọi vào `auth-service`, chặn `frontend` gọi thẳng tới `postgres`).",
+      "options": null,
+      "correct_option_key": null,
+      "rubric": {
+        "criteria": [
+          {
+            "name": "Mặc định K8s cho phép mọi Pod nói chuyện tự do; NetworkPolicy chuyển sang Default-Deny",
+            "weight": 0.5,
+            "required_keywords": [
+              "default-deny",
+              "zero-trust",
+              "mặc định",
+              "chặn",
+              "pod"
+            ],
+            "socratic_hint": "Nếu không khai báo NetworkPolicy, Pod frontend có mở kết nối tới cổng 5432 của Postgres được không?"
+          },
+          {
+            "name": "Whitelisting rõ Ingress/Egress theo podSelector và port",
+            "weight": 0.5,
+            "required_keywords": [
+              "ingress",
+              "egress",
+              "podselector",
+              "allowlist",
+              "port"
+            ],
+            "socratic_hint": "NetworkPolicy dùng nhãn (`podSelector`) và cổng (`ports`) để cho phép đúng luồng nào?"
+          }
+        ],
+        "reference_explanation": "Mặc định K8s mở thông mọi Pod. NetworkPolicy áp dụng Default-Deny rồi chỉ mở whitelist Ingress/Egress theo `podSelector` và `port` (ví dụ chỉ các backend service được chạm Postgres:5432)."
+      }
     }
   ]
 }

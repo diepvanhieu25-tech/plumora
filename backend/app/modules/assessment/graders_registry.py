@@ -125,7 +125,7 @@ class TaskGraderRegistry:
 
     def __init__(self, rubric_service: CircuitBreakerRubricService | None = None) -> None:
         svc = rubric_service or CircuitBreakerRubricService(
-            primary=LlmRubricGraderAdapter(timeout_s=4.0),
+            primary=LlmRubricGraderAdapter(),
             fallback=DeterministicRubricGrader(),
             failure_threshold=2,
         )

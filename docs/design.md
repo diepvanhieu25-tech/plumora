@@ -1,7 +1,7 @@
 # Thiết kế hệ thống Plumora (System Design)
 
 Phiên bản: `2.0.0` — **APPROVED (Gate 1 Baseline Giai đoạn 3 — Chủ dự án duyệt tại `D-16`..`D-26` ngày 2026-11-18; bảo lưu trọn vẹn lịch sử Gate 1 Baseline MVP `v1.0.0` duyệt tại `D-14` / `O-10` ngày 2026-11-16)**.
-Nguồn: [Định hướng gốc (`docs/brief/project-direction.md`)](brief/project-direction.md), [Intent (`docs/intent.md`)](intent.md) (`v2.0.0`), [Đặc tả (`docs/spec.md`)](spec.md) (`v2.0.0`), [Phân tích Giai đoạn 3 (`docs/proposals/PHASE3_ANALYSIS.md`)](proposals/PHASE3_ANALYSIS.md), [Sổ quyết định (`docs/decisions.md`)](decisions.md) (`v2.0.0`, `D-01`–`D-26`).
+Nguồn: [Định hướng gốc (`docs/brief/project-direction.md`)](brief/project-direction.md), [Intent (`docs/intent.md`)](intent.md), [Đặc tả (`docs/spec.md`)](spec.md), [Sổ quyết định (`docs/decisions.md`)](decisions.md) (`v4.0.0`, `D-01`–`D-36`).
 Tài liệu Hệ thống Thiết kế Giao diện liên kết: **[UI Design System (`docs/ui-design-system.md`)](ui-design-system.md) (`v2.0.0` — APPROVED Gate 1 Baseline & 20 Màn hình Stitch `SCR-01`..`SCR-20`)**.
 
 > **Lưu ý thẩm quyền:** Tài liệu này bao gồm cả **System Design Baseline MVP (`v1.0.0` — Mục 1..7)** đã hoàn thành Gate 1–4 và **System Design Mở rộng Đích Giai đoạn 3 (`v2.0.0` — Mục 6 & Mục 8)** đã được chủ dự án phê duyệt tại **Gate 1 (`D-16`..`D-26`)**, liên kết hai chiều với **[Design System (`docs/ui-design-system.md`)](ui-design-system.md) (`v2.0.0`)**. Nhiệm vụ `P3-SLICE-1` đang ở trạng thái `ready`; việc viết business logic trong `P3-SLICE-1`..`P3-SLICE-4` bắt buộc tuân thủ quy trình **Gate 2** (nhánh task, Day-0 CI, Docker Compose healthy và RED tests).

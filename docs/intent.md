@@ -1,6 +1,6 @@
 # Định hướng thực hiện Plumora
 
-Phiên bản: `2.0.0` — **APPROVED (Gate 1 Baseline Giai đoạn 3 — Chủ dự án duyệt tại `D-16`..`D-26` ngày 2026-11-18; bảo lưu trọn vẹn lịch sử Gate 1 Baseline MVP `v1.0.0` duyệt tại `D-14` / `O-10` ngày 2026-11-16)**. Nguồn: [brief gốc](brief/project-direction.md), [báo cáo phân tích mở rộng Giai đoạn 3](proposals/PHASE3_ANALYSIS.md) và toàn bộ quyết định của chủ dự án (`D-01`–`D-26`) trong [sổ quyết định](decisions.md).
+Phiên bản: `4.0.0` — **APPROVED (Final Clean Baseline `v4.0.0` — Chủ dự án duyệt tại `D-31`..`D-36` ngày 2026-11-26)**. Nguồn: [brief gốc](brief/project-direction.md) và toàn bộ quyết định của chủ dự án (`D-01`–`D-36`) trong [sổ quyết định](decisions.md).
 
 ## Mục tiêu
 
@@ -45,7 +45,7 @@ Ngưỡng hiệu quả RL trên simulator đã được chốt tại `D-08` (`O-
 
 ## Định hướng Mở rộng Giai đoạn sau MVP — Đích Giai đoạn 3 (`v2.0.0`)
 
-- **Trạng thái:** `v2.0.0 — APPROVED (Gate 1 Baseline Giai đoạn 3 — Chủ dự án duyệt tại D-16..D-26 ngày 2026-11-18)` — Toàn bộ ý tưởng, đặc tả hành vi ([`spec.md`](spec.md) `v2.0.0`), thiết kế kiến trúc ([`design.md`](design.md) `v2.0.0`), hệ thống giao diện 20 màn hình ([`ui-design-system.md`](ui-design-system.md) `v2.0.0`), kế hoạch nghiên cứu RL ([`research/RL_PLAN.md`](research/RL_PLAN.md) `v2.0.0`) và lộ trình 4 lát cắt ([`plan.md`](plan.md) `v2.0.0`) đã được khóa chuẩn Gate 1 (chi tiết phân tích tại [PHASE3_ANALYSIS.md](proposals/PHASE3_ANALYSIS.md)).
+- **Trạng thái:** `v4.0.0 — APPROVED (Final Clean Baseline — D-31..D-36)` — Toàn bộ ý tưởng, đặc tả hành vi ([`spec.md`](spec.md)), thiết kế kiến trúc ([`design.md`](design.md)), hệ thống giao diện ([`ui-design-system.md`](ui-design-system.md)), kế hoạch nghiên cứu RL ([`research/RL_PLAN.md`](research/RL_PLAN.md)) và lộ trình ([`plan.md`](plan.md)) đã hợp nhất về chuẩn `v4.0.0`.
 - **Nền tảng kế thừa:** Toàn bộ hệ thống Giai đoạn 1 MVP (`v1.0.0` ở trên, đã hoàn thành Gate 1–4) là nền tảng đã kiểm chứng để mở rộng lên đích báo cáo đồ án ở **Giai đoạn 3**.
 
 ### 1. Mục tiêu, Bài toán & Giá trị Cốt lõi Mới (`P3-01`)

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="440" viewBox="0 0 880 440" role="img" aria-label="Fig 2. Unmasked Invalid Action Rate (DAG & Sequential Invariants)">
+  <rect width="880" height="440" rx="12" fill="#FAFAF9" stroke="#E7E5E4"/>
+  <text x="36" y="38" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18" font-weight="700" fill="#1C1917">Fig 2. Unmasked Invalid Action Rate (DAG & Sequential Invariants)</text>
+  <text x="36" y="60" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="12" fill="#57534E">Lower is better — measures intrinsic structural learning without Policy Guardrail mask</text>
+<line x1="80" y1="355" x2="820" y2="355" stroke="#A8A29E" stroke-width="1.2"/>
+  <line x1="80" y1="342.5" x2="820" y2="342.5" stroke="#DC2626" stroke-dasharray="6,4" stroke-width="1.5"/>
+  <text x="816" y="336.5" text-anchor="end" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="700" fill="#DC2626">Safety Threshold (&lt; 5.0%)</text>
+  <rect x="520" y="72" width="12" height="12" rx="2" fill="#D97706"/><text x="538" y="82" font-family="Inter, Arial, sans-serif" font-size="12" fill="#1C1917">Known Domains</text>
+  <rect x="680" y="72" width="12" height="12" rx="2" fill="#0D9488"/><text x="698" y="82" font-family="Inter, Arial, sans-serif" font-size="12" fill="#1C1917">Zero-shot Transfer</text>
+  <rect x="141.3" y="158.5" width="56" height="196.5" rx="4" fill="#D97706"/>
+  <text x="169.3" y="152.5" text-anchor="middle" font-family="monospace" font-size="11" font-weight="700" fill="#1C1917">78.58%</text>
+  <rect x="209.3" y="159.4" width="56" height="195.6" rx="4" fill="#0D9488"/>
+  <text x="237.3" y="153.4" text-anchor="middle" font-family="monospace" font-size="11" font-weight="700" fill="#1C1917">78.22%</text>
+  <text x="203.3" y="381" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="12" font-weight="600" fill="#44403C">DQN-MLP (Unmasked)</text>
+  <rect x="388.0" y="137.4" width="56" height="217.6" rx="4" fill="#D97706"/>
+  <text x="416.0" y="131.4" text-anchor="middle" font-family="monospace" font-size="11" font-weight="700" fill="#1C1917">87.04%</text>
+  <rect x="456.0" y="149.8" width="56" height="205.2" rx="4" fill="#0D9488"/>
+  <text x="484.0" y="143.8" text-anchor="middle" font-family="monospace" font-size="11" font-weight="700" fill="#1C1917">82.09%</text>
+  <text x="450.0" y="381" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="12" font-weight="600" fill="#44403C">PPO-MLP (Unmasked)</text>
+  <rect x="634.7" y="355.0" width="56" height="2.0" rx="4" fill="#D97706"/>
+  <text x="662.7" y="349.0" text-anchor="middle" font-family="monospace" font-size="11" font-weight="700" fill="#1C1917">0.00%</text>
+  <rect x="702.7" y="355.0" width="56" height="2.0" rx="4" fill="#0D9488"/>
+  <text x="730.7" y="349.0" text-anchor="middle" font-family="monospace" font-size="11" font-weight="700" fill="#1C1917">0.00%</text>
+  <text x="696.7" y="381" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="12" font-weight="600" fill="#44403C">GNN-PPO (Unmasked)</text>
+</svg>

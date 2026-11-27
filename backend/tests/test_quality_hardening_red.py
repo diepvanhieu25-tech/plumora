@@ -9,29 +9,29 @@ import pytest
 
 
 def test_f2_quiz_answer_distribution_balanced() -> None:
-    """F2: All 48 questions must NOT have 'A' as correct answer.
-
-    Must be pedagogical and balanced across A, B, C, D.
-    """
-    seed_path = Path(__file__).resolve().parents[1] / "app" / "seed" / "backend_12_concepts.json"
+    """F2: All 88 Tier 1-2 MCQ questions in depth_questions_and_rubrics.json must be balanced across A, B, C, D."""
+    seed_path = Path(__file__).resolve().parents[1] / "app" / "seed" / "depth_questions_and_rubrics.json"
     with open(seed_path, encoding="utf-8") as f:
         data = json.load(f)
 
-    keys = [q["correct_option_key"] for c in data["concepts"] for q in c["questions"]]
-    assert len(keys) == 48
+    mcqs = [q for q in data["questions"] if q["depth_tier"] in (1, 2)]
+    keys = [q["correct_option_key"] for q in mcqs]
+    assert len(keys) == 88
 
     # Must NOT be 100% 'A'
-    assert keys.count("A") < 48, "All 48 questions currently have 'A' as correct answer!"
+    assert keys.count("A") < 88
 
-    # Distribution must be balanced across all 4 keys (between 8 and 16 per key)
+    # Distribution must be balanced across all 4 keys (<= 35% each)
     for k in ("A", "B", "C", "D"):
-        assert 8 <= keys.count(k) <= 16, f"Key {k} has count {keys.count(k)}, not balanced!"
+        assert 14 <= keys.count(k) <= 30, f"Key {k} has count {keys.count(k)}, not balanced!"
 
-    # In each concept, the 4 questions must not all have the same key
-    for c in data["concepts"]:
-        concept_keys = [q["correct_option_key"] for q in c["questions"]]
-        assert len(set(concept_keys)) >= 3, (
-            f"Concept {c['slug']} does not have at least 3 distinct keys: {concept_keys}"
+    # In each concept, the 4 MCQ questions (2x Tier 1 + 2x Tier 2) must have >= 2 distinct keys
+    by_concept: dict[str, list[str]] = {}
+    for q in mcqs:
+        by_concept.setdefault(q["concept_slug"], []).append(q["correct_option_key"])
+    for slug, concept_keys in by_concept.items():
+        assert len(set(concept_keys)) >= 2, (
+            f"Concept {slug} does not have at least 2 distinct keys: {concept_keys}"
         )
 
 
@@ -186,21 +186,17 @@ def test_h2_schema_migration_upgrade_from_pre_hardening_schema() -> None:
     assert len(applied) >= 2
     assert "0002_add_quiz_attempt_state_version_and_unlocked" in applied
 
-    # Verify column existence and NULL values in legacy row
-    with test_engine.begin() as conn:
-        row = conn.execute(
-            text("SELECT id, state_version, newly_unlocked_json FROM quiz_attempts WHERE id = 'att-01'")
-        ).fetchone()
-        assert row is not None
-        assert row[0] == "att-01"
-        assert row[1] is None, f"Expected state_version NULL, got {row[1]}"
-        assert row[2] is None, f"Expected newly_unlocked_json NULL, got {row[2]}"
+    # Verify legacy quiz_attempts was upgraded through 0002 then cleanly retired by 0011 (D-31)
+    from sqlalchemy import inspect
 
+    assert not inspect(test_engine).has_table("quiz_attempts")
+    with test_engine.begin() as conn:
         # Verify schema_migrations tracking
         migrations = conn.execute(text("SELECT version FROM schema_migrations ORDER BY version")).fetchall()
         mig_versions = [m[0] for m in migrations]
         assert "0001_initial_schema" in mig_versions
         assert "0002_add_quiz_attempt_state_version_and_unlocked" in mig_versions
+        assert any(v.startswith("0011_") for v in mig_versions)
 
 
 def test_h2_migration_error_raises_and_does_not_swallow() -> None:

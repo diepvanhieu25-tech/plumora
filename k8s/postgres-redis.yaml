@@ -13,6 +13,9 @@ spec:
       labels:
         app: postgres
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
       containers:
         - name: postgres
           image: postgres:16-alpine
@@ -63,6 +66,9 @@ spec:
       labels:
         app: redis
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
       containers:
         - name: redis
           image: redis:7-alpine

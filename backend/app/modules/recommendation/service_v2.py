@@ -20,11 +20,12 @@ from plumora_rl.domain import (
     NodeFeatureIdx,
 )
 from plumora_rl.inference import NumpyGnnPredictor
-from sqlalchemy import select
+from sqlalchemy import select, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.db.models import ModelRegistryModel
+from app.db.models import ModelRegistryModel, RecommendationLogModel
 from app.db.redis_pool import get_redis_client
 from app.modules.assessment.schemas_v2 import (
     V2RecommendationResponse,
@@ -358,6 +359,43 @@ def _fallback_recommendation(
     )
 
 
+def _record_recommendation_log_safe(
+    db: Session,
+    user_id: uuid.UUID,
+    resp: V2RecommendationResponse,
+) -> None:
+    """Persist v2 audit row into rec_ai_svc.recommendation_logs without disrupting read paths."""
+    if not hasattr(db, "add") or not hasattr(db, "commit"):
+        return
+    try:
+        bind = db.get_bind()
+        if bind is not None and bind.dialect.name == "postgresql":
+            has_tbl = bool(
+                db.execute(text("SELECT to_regclass('recommendation_logs') IS NOT NULL")).scalar()
+            )
+            if not has_tbl:
+                return
+        act = resp.recommended_action
+        db.add(
+            RecommendationLogModel(
+                id=uuid.uuid4(),
+                user_id=user_id,
+                domain_slug=resp.domain_slug,
+                recommended_concept_slug=act.concept_slug if act is not None else None,
+                recommended_mode=act.learning_mode if act is not None else None,
+                state_version=1,
+                policy_source=resp.policy_source,
+                state_source=resp.state_source,
+                guardrail_applied=resp.guardrail_applied,
+                checkpoint_sha256=resp.checkpoint_sha256 or None,
+            )
+        )
+        db.commit()
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.warning("Failed to record v2 recommendation log for user %s: %s", user_id, exc)
+
+
 def recommend_gnn_ppo_v2(
     db: Session,
     user_id: uuid.UUID,
@@ -398,7 +436,7 @@ def recommend_gnn_ppo_v2(
     depths = obs.node_features[:, NodeFeatureIdx.DEPTH_NORM]
     needs_rev = obs.node_features[:, NodeFeatureIdx.NEEDS_REVIEW] > 0.5
     if bool(np.all(depths >= 0.75)) and not bool(np.any(needs_rev)):
-        return V2RecommendationResponse(
+        done_resp = V2RecommendationResponse(
             domain_slug=domain_slug,
             status="completed",
             recommended_action=None,
@@ -409,6 +447,8 @@ def recommend_gnn_ppo_v2(
             checkpoint_sha256="",
             node_features_snapshot=snapshot,
         )
+        _record_recommendation_log_safe(db, user_id, done_resp)
+        return done_resp
 
     ckpt: NumpyGnnPredictor | None = None
     if checkpoint_path_override is not None or manifest_path_override is not None:
@@ -427,7 +467,7 @@ def recommend_gnn_ppo_v2(
             ckpt = load_verified_gnn_checkpoint()
 
     if ckpt is None:
-        return _fallback_recommendation(
+        fb_resp = _fallback_recommendation(
             domain_slug=domain_slug,
             ordered_nodes=ordered_nodes,
             obs=obs,
@@ -435,6 +475,8 @@ def recommend_gnn_ppo_v2(
             state_source=state_source,
             snapshot=snapshot,
         )
+        _record_recommendation_log_safe(db, user_id, fb_resp)
+        return fb_resp
 
     logits = ckpt.predict_logits(obs.node_features, obs.adj_in, obs.adj_out)
     sel_v, sel_m_int, policy_source, guardrail_applied = select_guarded_action_from_obs(logits, obs)
@@ -450,7 +492,7 @@ def recommend_gnn_ppo_v2(
         retention=float(obs.node_features[sel_v, NodeFeatureIdx.RETENTION]),
     )
 
-    return V2RecommendationResponse(
+    resp = V2RecommendationResponse(
         domain_slug=domain_slug,
         status="active",
         recommended_action=V2RecommendedAction(
@@ -467,3 +509,5 @@ def recommend_gnn_ppo_v2(
         checkpoint_sha256=ckpt.sha256,
         node_features_snapshot=snapshot,
     )
+    _record_recommendation_log_safe(db, user_id, resp)
+    return resp

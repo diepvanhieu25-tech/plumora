@@ -18,27 +18,38 @@ def _migration_0001(conn: Connection) -> None:
 
 
 def _migration_0002(conn: Connection) -> None:
-    """Add state_version and newly_unlocked_json columns to quiz_attempts without defaults."""
+    """Add state_version and newly_unlocked_json columns to quiz_attempts if legacy table exists."""
     if conn.dialect.name == "sqlite":
         cols = {
             row[1] for row in conn.execute(text("PRAGMA table_info(quiz_attempts);")).fetchall()
         }
-        if "state_version" not in cols:
-            conn.execute(text("ALTER TABLE quiz_attempts ADD COLUMN state_version INTEGER;"))
-        if "newly_unlocked_json" not in cols:
-            conn.execute(text("ALTER TABLE quiz_attempts ADD COLUMN newly_unlocked_json TEXT;"))
+        if cols:
+            if "state_version" not in cols:
+                conn.execute(text("ALTER TABLE quiz_attempts ADD COLUMN state_version INTEGER;"))
+            if "newly_unlocked_json" not in cols:
+                conn.execute(text("ALTER TABLE quiz_attempts ADD COLUMN newly_unlocked_json TEXT;"))
     else:
-        conn.execute(text("ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS state_version INTEGER;"))
         conn.execute(
-            text("ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS newly_unlocked_json JSONB;")
+            text(
+                "ALTER TABLE IF EXISTS quiz_attempts ADD COLUMN IF NOT EXISTS state_version INTEGER;"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE IF EXISTS quiz_attempts ADD COLUMN IF NOT EXISTS newly_unlocked_json JSONB;"
+            )
         )
 
 
 def _migration_0003(conn: Connection) -> None:
-    """Drop any legacy fake defaults (DEFAULT 1, DEFAULT '[]'::jsonb) from quiz_attempts."""
+    """Drop any legacy fake defaults (DEFAULT 1, DEFAULT '[]'::jsonb) from quiz_attempts if present."""
     if conn.dialect.name != "sqlite":
-        conn.execute(text("ALTER TABLE quiz_attempts ALTER COLUMN state_version DROP DEFAULT;"))
-        conn.execute(text("ALTER TABLE quiz_attempts ALTER COLUMN newly_unlocked_json DROP DEFAULT;"))
+        exists = conn.execute(text("SELECT to_regclass('quiz_attempts') IS NOT NULL")).scalar()
+        if exists:
+            conn.execute(text("ALTER TABLE quiz_attempts ALTER COLUMN state_version DROP DEFAULT;"))
+            conn.execute(
+                text("ALTER TABLE quiz_attempts ALTER COLUMN newly_unlocked_json DROP DEFAULT;")
+            )
 
 
 def _migration_0004(conn: Connection) -> None:
@@ -566,6 +577,93 @@ def _migration_0010(conn: Connection) -> None:
     )
 
 
+def _migration_0011(conn: Connection) -> None:
+    """Drop retired MVP v1 tables and upgrade recommendation_logs to v2 multi-domain schema (D-31)."""
+    legacy_tables = (
+        "quiz_attempts",
+        "user_concept_mastery",
+        "quiz_questions",
+        "concept_prerequisites",
+        "concepts",
+    )
+    if conn.dialect.name == "sqlite":
+        for tbl in legacy_tables:
+            conn.execute(text(f"DROP TABLE IF EXISTS {tbl};"))
+        cols = {
+            row[1]
+            for row in conn.execute(text("PRAGMA table_info(recommendation_logs);")).fetchall()
+        }
+        if cols:
+            if "domain_slug" not in cols:
+                conn.execute(
+                    text(
+                        "ALTER TABLE recommendation_logs "
+                        "ADD COLUMN domain_slug VARCHAR(64) NOT NULL DEFAULT 'backend';"
+                    )
+                )
+            if "recommended_concept_slug" not in cols:
+                conn.execute(
+                    text(
+                        "ALTER TABLE recommendation_logs "
+                        "ADD COLUMN recommended_concept_slug VARCHAR(64);"
+                    )
+                )
+            if "recommended_mode" not in cols:
+                conn.execute(
+                    text(
+                        "ALTER TABLE recommendation_logs ADD COLUMN recommended_mode VARCHAR(32);"
+                    )
+                )
+        return
+
+    for schema_name in ("assess_svc", "content_svc", "public"):
+        for tbl in legacy_tables:
+            conn.execute(text(f"DROP TABLE IF EXISTS {schema_name}.{tbl} CASCADE;"))
+
+    conn.execute(
+        text(
+            "ALTER TABLE IF EXISTS rec_ai_svc.recommendation_logs "
+            "ADD COLUMN IF NOT EXISTS domain_slug VARCHAR(64) NOT NULL DEFAULT 'backend';"
+        )
+    )
+    conn.execute(
+        text(
+            "ALTER TABLE IF EXISTS rec_ai_svc.recommendation_logs "
+            "ADD COLUMN IF NOT EXISTS recommended_concept_slug VARCHAR(64);"
+        )
+    )
+    conn.execute(
+        text(
+            "ALTER TABLE IF EXISTS rec_ai_svc.recommendation_logs "
+            "ADD COLUMN IF NOT EXISTS recommended_mode VARCHAR(32);"
+        )
+    )
+    conn.execute(
+        text(
+            "ALTER TABLE IF EXISTS rec_ai_svc.recommendation_logs "
+            "ALTER COLUMN state_version SET DEFAULT 1;"
+        )
+    )
+    conn.execute(
+        text(
+            "ALTER TABLE IF EXISTS rec_ai_svc.recommendation_logs "
+            "DROP COLUMN IF EXISTS recommended_action_id;"
+        )
+    )
+    conn.execute(
+        text(
+            "CREATE INDEX IF NOT EXISTS idx_rec_logs_domain_created "
+            "ON rec_ai_svc.recommendation_logs (domain_slug, created_at);"
+        )
+    )
+    conn.execute(
+        text(
+            "GRANT SELECT, INSERT, UPDATE, DELETE ON rec_ai_svc.recommendation_logs "
+            "TO rec_ai_svc_user, rec_ai_role;"
+        )
+    )
+
+
 MIGRATIONS: list[tuple[str, Callable[[Connection], None]]] = [
     ("0001_initial_schema", _migration_0001),
     ("0002_add_quiz_attempt_state_version_and_unlocked", _migration_0002),
@@ -577,6 +675,7 @@ MIGRATIONS: list[tuple[str, Callable[[Connection], None]]] = [
     ("0008_cleanup_public_duplicates", _migration_0008),
     ("0009_single_active_model_index", _migration_0009),
     ("0010_v3_per_schema_outbox_and_content_columns", _migration_0010),
+    ("0011_v4_drop_legacy_v1_tables_and_upgrade_rec_logs", _migration_0011),
 ]
 
 

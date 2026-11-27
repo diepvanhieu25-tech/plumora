@@ -65,7 +65,7 @@ flowchart LR
 
 ## 2. Đặc tả Kỹ thuật & Kiểm chứng cho Lập trình / CI (Chuẩn `sdlc-plan` Gate 1 `v2.0.0`)
 
-- **Nguồn căn cứ:** [intent.md](intent.md) (`v2.0.0`), [spec.md](spec.md) (`v2.0.0`), [design.md](design.md) (`v2.0.0`), [ui-design-system.md](ui-design-system.md) (`v2.0.0`), [research/RL_PLAN.md](research/RL_PLAN.md) (`v2.0.0`), [proposals/PHASE3_ANALYSIS.md](proposals/PHASE3_ANALYSIS.md) và các quyết định `D-16`–`D-26` trong [decisions.md](decisions.md) (`2026-11-18`).
+- **Nguồn căn cứ:** [intent.md](intent.md), [spec.md](spec.md), [design.md](design.md), [ui-design-system.md](ui-design-system.md), [research/RL_PLAN.md](research/RL_PLAN.md) và các quyết định `D-16`–`D-36` trong [decisions.md](decisions.md).
 
 ### 2.1. Bảng Tóm tắt Kỹ thuật 4 Lát cắt (`Phase 3 Task DAG`)
 

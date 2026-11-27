@@ -91,6 +91,14 @@ if [ "$DEAD_V1_STATUS" != "404" ]; then
 fi
 echo "Edge security verified: Gateway/Nginx internal routes -> 403, removed v1 routes -> 404."
 
+GW_RID=$(curl -sI -H "X-Request-ID: ci-trace-001" http://127.0.0.1:8000/api/v1/health | tr -d '\r' | grep -i "^x-request-id:" | awk '{print $2}')
+if [ "$GW_RID" != "ci-trace-001" ]; then
+  echo "FATAL: API Gateway did not echo X-Request-ID header (got '$GW_RID')"
+  exit 1
+fi
+
+(cd backend && uv run python -c "import glob, yaml; [list(yaml.safe_load_all(open(f))) for f in glob.glob('../k8s/*.yaml')]; print('k8s YAML valid')")
+
 git diff --check
 
 echo "=== ALL DAY-0 CI, LIVE MICROSERVICES INTEGRATION & BROWSER E2E CHECKS PASSED ==="

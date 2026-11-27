@@ -32,7 +32,7 @@ from plumora_rl.multidomain_sim import (
 )
 
 ARTIFACTS_DIR = Path(__file__).resolve().parents[2] / "artifacts"
-TIMESTEPS_PER_SEED: int = 15_000
+TIMESTEPS_PER_SEED: int = 60_000
 VAL_EPISODES_PHASE3: int = 200
 
 
@@ -360,7 +360,7 @@ def run_training_and_evaluation(
     ckpt_path = ARTIFACTS_DIR / "gnn_ppo_v2_base.zip"
     metadata = {
         "model_type": "GnnActorCritic",
-        "simulator_version": "3.1.0",
+        "simulator_version": "4.0.0",
         "selected_seed": best_seed,
         "train_seeds": list(TRAIN_SEEDS),
         "timesteps_per_seed": timesteps_per_seed,
@@ -370,6 +370,8 @@ def run_training_and_evaluation(
         "node_feat_dim": 8,
         "hidden_dim": 64,
         "num_modes": 4,
+        "num_layers": 3,
+        "step_elapsed_days": 0.25,
         "created_at": datetime.now(UTC).isoformat(),
     }
     sha256 = export_gnn_ppo_checkpoint(best_model, ckpt_path, metadata)
@@ -377,7 +379,7 @@ def run_training_and_evaluation(
     manifest = {
         "checkpoint_file": "gnn_ppo_v2_base.zip",
         "checkpoint_sha256": sha256,
-        "simulator_version": "3.1.0",
+        "simulator_version": "4.0.0",
         "selected_seed": best_seed,
         "train_seeds": list(TRAIN_SEEDS),
         "timesteps_per_seed": timesteps_per_seed,
@@ -440,8 +442,43 @@ def run_training_and_evaluation(
         ),
     }
 
+    # Ablation Study (D-33): Encoder Depth (3-Layer GNN vs 1-Layer GNN vs MLP) & Sample Budget (15k vs 30k vs 60k)
+    ablation_1layer, _ = train_gnn_ppo_on_seed(
+        seed=best_seed, total_timesteps=timesteps_per_seed, num_layers=1
+    )
+    b15 = max(2048, timesteps_per_seed // 4)
+    b30 = max(4096, timesteps_per_seed // 2)
+    ablation_15k, _ = train_gnn_ppo_on_seed(seed=best_seed, total_timesteps=b15, num_layers=3)
+    ablation_30k, _ = train_gnn_ppo_on_seed(seed=best_seed, total_timesteps=b30, num_layers=3)
+
+    ablation_study = {
+        "selected_seed": best_seed,
+        "encoder_depth_zero_shot": {
+            "mlp_ppo_masked": scenario_b["ppo_mlp_masked"],
+            "mlp_ppo_unmasked": scenario_b["ppo_mlp_unmasked"],
+            "gnn_1layer_masked": evaluate_policy(
+                "gnn_ppo", heldout, eval_seed, episodes, gnn_model=ablation_1layer, masked=True
+            ),
+            "gnn_1layer_unmasked": evaluate_policy(
+                "gnn_ppo", heldout, eval_seed, episodes, gnn_model=ablation_1layer, masked=False
+            ),
+            "gnn_3layer_masked": scenario_b["gnn_ppo_masked"],
+            "gnn_3layer_unmasked": scenario_b["gnn_ppo_unmasked"],
+        },
+        "sample_budget_curve_known_domains": {
+            f"steps_{b15}": evaluate_policy(
+                "gnn_ppo", TRAIN_DOMAINS, eval_seed, episodes, gnn_model=ablation_15k, masked=True
+            ),
+            f"steps_{b30}": evaluate_policy(
+                "gnn_ppo", TRAIN_DOMAINS, eval_seed, episodes, gnn_model=ablation_30k, masked=True
+            ),
+            f"steps_{timesteps_per_seed}": scenario_a["gnn_ppo_masked"],
+        },
+    }
+
     report = {
-        "simulator_version": "3.1.0",
+        "simulator_version": "4.0.0",
+        "step_elapsed_days": 0.25,
         "eval_seed": eval_seed,
         "episodes": episodes,
         "timesteps_per_seed": timesteps_per_seed,
@@ -449,6 +486,7 @@ def run_training_and_evaluation(
         "selected_seed": best_seed,
         "scenario_a_known_domains": scenario_a,
         "scenario_b_zero_shot_transfer": scenario_b,
+        "ablation_study": ablation_study,
     }
     (ARTIFACTS_DIR / "evaluation_phase3_report.json").write_text(
         json.dumps(report, indent=2), encoding="utf-8"

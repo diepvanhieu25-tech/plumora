@@ -1,4 +1,4 @@
-# Plumora Frontend (`v3.1` — Dual-Portal React 19 SPA)
+# Plumora Frontend (`v4.0` — Dual-Portal React 19 SPA)
 
 Giao diện người dùng của **Plumora** được xây dựng bằng **React 19 + TypeScript + Vite 6 + Tailwind CSS v4 (`@theme`) + `lucide-react`**, tuân thủ hệ thống thiết kế **Chồi Cây Non (*Botanical Sprout & Sunlit Canopy*)**:
 - Bảng màu chuẩn `WCAG 2.1 AA`: Xanh Chồi Rừng `#15803D`, Vàng Nắng Sớm `#D97706`, Xanh Ngọc Lá Mạ `#0D9488`, Xám Đá Ấm `#57534E` trên nền `#F6F8F5`.
