@@ -7,7 +7,8 @@ on:
     branches: [main]
 
 jobs:
-  verify:
+  unit-and-static:
+    name: Static Checks & Unit Tests
     runs-on: ubuntu-latest
     env:
       PYTHONPATH: ${{ github.workspace }}/rl/src
@@ -70,7 +71,7 @@ jobs:
           cd ../rl && uv run mypy src tests
           cd ../frontend && npm run typecheck
 
-      - name: 3. Unit & Mock Behavioral Tests
+      - name: 3. Unit & Behavioral Tests
         env:
           DATABASE_URL: postgresql+psycopg://plumora_app:plumora_dev_pass_local_only@127.0.0.1:5432/plumora_test
           PLUMORA_TEST_DB_NAME: plumora_test
@@ -80,9 +81,28 @@ jobs:
           cd ../rl && uv run pytest
           cd ../frontend && npm run test:unit
 
-      - name: 4. Frontend Production Build Verification
+      - name: 4. Frontend Production Build & K8s Manifest Validation
         run: |
           cd frontend && npm run build
+          cd ../backend && uv run python -c "import glob, yaml; [list(yaml.safe_load_all(open(f))) for f in glob.glob('../k8s/*.yaml')]; print('k8s YAML valid')"
+
+  docker-e2e-and-security:
+    name: Live Docker Microservices E2E & Edge Security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+          cache-dependency-path: "frontend/package-lock.json"
+
+      - name: Install Frontend dependencies for Integration & E2E
+        run: |
+          cd frontend && npm ci
 
       - name: 5. Start Unified Docker 4-Microservices + API Gateway + Frontend Stack
         run: |
@@ -128,7 +148,7 @@ jobs:
             echo "Negative-control probe correctly failed with non-zero exit code as expected."
           fi
 
-      - name: 8. Edge Security Probes & Kubernetes v4.0 Manifest Validation
+      - name: 8. Edge Security Probes
         run: |
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/v2/internal/domains/frontend/bundle)" = "403"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/v2/internal/domains/frontend/bundle)" = "403"
@@ -136,4 +156,3 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/v1/roadmap)" = "404"
           GW_RID=$(curl -sI -H "X-Request-ID: ci-trace-001" http://127.0.0.1:8000/api/v1/health | tr -d '\r' | grep -i "^x-request-id:" | awk '{print $2}')
           test "$GW_RID" = "ci-trace-001"
-          cd backend && uv run python -c "import glob, yaml; [list(yaml.safe_load_all(open(f))) for f in glob.glob('../k8s/*.yaml')]; print('k8s YAML valid')"
