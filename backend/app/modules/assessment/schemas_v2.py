@@ -206,12 +206,26 @@ class V2RecommendedAction(BaseModel):
     reason_vi: str
 
 
+class V2PlannedStep(BaseModel):
+    """One projected step in the 3-step adaptive RL learning path (D-39)."""
+
+    step_order: int
+    concept_slug: str
+    title: str
+    tier: int
+    learning_mode: str
+    estimated_minutes: int
+    goal_summary: str
+
+
 class V2RecommendationResponse(BaseModel):
     """Response for POST /api/v2/recommendations."""
 
     domain_slug: str
     status: str  # "active" | "completed"
     recommended_action: V2RecommendedAction | None
+    planned_next_steps: list[V2PlannedStep] = Field(default_factory=list)
+    decision_factors: list[str] = Field(default_factory=list)
     policy_source: str
     state_source: str
     guardrail_applied: bool

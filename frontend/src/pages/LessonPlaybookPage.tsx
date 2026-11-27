@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { apiCompletePlaybook, apiGetConceptPlaybook } from '../api'
 import { DepthBadge } from '../components/ui/DepthBadge'
-import { MarkdownRenderer } from '../components/ui/MarkdownRenderer'
+import { cleanMathText, MarkdownRenderer } from '../components/ui/MarkdownRenderer'
 import { PageContextBar } from '../components/ui/PageContextBar'
 import { RetentionMeter } from '../components/ui/RetentionMeter'
 import { StatusAlertBanner } from '../components/ui/StatusAlertBanner'
@@ -40,6 +40,7 @@ export function LessonPlaybookPage({
   const [completeError, setCompleteError] = useState<string | null>(null)
   const [completedOverride, setCompletedOverride] = useState(false)
   const [selfCheckConfirmed, setSelfCheckConfirmed] = useState(false)
+  const [checkedReflections, setCheckedReflections] = useState<Record<string, boolean>>({})
 
   const { data, loading, errorMessage, refetch } = useAsyncQuery(
     (signal) => apiGetConceptPlaybook(domainSlug, conceptSlug, signal),
@@ -77,6 +78,28 @@ export function LessonPlaybookPage({
       ? node.lesson_markdown
       : `## ${node?.title ?? conceptSlug}\n\nNội dung bài học lý thuyết đang được cập nhật.`
 
+  const tocSections = markdown
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => /^##\s+\d+\.\s+/.test(l))
+    .map((l) => {
+      const m = l.match(/^##\s+(\d+)\.\s+(.*)$/)
+      return { id: `playbook-sec-${m?.[1] ?? '1'}`, num: m?.[1] ?? '1', title: m?.[2] ?? l.slice(3) }
+    })
+
+  const reflectionQuestions = (() => {
+    const idx = markdown.indexOf('## 5.')
+    if (idx < 0) return []
+    return markdown
+      .slice(idx)
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => /^\d+\.\s+/.test(l))
+      .map((l) => l.replace(/^\d+\.\s+/, ''))
+  })()
+
+  const estReadMinutes = Math.max(3, Math.round(markdown.split(/\s+/).length / 180))
+
   const prereqItems =
     node?.prerequisite_titles && node.prerequisite_titles.length > 0
       ? node.prerequisite_titles
@@ -85,7 +108,7 @@ export function LessonPlaybookPage({
   return (
     <section
       className="w-full pb-10 space-y-6"
-      data-testid={loading ? 'lesson-playbook-loading' : 'lesson-playbook-page'}
+      data-testid={loading && !node ? 'lesson-playbook-loading' : 'lesson-playbook-page'}
     >
       <PageContextBar
         backLabel={`Quay về Lộ trình (${domainTitle})`}
@@ -108,18 +131,18 @@ export function LessonPlaybookPage({
         }
       />
 
-      {loading && (
+      {loading && !node && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-8 h-96 rounded-2xl bg-white border border-outline-variant/40 animate-pulse" />
           <div className="lg:col-span-4 h-64 rounded-2xl bg-white border border-outline-variant/40 animate-pulse" />
         </div>
       )}
 
-      {!loading && errorMessage && (
+      {!loading && errorMessage && !node && (
         <StatusAlertBanner variant="error" message={errorMessage} onRetry={refetch} />
       )}
 
-      {!loading && !errorMessage && node && (
+      {node && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Main Playbook Reader (8 cols) */}
           <article className="lg:col-span-8 bg-white rounded-2xl shadow-sm border border-outline-variant/50 p-6 sm:p-8 space-y-6">
@@ -141,17 +164,76 @@ export function LessonPlaybookPage({
               />
             )}
 
-            <header className="pb-5 border-b border-surface-container space-y-2">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-container/60 text-on-primary-container text-xs font-bold">
-                <BookOpen className="w-3.5 h-3.5" aria-hidden="true" />
-                <span>Bước 1 • Bài giảng Lý thuyết &amp; Mô hình Tư duy</span>
+            <header className="pb-5 border-b border-surface-container space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-container/60 text-on-primary-container text-xs font-bold">
+                  <BookOpen className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>Bước 1 • Playbook 5 Phần &amp; Mô hình Tư duy</span>
+                </div>
+                <span className="text-xs font-mono font-semibold text-on-surface-variant bg-surface-container-low px-2.5 py-1 rounded-full">
+                  ~{estReadMinutes} phút đọc
+                </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-headline font-extrabold text-on-surface tracking-tight">
                 {node.title}
               </h1>
+              <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
+                Mục tiêu chặng này: nắm chắc mô hình tư duy, cơ chế tầng sâu và các đánh đổi kiến trúc để tự tin bước vào luyện tập thích ứng 5 cấp độ &amp; Code Sandbox.
+              </p>
             </header>
 
             <MarkdownRenderer markdown={markdown} />
+
+            {/* Interactive Section 5 Reflection Cards (D-38) */}
+            {reflectionQuestions.length > 0 && (
+              <div className="mt-6 pt-5 border-t border-surface-container space-y-3">
+                <h2 className="text-sm font-headline font-extrabold text-on-surface">
+                  Tự kiểm chứng nhanh trước khi sang bước luyện tập
+                </h2>
+                <div className="space-y-2.5">
+                  {reflectionQuestions.map((q, idx) => {
+                    const reflectionKey = `${conceptSlug}:${idx}`
+                    const checked = Boolean(checkedReflections[reflectionKey])
+                    return (
+                      <div
+                        key={reflectionKey}
+                        data-testid="playbook-reflection-card"
+                        className={`p-3.5 rounded-xl border transition-colors ${
+                          checked
+                            ? 'bg-primary-container/25 border-primary/40'
+                            : 'bg-surface-container-low border-outline-variant/40'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="text-xs sm:text-sm text-on-surface font-medium leading-relaxed">
+                            <span className="font-mono font-bold text-primary mr-1.5">
+                              Q{idx + 1}.
+                            </span>
+                            {cleanMathText(q)}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCheckedReflections((prev) => ({
+                                ...prev,
+                                [reflectionKey]: !prev[reflectionKey],
+                              }))
+                            }
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 cursor-pointer transition-colors ${
+                              checked
+                                ? 'bg-primary text-on-primary'
+                                : 'bg-white border border-outline-variant text-on-surface-variant hover:border-primary'
+                            }`}
+                          >
+                            {checked ? 'Đã suy ngẫm' : 'Đánh dấu'}
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* End-of-Lesson Quick Self-Check & Playbook Completion Gate (INV-SEQ-01) */}
             <div className="mt-8 pt-6 border-t border-surface-container space-y-4">
@@ -233,6 +315,36 @@ export function LessonPlaybookPage({
 
           {/* Sticky Sidebar (4 cols) */}
           <aside className="lg:col-span-4 space-y-5 lg:sticky lg:top-20">
+            {tocSections.length > 0 && (
+              <nav
+                aria-label="Mục lục Playbook 5 phần"
+                data-testid="playbook-toc"
+                className="bg-white rounded-2xl shadow-sm border border-outline-variant/50 p-5 space-y-3"
+              >
+                <div className="flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-primary" aria-hidden="true" />
+                  <h2 className="text-xs font-headline font-extrabold uppercase tracking-wider text-on-surface">
+                    Mục lục Playbook ({tocSections.length} phần)
+                  </h2>
+                </div>
+                <ol className="space-y-1.5">
+                  {tocSections.map((sec) => (
+                    <li key={sec.id}>
+                      <a
+                        href={`#${sec.id}`}
+                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-on-surface-variant hover:bg-primary-container/35 hover:text-primary transition-colors"
+                      >
+                        <span className="w-5 h-5 rounded-full bg-surface-container text-primary font-mono text-[10px] font-bold flex items-center justify-center shrink-0">
+                          {sec.num}
+                        </span>
+                        <span className="truncate">{sec.title}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ol>
+              </nav>
+            )}
+
             <div className="bg-white rounded-2xl shadow-sm border border-outline-variant/50 p-5 space-y-4">
               <div className="flex items-center gap-2">
                 <Layers className="w-4 h-4 text-primary" aria-hidden="true" />

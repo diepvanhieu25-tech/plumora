@@ -15,6 +15,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import { apiGetCodeChallenge, apiSubmitCodeSandbox } from '../api'
+import { AdaptiveNextStepCard } from '../components/AdaptiveNextStepCard'
 import { PlaybookQuickDrawer } from '../components/PlaybookQuickDrawer'
 import { PageContextBar } from '../components/ui/PageContextBar'
 import { StatusAlertBanner } from '../components/ui/StatusAlertBanner'
@@ -440,7 +441,8 @@ export function CodeSandboxPage({
                     </div>
 
                     {result.code_score >= 1.0 && (
-                      <div className="p-4 rounded-xl bg-primary-container/35 border border-primary/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="space-y-3">
+                        <div className="p-4 rounded-xl bg-primary-container/35 border border-primary/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div className="flex items-center gap-2 text-xs font-bold text-on-primary-container">
                           <ShieldCheck className="w-4 h-4 text-primary shrink-0" aria-hidden="true" />
                           <span>
@@ -470,6 +472,8 @@ export function CodeSandboxPage({
                           </button>
                         </div>
                       </div>
+                      <AdaptiveNextStepCard domainSlug={domainSlug} />
+                    </div>
                     )}
                   </div>
                 )}

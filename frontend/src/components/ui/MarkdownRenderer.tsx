@@ -1,7 +1,43 @@
 import { useState } from 'react'
-import { Check, Copy } from 'lucide-react'
+import { AlertTriangle, Check, Copy, Info, Lightbulb } from 'lucide-react'
 
-function renderInlineMarkdown(text: string): React.ReactNode[] {
+const LATEX_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/\\rightarrow|\\to\b/g, '→'],
+  [/\\leftarrow/g, '←'],
+  [/\\leftrightarrow/g, '↔'],
+  [/\\ge\b|\\geq\b/g, '≥'],
+  [/\\le\b|\\leq\b/g, '≤'],
+  [/\\neq\b/g, '≠'],
+  [/\\approx\b/g, '≈'],
+  [/\\times\b/g, '×'],
+  [/\\cdot\b/g, '·'],
+  [/\\Delta\b/g, 'Δ'],
+  [/\\alpha\b/g, 'α'],
+  [/\\gamma\b/g, 'γ'],
+  [/\\phi\b/g, 'φ'],
+  [/\\delta\b/g, 'δ'],
+  [/\\log\b/g, 'log'],
+  [/\\textunderscore/g, '_'],
+  [/\\text\{([^}]+)\}/g, '$1'],
+  [/S_0/g, 'S₀'],
+  [/S_\{new\}/g, 'S_new'],
+  [/S_\{old\}/g, 'S_old'],
+  [/\\_/g, '_'],
+]
+
+export function cleanMathText(raw: string): string {
+  // Replace inline $...$ blocks with clean readable mathematical typography
+  return raw.replace(/\$([^$]+)\$/g, (_match, inner: string) => {
+    let cleaned = inner
+    for (const [pat, rep] of LATEX_REPLACEMENTS) {
+      cleaned = cleaned.replace(pat, rep)
+    }
+    return cleaned.replace(/[{}]/g, '').trim()
+  })
+}
+
+function renderInlineMarkdown(rawText: string): React.ReactNode[] {
+  const text = cleanMathText(rawText)
   const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]+\]\([^)]+\))/g)
   return parts.map((part, idx) => {
     if (part.startsWith('`') && part.endsWith('`') && part.length >= 2) {
@@ -31,7 +67,10 @@ function renderInlineMarkdown(text: string): React.ReactNode[] {
     const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/)
     if (linkMatch) {
       const href = linkMatch[2]
-      const isSafe = href.startsWith('http://') || href.startsWith('https://') || href.startsWith('/')
+      const isSafe =
+        href.startsWith('http://') ||
+        href.startsWith('https://') ||
+        (href.startsWith('/') && !href.startsWith('//'))
       if (isSafe) {
         return (
           <a
@@ -86,6 +125,16 @@ function CodeBlock({ lang, code }: { lang: string; code: string }) {
       </pre>
     </div>
   )
+}
+
+interface BulletNode {
+  text: string
+  children: string[]
+}
+
+function parseSectionAnchorId(headingText: string): string | undefined {
+  const m = headingText.trim().match(/^(\d+)\.\s+/)
+  return m ? `playbook-sec-${m[1]}` : undefined
 }
 
 interface MarkdownRendererProps {
@@ -169,16 +218,51 @@ export function MarkdownRenderer({ markdown, className = '' }: MarkdownRendererP
         quoteLines.push(lines[i].trim().slice(2))
         i++
       }
-      blocks.push(
-        <blockquote
-          key={`bq-${i}`}
-          className="my-3 pl-4 pr-3 py-2.5 rounded-r-xl border-l-4 border-secondary bg-secondary-container/25 text-xs sm:text-sm text-on-surface leading-relaxed space-y-1"
-        >
-          {quoteLines.map((ql, qIdx) => (
-            <p key={qIdx}>{renderInlineMarkdown(ql)}</p>
-          ))}
-        </blockquote>,
-      )
+      const firstLine = quoteLines[0] ?? ''
+      const calloutMatch = firstLine.match(/^\[!(TIP|NOTE|WARNING|IMPORTANT)\]\s*(.*)$/i)
+      if (calloutMatch) {
+        const kind = calloutMatch[1].toUpperCase()
+        const restLines = [calloutMatch[2], ...quoteLines.slice(1)].filter((l) => l.trim().length > 0)
+        const isWarn = kind === 'WARNING'
+        const isTip = kind === 'TIP'
+        const boxCls = isWarn
+          ? 'border-[#F59E0B] bg-[#FFFBEB] text-[#78350F]'
+          : isTip
+            ? 'border-[#15803D] bg-[#F0FDF4] text-[#14532D]'
+            : 'border-secondary bg-secondary-container/25 text-on-surface'
+        const label = isWarn ? 'Lưu ý quan trọng' : isTip ? 'Mẹo thực chiến' : 'Ghi chú'
+        blocks.push(
+          <aside
+            key={`callout-${i}`}
+            className={`my-4 pl-4 pr-4 py-3 rounded-xl border-l-4 text-xs sm:text-sm leading-relaxed space-y-1 ${boxCls}`}
+          >
+            <div className="flex items-center gap-1.5 font-bold text-xs uppercase tracking-wide">
+              {isWarn ? (
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+              ) : isTip ? (
+                <Lightbulb className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+              ) : (
+                <Info className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+              )}
+              <span>{label}</span>
+            </div>
+            {restLines.map((ql, qIdx) => (
+              <p key={qIdx}>{renderInlineMarkdown(ql)}</p>
+            ))}
+          </aside>,
+        )
+      } else {
+        blocks.push(
+          <blockquote
+            key={`bq-${i}`}
+            className="my-3 pl-4 pr-3 py-2.5 rounded-r-xl border-l-4 border-secondary bg-secondary-container/25 text-xs sm:text-sm text-on-surface leading-relaxed space-y-1"
+          >
+            {quoteLines.map((ql, qIdx) => (
+              <p key={qIdx}>{renderInlineMarkdown(ql)}</p>
+            ))}
+          </blockquote>,
+        )
+      }
       continue
     }
 
@@ -195,12 +279,15 @@ export function MarkdownRenderer({ markdown, className = '' }: MarkdownRendererP
       continue
     }
     if (line.startsWith('## ')) {
+      const headingText = line.slice(3)
+      const anchorId = parseSectionAnchorId(headingText)
       blocks.push(
         <h2
           key={`h2-${i}`}
-          className="text-lg font-headline font-extrabold text-on-surface mt-6 mb-2.5 pl-3 border-l-4 border-primary"
+          id={anchorId}
+          className="scroll-mt-24 text-lg font-headline font-extrabold text-on-surface mt-7 mb-2.5 pl-3 border-l-4 border-primary"
         >
-          {renderInlineMarkdown(line.slice(3))}
+          {renderInlineMarkdown(headingText)}
         </h2>,
       )
       i++
@@ -232,23 +319,41 @@ export function MarkdownRenderer({ markdown, className = '' }: MarkdownRendererP
     }
 
     if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-      const items: string[] = []
+      const items: BulletNode[] = []
       while (
         i < lines.length &&
         (lines[i].trim().startsWith('- ') || lines[i].trim().startsWith('* '))
       ) {
-        items.push(lines[i].trim().slice(2))
+        const indent = lines[i].length - lines[i].trimStart().length
+        const content = lines[i].trim().slice(2)
+        if (indent >= 2 && items.length > 0) {
+          items[items.length - 1].children.push(content)
+        } else {
+          items.push({ text: content, children: [] })
+        }
         i++
       }
       blocks.push(
         <ul key={`ul-${i}`} className="my-2.5 space-y-2 pl-2">
           {items.map((item, idx) => (
-            <li
-              key={idx}
-              className="text-sm sm:text-[15px] text-on-surface-variant leading-relaxed flex items-start gap-2.5"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2.5 shrink-0" />
-              <span>{renderInlineMarkdown(item)}</span>
+            <li key={idx} className="text-sm sm:text-[15px] text-on-surface-variant leading-relaxed">
+              <div className="flex items-start gap-2.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2.5 shrink-0" />
+                <span>{renderInlineMarkdown(item.text)}</span>
+              </div>
+              {item.children.length > 0 && (
+                <ul data-nested-list="true" className="mt-1.5 ml-6 space-y-1.5">
+                  {item.children.map((sub, sIdx) => (
+                    <li
+                      key={sIdx}
+                      className="text-xs sm:text-sm text-on-surface-variant leading-relaxed flex items-start gap-2"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full border border-primary mt-2 shrink-0" />
+                      <span>{renderInlineMarkdown(sub)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </li>
           ))}
         </ul>,
@@ -263,7 +368,10 @@ export function MarkdownRenderer({ markdown, className = '' }: MarkdownRendererP
         i++
       }
       blocks.push(
-        <ol key={`ol-${i}`} className="my-2.5 space-y-2 pl-5 list-decimal text-sm sm:text-[15px] text-on-surface-variant leading-relaxed">
+        <ol
+          key={`ol-${i}`}
+          className="my-2.5 space-y-2 pl-5 list-decimal text-sm sm:text-[15px] text-on-surface-variant leading-relaxed"
+        >
           {items.map((item, idx) => (
             <li key={idx} className="pl-1">
               {renderInlineMarkdown(item)}
@@ -280,7 +388,10 @@ export function MarkdownRenderer({ markdown, className = '' }: MarkdownRendererP
     }
 
     blocks.push(
-      <p key={`p-${i}`} className="text-sm sm:text-[15px] text-on-surface-variant leading-relaxed my-2.5 max-w-[68ch]">
+      <p
+        key={`p-${i}`}
+        className="text-sm sm:text-[15px] text-on-surface-variant leading-relaxed my-2.5 max-w-[68ch]"
+      >
         {renderInlineMarkdown(line)}
       </p>,
     )

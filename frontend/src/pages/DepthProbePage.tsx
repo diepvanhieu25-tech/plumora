@@ -21,6 +21,7 @@ import {
   apiStartAssessmentV2,
   apiSubmitAssessmentV2,
 } from '../api'
+import { AdaptiveNextStepCard } from '../components/AdaptiveNextStepCard'
 import { AiTutorRubricDrawer } from '../components/AiTutorRubricDrawer'
 import { PlaybookQuickDrawer } from '../components/PlaybookQuickDrawer'
 import { PageContextBar } from '../components/ui/PageContextBar'
@@ -658,10 +659,10 @@ export function DepthProbePage({
                       <div>
                         <span>
                           {sessionStatus === 'ceiling_reached'
-                            ? 'Đã xác lập Trần Hiểu biết Hiện tại'
+                            ? 'Đã xác lập Mốc Năng lực Hiện tại — Điểm xuất phát tối ưu tiếp theo'
                             : isSpacedReview
                               ? 'Hoàn tất Ôn tập Củng cố Trí nhớ!'
-                              : 'Hoàn tất Phiên Kiểm tra Đào sâu 5 Tầng!'}
+                              : 'Hoàn tất Phiên Luyện tập Đào sâu 5 Cấp độ!'}
                         </span>
                       </div>
                     </>
@@ -689,6 +690,8 @@ export function DepthProbePage({
                     </strong>
                   </div>
                 </div>
+
+                <AdaptiveNextStepCard domainSlug={domainSlug} />
 
                 <div className="flex flex-col sm:flex-row gap-2.5">
                   {updatedComp.depth_level_norm >= 0.75 &&

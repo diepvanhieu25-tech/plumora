@@ -141,3 +141,45 @@ export async function apiExpertGetCohortAnalytics(
     'Không thể tải dữ liệu phân tích đoàn hệ học viên',
   )
 }
+
+
+export async function apiExpertPatchPlaybook(
+  conceptSlug: string,
+  lessonMarkdown: string,
+): Promise<{
+  concept_slug: string
+  updated_domains_count: number
+  affected_domains: string[]
+  markdown_length: number
+}> {
+  return requestJson(
+    `/api/v2/expert/concepts/${encodeURIComponent(conceptSlug)}/playbook`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ lesson_markdown: lessonMarkdown }),
+    },
+    'Không thể lưu nội dung Playbook',
+  )
+}
+
+export async function apiExpertDryRunCodeChallenge(
+  payload: ExpertCodeChallengeWritePayload,
+): Promise<{
+  verified: boolean
+  solution_passed: boolean
+  starter_failed: boolean
+  runtime_ms: number
+  memory_kb: number
+  passed_tests: number
+  total_tests: number
+  test_results: Array<{ name: string; passed: boolean; error?: string | null }>
+}> {
+  return requestJson(
+    '/api/v2/expert/code-challenges/dry-run',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    'Lỗi chạy thử Code Sandbox (Dry-Run)',
+  )
+}

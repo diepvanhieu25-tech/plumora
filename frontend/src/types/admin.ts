@@ -186,3 +186,29 @@ export interface SystemHealthResponse {
   redis_stream_pending?: number
   graph_cache_hit_rate: number
 }
+
+
+export interface AdminRlAnalyticsDecisionItem {
+  id: string
+  user_id: string
+  domain_slug: string
+  recommended_concept_slug: string | null
+  recommended_mode: string | null
+  policy_source: string
+  state_source: string
+  guardrail_applied: boolean
+  checkpoint_sha256: string
+  created_at: string | null
+}
+
+export interface AdminRlAnalyticsResponse {
+  total_recommendations: number
+  guardrail_intervention_rate: number
+  fallback_rate: number
+  redis_cache_hit_rate: number
+  policy_source_counts: Record<string, number>
+  by_mode: Array<{ mode: string; count: number; share_pct: number }>
+  by_domain: Array<{ domain_slug: string; count: number; share_pct: number }>
+  top_concepts: Array<{ concept_slug: string; count: number; share_pct: number }>
+  recent_decisions: AdminRlAnalyticsDecisionItem[]
+}

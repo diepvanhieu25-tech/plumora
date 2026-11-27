@@ -40,6 +40,7 @@ from app.db.models import (
     ModelRegistryModel,
     OnlineEvalRunModel,
     OutboxEventModel,
+    RecommendationLogModel,
     RlExperienceBufferModel,
 )
 from app.db.redis_pool import get_redis_client
@@ -1528,4 +1529,83 @@ def get_system_health_status(db: Session) -> dict[str, Any]:
         "consumer_group_active": consumer_group_active,
         "redis_stream_pending": redis_stream_pending,
         "graph_cache_hit_rate": cache_hit_rate,
+    }
+
+
+def get_admin_rl_analytics(
+    db: Session,
+    *,
+    domain_slug: str | None = None,
+    user_id: uuid.UUID | None = None,
+    limit: int = 30,
+) -> dict[str, Any]:
+    """Aggregate live production RL recommendation logs for Admin RL Observability Dashboard (D-40)."""
+    stmt = select(RecommendationLogModel)
+    if domain_slug:
+        stmt = stmt.where(RecommendationLogModel.domain_slug == domain_slug)
+    if user_id is not None:
+        stmt = stmt.where(RecommendationLogModel.user_id == user_id)
+
+    rows = list(db.scalars(stmt.order_by(RecommendationLogModel.created_at.desc()).limit(1000)).all())
+    total = len(rows)
+
+    guardrail_cnt = sum(1 for r in rows if r.guardrail_applied)
+    fallback_cnt = sum(1 for r in rows if "fallback" in (r.policy_source or "").lower())
+    redis_hit_cnt = sum(1 for r in rows if (r.state_source or "").startswith("redis"))
+
+    mode_counts: dict[str, int] = {}
+    domain_counts: dict[str, int] = {}
+    concept_counts: dict[str, int] = {}
+    policy_counts: dict[str, int] = {}
+
+    for r in rows:
+        mode = r.recommended_mode or "completed"
+        mode_counts[mode] = mode_counts.get(mode, 0) + 1
+        dom = r.domain_slug or "unknown"
+        domain_counts[dom] = domain_counts.get(dom, 0) + 1
+        if r.recommended_concept_slug:
+            concept_counts[r.recommended_concept_slug] = (
+                concept_counts.get(r.recommended_concept_slug, 0) + 1
+            )
+        ps = r.policy_source or "unknown"
+        policy_counts[ps] = policy_counts.get(ps, 0) + 1
+
+    by_mode = [
+        {"mode": k, "count": v, "share_pct": round((v / total) * 100.0, 1) if total else 0.0}
+        for k, v in sorted(mode_counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    ]
+    by_domain = [
+        {"domain_slug": k, "count": v, "share_pct": round((v / total) * 100.0, 1) if total else 0.0}
+        for k, v in sorted(domain_counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    ]
+    top_concepts = [
+        {"concept_slug": k, "count": v, "share_pct": round((v / total) * 100.0, 1) if total else 0.0}
+        for k, v in sorted(concept_counts.items(), key=lambda kv: (-kv[1], kv[0]))[:10]
+    ]
+    recent_decisions = [
+        {
+            "id": str(r.id),
+            "user_id": str(r.user_id),
+            "domain_slug": r.domain_slug,
+            "recommended_concept_slug": r.recommended_concept_slug,
+            "recommended_mode": r.recommended_mode,
+            "policy_source": r.policy_source,
+            "state_source": r.state_source,
+            "guardrail_applied": bool(r.guardrail_applied),
+            "checkpoint_sha256": r.checkpoint_sha256 or "",
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows[: max(1, min(limit, 100))]
+    ]
+
+    return {
+        "total_recommendations": total,
+        "guardrail_intervention_rate": round(guardrail_cnt / total, 4) if total else 0.0,
+        "fallback_rate": round(fallback_cnt / total, 4) if total else 0.0,
+        "redis_cache_hit_rate": round(redis_hit_cnt / total, 4) if total else 0.0,
+        "policy_source_counts": policy_counts,
+        "by_mode": by_mode,
+        "by_domain": by_domain,
+        "top_concepts": top_concepts,
+        "recent_decisions": recent_decisions,
     }

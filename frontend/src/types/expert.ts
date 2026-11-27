@@ -3,6 +3,7 @@ export type BackOfficeView =
   | 'expert_questions'
   | 'expert_code'
   | 'expert_cohort'
+  | 'admin_rl_observability'
   | 'admin_online_rl'
   | 'admin_registry'
   | 'admin_health'

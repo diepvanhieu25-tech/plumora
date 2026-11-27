@@ -14,6 +14,7 @@ from app.modules.content.expert_schemas import (
     ExpertCreateDomainRequest,
     ExpertCreateQuestionRequest,
     ExpertGraphUpdateResponse,
+    ExpertPlaybookPatchRequest,
     ExpertRubricDryRunRequest,
     ExpertRubricDryRunResponse,
     ExpertUpdateGraphRequest,
@@ -23,11 +24,13 @@ from app.modules.content.expert_service import (
     create_expert_domain,
     create_expert_question,
     delete_expert_question,
+    dry_run_expert_code_challenge,
     dry_run_expert_rubric,
     get_expert_cohort_analytics,
     get_expert_domain_graph,
     list_expert_code_challenges,
     list_expert_questions,
+    patch_expert_concept_playbook,
     update_expert_domain_graph,
     update_expert_question,
 )
@@ -116,6 +119,26 @@ def post_expert_rubric_dry_run(
 ) -> ExpertRubricDryRunResponse:
     """Preview live deterministic Rubric grading on a sample student explanation."""
     return dry_run_expert_rubric(payload)
+
+
+@router.patch("/concepts/{slug}/playbook")
+def patch_expert_playbook(
+    slug: str,
+    _user: ExpertUser,
+    payload: ExpertPlaybookPatchRequest,
+    db: DbSession,
+) -> dict[str, Any]:
+    """Update lesson_markdown for a single concept (synced across shared domains)."""
+    return patch_expert_concept_playbook(db, slug, payload.lesson_markdown)
+
+
+@router.post("/code-challenges/dry-run")
+def post_expert_code_challenge_dry_run(
+    _user: ExpertUser,
+    payload: ExpertCodeChallengeRequest,
+) -> dict[str, Any]:
+    """Run Dual Sandbox Verification without persisting to DB."""
+    return dry_run_expert_code_challenge(payload)
 
 
 @router.get("/concepts/{slug}/code-challenges")

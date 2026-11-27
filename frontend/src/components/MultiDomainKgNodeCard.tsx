@@ -124,11 +124,7 @@ export function MultiDomainKgNodeCard({
               <span className="text-on-surface-variant font-medium">Mức độ nắm vững</span>
               <span className="font-mono font-bold text-primary">{depthPct}%</span>
             </div>
-            <div className="relative w-full h-1.5 rounded-full bg-surface-container-highest overflow-hidden">
-              <div
-                className="absolute top-0 bottom-0 left-[75%] w-0.5 bg-primary/50 z-10"
-                title="Mốc đạt chuẩn mở khóa (75%)"
-              />
+            <div className="w-full h-1.5 rounded-full bg-surface-container-highest overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-300 ${depthMeta.barClass}`}
                 style={{ width: `${Math.max(4, depthPct)}%` }}

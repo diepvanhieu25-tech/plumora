@@ -71,11 +71,7 @@ export function RetentionMeter({
         </span>
       </div>
 
-      <div className="relative w-full h-1.5 rounded-full bg-surface-container-highest overflow-hidden">
-        <div
-          className="absolute top-0 bottom-0 left-[60%] w-0.5 bg-outline/40 z-10"
-          title="Ngưỡng nhắc ôn tập 60%"
-        />
+      <div className="w-full h-1.5 rounded-full bg-surface-container-highest overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-300 ${
             needsReview ? 'bg-tertiary' : 'bg-secondary'

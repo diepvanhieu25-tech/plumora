@@ -164,11 +164,7 @@ export function AiTutorRubricDrawer({
                       {retentionPct}%
                     </span>
                   </div>
-                  <div className="relative w-full h-2.5 bg-surface-container-highest rounded-full overflow-hidden">
-                    <div
-                      className="absolute top-0 bottom-0 left-[60%] w-0.5 bg-outline/50 z-10"
-                      title="Ngưỡng nhắc ôn tập 60%"
-                    />
+                  <div className="w-full h-2.5 bg-surface-container-highest rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all duration-500 ${
                         retentionPct < 60 ? 'bg-tertiary' : 'bg-primary'

@@ -612,7 +612,59 @@ def _run_dual_sandbox_verification(payload: ExpertCodeChallengeRequest) -> dict[
         "starter_failed_at_least_one": True,
         "runtime_ms": sol_res.runtime_ms,
         "memory_kb": sol_res.memory_kb,
+        "passed_tests": sol_res.passed_tests,
+        "total_tests": sol_res.total_tests,
         "test_results": sol_res.test_results,
+    }
+
+
+def patch_expert_concept_playbook(
+    db: Session,
+    concept_slug: str,
+    lesson_markdown: str,
+) -> dict[str, Any]:
+    """Update lesson_markdown for a single concept across all domains sharing it (D-41)."""
+    rows = db.scalars(
+        select(DomainConceptMapModel).where(DomainConceptMapModel.concept_slug == concept_slug)
+    ).all()
+    if not rows:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error_code": "CONCEPT_NOT_FOUND",
+                "message": f"Concept '{concept_slug}' not found.",
+            },
+        )
+    cleaned = lesson_markdown.strip()
+    for r in rows:
+        r.lesson_markdown = cleaned
+    affected = _emit_content_mutation_in_tx(
+        db,
+        concept_slug=concept_slug,
+        change_summary=f"Updated Playbook markdown for {concept_slug}",
+    )
+    db.commit()
+    _flush_content_caches_after_commit(db, affected)
+    return {
+        "concept_slug": concept_slug,
+        "updated_domains_count": len(rows),
+        "affected_domains": sorted({r.domain_slug for r in rows}),
+        "markdown_length": len(cleaned),
+    }
+
+
+def dry_run_expert_code_challenge(payload: ExpertCodeChallengeRequest) -> dict[str, Any]:
+    """Run Dual Sandbox Verification without persisting to DB (D-41)."""
+    validation_run = _run_dual_sandbox_verification(payload)
+    return {
+        "verified": True,
+        "solution_passed": bool(validation_run.get("solution_passed_all_tests", True)),
+        "starter_failed": bool(validation_run.get("starter_failed_at_least_one", True)),
+        "runtime_ms": int(validation_run.get("runtime_ms", 0)),
+        "memory_kb": int(validation_run.get("memory_kb", 0)),
+        "passed_tests": int(validation_run.get("passed_tests", 0)),
+        "total_tests": int(validation_run.get("total_tests", 0)),
+        "test_results": validation_run.get("test_results", []),
     }
 
 

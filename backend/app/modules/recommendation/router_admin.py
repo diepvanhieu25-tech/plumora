@@ -17,6 +17,7 @@ from app.modules.recommendation.admin_schemas import (
 )
 from app.modules.recommendation.admin_service import (
     activate_candidate_model,
+    get_admin_rl_analytics,
     get_online_rl_buffer_summary,
     get_online_rl_status,
     get_streams_dlq_entries,
@@ -29,6 +30,18 @@ from app.modules.recommendation.admin_service import (
 
 AdminUser = Annotated[UserModel, Depends(require_roles("admin"))]
 router = APIRouter(prefix="/api/v2/admin", tags=["admin_v2"])
+
+
+@router.get("/rl-analytics")
+def get_admin_rl_analytics_route(
+    _user: AdminUser,
+    db: DbSession,
+    domain_slug: Annotated[str | None, Query()] = None,
+    user_id: Annotated[uuid.UUID | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 30,
+) -> dict[str, Any]:
+    """Get live production RL recommendation analytics & recent decisions (admin only)."""
+    return get_admin_rl_analytics(db, domain_slug=domain_slug, user_id=user_id, limit=limit)
 
 
 @router.get("/online-rl/status", response_model=OnlineRlStatusResponse)

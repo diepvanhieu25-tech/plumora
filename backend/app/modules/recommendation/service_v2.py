@@ -18,6 +18,7 @@ from plumora_rl.domain import (
     LearningMode,
     NodeCompetencyInput,
     NodeFeatureIdx,
+    PolicyGuardrailStrategy,
 )
 from plumora_rl.inference import NumpyGnnPredictor
 from sqlalchemy import select, text
@@ -28,6 +29,7 @@ from app.config import settings
 from app.db.models import ModelRegistryModel, RecommendationLogModel
 from app.db.redis_pool import get_redis_client
 from app.modules.assessment.schemas_v2 import (
+    V2PlannedStep,
     V2RecommendationResponse,
     V2RecommendedAction,
 )
@@ -340,6 +342,13 @@ def _fallback_recommendation(
         comp_map=comp_map,
         retention=float(retention_vec[idx]),
     )
+    factors = PedagogicalRationaleBuilder.build_decision_factors(
+        target_node=target,
+        mode=mode,
+        all_nodes=ordered_nodes,
+        comp_map=comp_map,
+        retention=float(retention_vec[idx]),
+    )
     return V2RecommendationResponse(
         domain_slug=domain_slug,
         status="active",
@@ -356,6 +365,7 @@ def _fallback_recommendation(
         retention_alert=False,
         checkpoint_sha256="",
         node_features_snapshot=snapshot,
+        decision_factors=factors,
     )
 
 
@@ -394,6 +404,95 @@ def _record_recommendation_log_safe(
     except SQLAlchemyError as exc:
         db.rollback()
         logger.warning("Failed to record v2 recommendation log for user %s: %s", user_id, exc)
+
+
+def _project_planned_steps(
+    *,
+    ordered_nodes: list[ConceptNodeDTO],
+    obs: GraphObservation,
+    ckpt: NumpyGnnPredictor | None,
+    first_v: int,
+    first_mode: LearningMode,
+    max_steps: int = 3,
+) -> list[V2PlannedStep]:
+    """Project a 3-step adaptive learning path from current state using GNN-PPO + PolicyGuardrail."""
+    steps: list[V2PlannedStep] = []
+    sim_feats = obs.node_features.copy()
+    cur_v, cur_mode = first_v, first_mode
+
+    for step_idx in range(1, max_steps + 1):
+        node = ordered_nodes[cur_v]
+        est_min, goal_summary = PedagogicalRationaleBuilder.goal_summary_for_mode(cur_mode)
+        steps.append(
+            V2PlannedStep(
+                step_order=step_idx,
+                concept_slug=node.concept_slug,
+                title=node.title,
+                tier=node.tier,
+                learning_mode=MODE_NAMES[cur_mode],
+                estimated_minutes=est_min,
+                goal_summary=goal_summary,
+            )
+        )
+        if step_idx >= max_steps:
+            break
+
+        # Advance simulated state cleanly for next step projection
+        if cur_mode == LearningMode.SPACED_REVIEW:
+            sim_feats[cur_v, NodeFeatureIdx.RETENTION] = 1.0
+            sim_feats[cur_v, NodeFeatureIdx.NEEDS_REVIEW] = 0.0
+        elif cur_mode == LearningMode.LEARN_NEW:
+            sim_feats[cur_v, NodeFeatureIdx.DEPTH_NORM] = max(
+                float(sim_feats[cur_v, NodeFeatureIdx.DEPTH_NORM]), 0.50
+            )
+        elif cur_mode == LearningMode.DEEP_PROBE:
+            sim_feats[cur_v, NodeFeatureIdx.DEPTH_NORM] = max(
+                float(sim_feats[cur_v, NodeFeatureIdx.DEPTH_NORM]), 0.75
+            )
+        else:
+            sim_feats[cur_v, NodeFeatureIdx.CODE_SCORE] = 1.0
+            if float(sim_feats[cur_v, NodeFeatureIdx.DEPTH_NORM]) >= 0.75:
+                sim_feats[cur_v, NodeFeatureIdx.DEPTH_NORM] = 1.0
+            else:
+                sim_feats[cur_v, NodeFeatureIdx.DEPTH_NORM] = max(
+                    float(sim_feats[cur_v, NodeFeatureIdx.DEPTH_NORM]), 0.50
+                )
+
+        # Recompute eligibility based on simulated depths
+        slug_to_idx = {n.concept_slug: i for i, n in enumerate(ordered_nodes)}
+        for idx, n in enumerate(ordered_nodes):
+            prereqs_ok = all(
+                float(sim_feats[slug_to_idx[p], NodeFeatureIdx.DEPTH_NORM]) >= 0.75
+                for p in n.prerequisites
+                if p in slug_to_idx
+            )
+            sim_feats[idx, NodeFeatureIdx.IS_ELIGIBLE] = 1.0 if prereqs_ok else 0.0
+
+        depths = sim_feats[:, NodeFeatureIdx.DEPTH_NORM]
+        needs_rev = sim_feats[:, NodeFeatureIdx.NEEDS_REVIEW] > 0.5
+        if bool(np.all(depths >= 0.75)) and not bool(np.any(needs_rev)):
+            break
+
+        sim_obs = GraphObservation(
+            node_features=sim_feats,
+            adj_in=obs.adj_in,
+            adj_out=obs.adj_out,
+            node_order=obs.node_order,
+            has_code_challenge=obs.has_code_challenge,
+        )
+        if ckpt is not None:
+            nxt_logits = ckpt.predict_logits(sim_obs.node_features, sim_obs.adj_in, sim_obs.adj_out)
+            cur_v, nxt_m_int, _, _ = select_guarded_action_from_obs(nxt_logits, sim_obs)
+            cur_mode = LearningMode(nxt_m_int)
+        else:
+            valid_mask = PolicyGuardrailStrategy.compute_valid_action_mask(sim_obs)
+            valid_pairs = np.argwhere(valid_mask)
+            if len(valid_pairs) == 0:
+                break
+            cur_v = int(valid_pairs[0][0])
+            cur_mode = LearningMode(int(valid_pairs[0][1]))
+
+    return steps
 
 
 def recommend_gnn_ppo_v2(
@@ -491,6 +590,20 @@ def recommend_gnn_ppo_v2(
         comp_map=comp_map,
         retention=float(obs.node_features[sel_v, NodeFeatureIdx.RETENTION]),
     )
+    factors = PedagogicalRationaleBuilder.build_decision_factors(
+        target_node=selected_node,
+        mode=sel_mode,
+        all_nodes=ordered_nodes,
+        comp_map=comp_map,
+        retention=float(obs.node_features[sel_v, NodeFeatureIdx.RETENTION]),
+    )
+    planned_steps = _project_planned_steps(
+        ordered_nodes=ordered_nodes,
+        obs=obs,
+        ckpt=ckpt,
+        first_v=sel_v,
+        first_mode=sel_mode,
+    )
 
     resp = V2RecommendationResponse(
         domain_slug=domain_slug,
@@ -502,6 +615,8 @@ def recommend_gnn_ppo_v2(
             learning_mode=MODE_NAMES[sel_mode],
             reason_vi=reason_vi,
         ),
+        planned_next_steps=planned_steps,
+        decision_factors=factors,
         policy_source=policy_source,
         state_source=state_source,
         guardrail_applied=guardrail_applied,

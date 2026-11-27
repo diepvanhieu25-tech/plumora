@@ -679,6 +679,23 @@ export function ExpertQuestionsPage({ onNavigate }: ExpertQuestionsPageProps = {
                       </span>
                       <button
                         type="button"
+                        onClick={() => {
+                          if (criteria.length === 0) return
+                          const base = Math.floor(100 / criteria.length) / 100
+                          const rem = Math.round((1.0 - base * criteria.length) * 100) / 100
+                          setCriteria((prev) =>
+                            prev.map((c, idx) => ({
+                              ...c,
+                              weight: idx === 0 ? Number((base + rem).toFixed(2)) : base,
+                            })),
+                          )
+                        }}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#F0FDF4] border border-[#86EFAC] text-[#14532D] text-[11px] font-bold cursor-pointer"
+                      >
+                        <span>Tự cân bằng = 1.0</span>
+                      </button>
+                      <button
+                        type="button"
                         onClick={() =>
                           setCriteria((prev) => [
                             ...prev,

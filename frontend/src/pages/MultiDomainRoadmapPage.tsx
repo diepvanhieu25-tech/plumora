@@ -337,8 +337,21 @@ export function MultiDomainRoadmapPage({
                       {rec.recommended_action.reason_vi}
                     </p>
 
-                    <p className="text-xs text-ai-sunlit-text font-medium flex items-center gap-1.5 pt-1">
-                      <Check className="w-4 h-4 text-primary shrink-0" aria-hidden="true" />
+                    {rec.decision_factors && rec.decision_factors.length > 0 && (
+                      <ul className="space-y-1 pt-1" data-testid="rl-decision-factors">
+                        {rec.decision_factors.map((factor, fIdx) => (
+                          <li
+                            key={fIdx}
+                            className="text-xs text-ai-sunlit-text font-medium flex items-start gap-1.5"
+                          >
+                            <Check className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" aria-hidden="true" />
+                            <span>{factor}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+
+                    <p className="text-xs text-on-surface-variant font-medium flex items-center gap-1.5 pt-0.5">
                       <span>{recModeMeta.desc}</span>
                     </p>
                   </div>
@@ -365,6 +378,45 @@ export function MultiDomainRoadmapPage({
                     )}
                   </div>
                 </div>
+
+                {/* 3-Step Adaptive RL Planned Path (D-39) */}
+                {rec.planned_next_steps && rec.planned_next_steps.length > 1 && (
+                  <div
+                    className="pt-4 border-t border-ai-sunlit-border/40 space-y-2.5"
+                    data-testid="rl-planned-path"
+                  >
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-ai-sunlit-text">
+                      Chuỗi {rec.planned_next_steps.length} chặng RL thích ứng đề xuất tiếp theo
+                    </span>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                      {rec.planned_next_steps.map((step) => (
+                        <div
+                          key={`${step.step_order}-${step.concept_slug}`}
+                          className={`p-3 rounded-xl border text-xs space-y-1 ${
+                            step.step_order === 1
+                              ? 'bg-white border-primary/50 shadow-xs'
+                              : 'bg-white/75 border-ai-sunlit-border/40'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono font-extrabold text-[11px] text-primary">
+                              Chặng {step.step_order}
+                            </span>
+                            <span className="text-[10px] font-mono text-on-surface-variant">
+                              ~{step.estimated_minutes} phút
+                            </span>
+                          </div>
+                          <p className="font-bold text-on-surface truncate" title={step.title}>
+                            {step.title}
+                          </p>
+                          <p className="text-[11px] text-on-surface-variant leading-snug">
+                            {step.goal_summary}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

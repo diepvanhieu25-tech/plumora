@@ -188,6 +188,16 @@ export interface CodeSandboxSubmitResponse {
   updated_competency: UpdatedCompetencyOut
 }
 
+export interface V2PlannedStep {
+  step_order: number
+  concept_slug: string
+  title: string
+  tier: number
+  learning_mode: 'Learn_New' | 'Deep_Probe' | 'Code_Practice' | 'Spaced_Review'
+  estimated_minutes: number
+  goal_summary: string
+}
+
 export interface V2RecommendationResponse {
   domain_slug: string
   status: 'active' | 'completed'
@@ -198,6 +208,8 @@ export interface V2RecommendationResponse {
     learning_mode: 'Learn_New' | 'Deep_Probe' | 'Code_Practice' | 'Spaced_Review'
     reason_vi: string
   } | null
+  planned_next_steps?: V2PlannedStep[]
+  decision_factors?: string[]
   policy_source: string
   state_source: string
   guardrail_applied: boolean
