@@ -1,8 +1,8 @@
 import { ArrowRight, Menu, Shield, Sprout, X } from 'lucide-react'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import type { PublicPageKind } from '../router'
-import { defaultPathForRole } from '../router'
+import type { PublicPageKind } from '../core/router'
+import { defaultPathForRole } from '../core/router'
 import type { LearnerUser } from '../types'
 
 interface PublicShowcaseShellProps {

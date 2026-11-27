@@ -1,10 +1,10 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { App } from '../App'
-import { Header } from '../components/common/Header'
-import { BackOfficeLoginPage } from '../pages/BackOfficeLoginPage'
-import { LearnerAuthPage } from '../pages/LearnerAuthPage'
-import { parseRoute } from '../router'
+import { parseRoute } from '../core/router'
+import { BackOfficeLoginPage } from '../pages/auth/BackOfficeLoginPage'
+import { LearnerAuthPage } from '../pages/auth/LearnerAuthPage'
+import { BackOfficeAppShell } from '../shells/BackOfficeAppShell'
 
 describe('Portal Separation, URL Routing & RBAC Enforcement', () => {
   it('parses canonical learner and back-office routes accurately', () => {
@@ -105,44 +105,32 @@ describe('Portal Separation, URL Routing & RBAC Enforcement', () => {
     window.history.pushState({}, '', '/')
   })
 
-  it('separates Header navigation strictly per role', () => {
+  it('separates BackOfficeAppShell sidebar navigation strictly per staff role', () => {
     const noop = async () => {}
     const { rerender } = render(
-      <Header
-        user={{ id: '1', username: 'l1', display_name: 'L1', role: 'learner', state_version: 1 }}
-        activeView="domains"
-        onNavigate={() => {}}
-        onLogout={noop}
-      />,
-    )
-    expect(screen.getByTestId('nav-multi-domain-btn')).toBeInTheDocument()
-    expect(screen.queryByTestId('nav-admin-online-rl-btn')).toBeNull()
-    expect(screen.queryByTestId('nav-expert-domains-btn')).toBeNull()
-
-    rerender(
-      <Header
+      <BackOfficeAppShell
         user={{ id: '2', username: 'a1', display_name: 'A1', role: 'admin', state_version: 1 }}
         activeView="admin_online_rl"
         onNavigate={() => {}}
         onLogout={noop}
       />,
     )
-    expect(screen.queryByTestId('nav-multi-domain-btn')).toBeNull()
-    expect(screen.getByTestId('nav-admin-online-rl-btn')).toBeInTheDocument()
-    expect(screen.getByTestId('nav-admin-registry-btn')).toBeInTheDocument()
-    expect(screen.getByTestId('nav-admin-health-btn')).toBeInTheDocument()
+    expect(screen.getByTestId('bo-nav-online-rl')).toBeInTheDocument()
+    expect(screen.getByTestId('bo-nav-registry')).toBeInTheDocument()
+    expect(screen.getByTestId('bo-nav-health')).toBeInTheDocument()
 
     rerender(
-      <Header
+      <BackOfficeAppShell
         user={{ id: '3', username: 'e1', display_name: 'E1', role: 'expert', state_version: 1 }}
         activeView="expert_domains"
         onNavigate={() => {}}
         onLogout={noop}
       />,
     )
-    expect(screen.queryByTestId('nav-multi-domain-btn')).toBeNull()
-    expect(screen.getByTestId('nav-expert-domains-btn')).toBeInTheDocument()
-    expect(screen.getByTestId('nav-expert-questions-btn')).toBeInTheDocument()
-    expect(screen.getByTestId('nav-expert-code-btn')).toBeInTheDocument()
+    expect(screen.getByTestId('bo-nav-domains')).toBeInTheDocument()
+    expect(screen.getByTestId('bo-nav-questions')).toBeInTheDocument()
+    expect(screen.getByTestId('bo-nav-code')).toBeInTheDocument()
+    expect(screen.queryByTestId('bo-nav-online-rl')).toBeNull()
+    expect(screen.queryByTestId('bo-nav-registry')).toBeNull()
   })
 })

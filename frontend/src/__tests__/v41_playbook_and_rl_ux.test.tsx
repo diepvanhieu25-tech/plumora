@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { MarkdownRenderer } from '../components/ui/MarkdownRenderer'
-import { LessonPlaybookPage } from '../pages/LessonPlaybookPage'
+import { LessonPlaybookPage } from '../pages/learner/LessonPlaybookPage'
 import type { DomainRoadmapNode } from '../types'
 
 const SAMPLE_PLAYBOOK = `## 1. Mô hình Tư duy & Bài toán Thực tế

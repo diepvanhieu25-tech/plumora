@@ -11,10 +11,11 @@ from fastapi import FastAPI
 
 from app.db.models import SessionLocal
 from app.modules.assessment.router_v2 import router as assessment_v2_router
-from app.modules.events.outbox import (
+from app.shared.events.outbox import (
     consume_domain_events_stream_once,
     relay_pending_outbox_events,
 )
+from services._runtime import register_common_middleware_and_handlers, register_health_routes
 
 logger = logging.getLogger(__name__)
 
@@ -46,9 +47,6 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Plumora assessment-grader-service", version="2.0.0", lifespan=lifespan)
+register_common_middleware_and_handlers(app, service_name="assessment-grader-service")
+register_health_routes(app, service_name="assessment-grader-service", schema_name="assess_svc")
 app.include_router(assessment_v2_router)
-
-
-@app.get("/health")
-def health() -> dict[str, str]:
-    return {"service": "assessment-grader-service", "schema": "assess_svc", "status": "up"}

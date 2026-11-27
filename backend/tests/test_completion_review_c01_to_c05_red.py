@@ -12,7 +12,7 @@ import redis
 from sqlalchemy import select
 from sqlalchemy.exc import OperationalError
 
-from app.config import settings
+from app.core.config import settings
 from app.db.models import OutboxEventModel, RlExperienceBufferModel, SessionLocal
 
 
@@ -49,7 +49,7 @@ def test_c02_transient_db_error_keeps_event_pending_and_recovers_without_dlq(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """C02: Transient DB error must NOT ACK to DLQ; event must retry via pending recovery and land once."""
-    from app.modules.events import outbox as outbox_mod
+    from app.shared.events import outbox as outbox_mod
 
     stream_name = f"plumora:c02_stream_{uuid.uuid4().hex[:8]}"
     dlq_name = f"{stream_name}:dlq"
@@ -169,8 +169,8 @@ def test_c03_shared_guardrail_enforces_due_review_fresh_and_locked_nodes() -> No
 
 def test_c04_transition_validation_rejects_mismatch_nan_and_matches_canonical_needs_review() -> None:
     """C04: Reject missing node_order, mismatched action_node_idx, unknown mode, NaN; use canonical is_review_needed."""
-    from app.modules.assessment.ebbinghaus import is_review_needed
     from app.modules.recommendation.admin_service import _build_transition_tensors
+    from app.shared.ebbinghaus import is_review_needed
 
     assert is_review_needed(0.75, 0.57) is True
     assert is_review_needed(0.0, 0.40) is False
@@ -209,7 +209,7 @@ def test_c04_transition_validation_rejects_mismatch_nan_and_matches_canonical_ne
 
 def test_c05_outbox_measures_true_db_commit_to_consume_latency() -> None:
     """C05: Outbox relay -> stream consume must measure true DB commit_ts -> consume latency (not publish_ts)."""
-    from app.modules.events.outbox import (
+    from app.shared.events.outbox import (
         consume_competency_stream_once,
         record_outbox_event_in_tx,
         relay_pending_outbox_events,

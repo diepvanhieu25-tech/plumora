@@ -4,12 +4,12 @@ import * as api from "../api";
 
 describe("P3-SLICE-3 Expert & Admin Portal Screens (SCR-15..SCR-20)", () => {
   it("exports all 6 Expert and Admin pages without Unicode emojis (INV-UI-01)", async () => {
-    const scr15 = await import("../pages/ExpertDomainsPage");
-    const scr16 = await import("../pages/ExpertQuestionsPage");
-    const scr17 = await import("../pages/ExpertCodeChallengesPage");
-    const scr18 = await import("../pages/AdminOnlineRlPage");
-    const scr19 = await import("../pages/AdminModelRegistryPage");
-    const scr20 = await import("../pages/AdminSystemHealthPage");
+    const scr15 = await import("../pages/expert/ExpertDomainsPage");
+    const scr16 = await import("../pages/expert/ExpertQuestionsPage");
+    const scr17 = await import("../pages/expert/ExpertCodeChallengesPage");
+    const scr18 = await import("../pages/admin/AdminOnlineRlPage");
+    const scr19 = await import("../pages/admin/AdminModelRegistryPage");
+    const scr20 = await import("../pages/admin/AdminSystemHealthPage");
 
     expect(scr15.ExpertDomainsPage).toBeDefined();
     expect(scr16.ExpertQuestionsPage).toBeDefined();
@@ -27,7 +27,7 @@ describe("P3-SLICE-3 Expert & Admin Portal Screens (SCR-15..SCR-20)", () => {
       models: [],
     });
 
-    const { AdminOnlineRlPage } = await import("../pages/AdminOnlineRlPage");
+    const { AdminOnlineRlPage } = await import("../pages/admin/AdminOnlineRlPage");
     render(<AdminOnlineRlPage onNavigate={() => {}} />);
 
     await waitFor(() => {

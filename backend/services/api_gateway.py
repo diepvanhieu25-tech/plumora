@@ -20,8 +20,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from redis.exceptions import RedisError
 
-from app.config import settings
+from app.core.config import settings
+from app.core.observability import REQUEST_ID_CTX, configure_json_logging
 from app.db.redis_pool import get_redis_client
+from app.middleware import apply_security_headers, register_exception_handlers
+
+configure_json_logging("api-gateway")
 
 
 class _StatelessNoOpCookieJar(CookieJar):
@@ -52,6 +56,7 @@ app = FastAPI(
     version="4.0.0",
     description="Unified BFF / Reverse-Proxy Gateway for Plumora 4-Microservice Architecture",
 )
+register_exception_handlers(app)
 
 app.add_middleware(
     CORSMiddleware,
@@ -139,66 +144,57 @@ async def security_headers_middleware(
     incoming_rid = request.headers.get("x-request-id", "").strip()
     request_id = incoming_rid if _REQUEST_ID_RE.fullmatch(incoming_rid) else str(uuid.uuid4())
     request.state.request_id = request_id
-
-    if request.method == "POST":
-        path = request.url.path
-        client_ip = _extract_client_ip(request)
-        if path in ("/api/v1/auth/login", "/api/v1/auth/register"):
-            auth_limit = int(os.environ.get("GATEWAY_AUTH_RATE_LIMIT_PER_MIN", "20"))
-            allowed, retry_after = _check_sliding_window_rate_limit(
-                f"plumora:rl:auth:{client_ip}", auth_limit, 60
-            )
-            if not allowed:
-                resp_429 = JSONResponse(
-                    status_code=429,
-                    content={
-                        "detail": {
-                            "error_code": "RATE_LIMITED",
-                            "message": "Too many authentication requests. Please retry later.",
-                        }
-                    },
-                    headers={"Retry-After": str(retry_after), "X-Request-ID": request_id},
+    rid_tok = REQUEST_ID_CTX.set(request_id)
+    try:
+        if request.method == "POST":
+            path = request.url.path
+            client_ip = _extract_client_ip(request)
+            if path in ("/api/v1/auth/login", "/api/v1/auth/register"):
+                auth_limit = int(os.environ.get("GATEWAY_AUTH_RATE_LIMIT_PER_MIN", "20"))
+                allowed, retry_after = await asyncio.to_thread(
+                    _check_sliding_window_rate_limit,
+                    f"plumora:rl:auth:{client_ip}",
+                    auth_limit,
+                    60,
                 )
-                return resp_429
-        elif path.startswith("/api/v2/concepts/") and path.endswith("/code-sandbox/submit"):
-            sb_limit = int(os.environ.get("GATEWAY_SANDBOX_RATE_LIMIT_PER_MIN", "30"))
-            allowed, retry_after = _check_sliding_window_rate_limit(
-                f"plumora:rl:sandbox:{client_ip}", sb_limit, 60
-            )
-            if not allowed:
-                resp_429 = JSONResponse(
-                    status_code=429,
-                    content={
-                        "detail": {
-                            "error_code": "RATE_LIMITED",
-                            "message": "Too many Code Sandbox submissions. Please retry later.",
-                        }
-                    },
-                    headers={"Retry-After": str(retry_after), "X-Request-ID": request_id},
+                if not allowed:
+                    resp_429 = JSONResponse(
+                        status_code=429,
+                        content={
+                            "detail": {
+                                "error_code": "RATE_LIMITED",
+                                "message": "Too many authentication requests. Please retry later.",
+                            }
+                        },
+                        headers={"Retry-After": str(retry_after), "X-Request-ID": request_id},
+                    )
+                    return resp_429
+            elif path.startswith("/api/v2/concepts/") and path.endswith("/code-sandbox/submit"):
+                sb_limit = int(os.environ.get("GATEWAY_SANDBOX_RATE_LIMIT_PER_MIN", "30"))
+                allowed, retry_after = await asyncio.to_thread(
+                    _check_sliding_window_rate_limit,
+                    f"plumora:rl:sandbox:{client_ip}",
+                    sb_limit,
+                    60,
                 )
-                return resp_429
+                if not allowed:
+                    resp_429 = JSONResponse(
+                        status_code=429,
+                        content={
+                            "detail": {
+                                "error_code": "RATE_LIMITED",
+                                "message": "Too many Code Sandbox submissions. Please retry later.",
+                            }
+                        },
+                        headers={"Retry-After": str(retry_after), "X-Request-ID": request_id},
+                    )
+                    return resp_429
 
-    response = await call_next(request)
-    response.headers["X-Request-ID"] = request_id
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-    response.headers["Cache-Control"] = "no-store"
-    if request.url.path in ("/docs", "/docs/oauth2-redirect", "/redoc"):
-        # TODO(security): Self-host Swagger UI bundle to eliminate cdn.jsdelivr.net & unsafe-inline on /docs.
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-            "img-src 'self' data: https://fastapi.tiangolo.com; "
-            "frame-ancestors 'self'; object-src 'none'"
-        )
-    else:
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; frame-ancestors 'self'; object-src 'none'"
-        )
-    return response
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return apply_security_headers(request, response)
+    finally:
+        REQUEST_ID_CTX.reset(rid_tok)
 
 
 def _resolve_upstream(path: str) -> str | None:
@@ -222,7 +218,7 @@ def _resolve_upstream(path: str) -> str | None:
 
 async def _probe_service(url: str) -> str:
     try:
-        resp = await _GATEWAY_CLIENT.get(f"{url.rstrip('/')}/health", timeout=2.0)
+        resp = await _GATEWAY_CLIENT.get(f"{url.rstrip('/')}/health/ready", timeout=2.0)
         return "up" if 200 <= resp.status_code < 300 else "degraded"
     except httpx.HTTPError:
         return "down"

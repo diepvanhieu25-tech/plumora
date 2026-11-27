@@ -186,9 +186,9 @@ def test_f05_outbox_runtime_relay_and_consume_pipeline_populates_buffer() -> Non
     """F05: Real PostgreSQL + Redis Streams E2E: outbox -> relay -> crashed pending recovery -> idempotent buffer."""
     import redis
 
-    from app.config import settings
+    from app.core.config import settings
     from app.db.models import ConsumedEventModel, RlExperienceBufferModel, SessionLocal, UserModel
-    from app.modules.events.outbox import (
+    from app.shared.events.outbox import (
         consume_competency_stream_once,
         record_outbox_event_in_tx,
         relay_pending_outbox_events,

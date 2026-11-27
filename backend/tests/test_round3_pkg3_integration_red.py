@@ -9,7 +9,7 @@ import pytest
 import redis
 from sqlalchemy import select
 
-from app.config import settings
+from app.core.config import settings
 from app.db.models import RlExperienceBufferModel, SessionLocal
 
 
@@ -51,7 +51,7 @@ def test_r3_07_system_health_honest_monolith_vs_microservices_and_unknown_metric
 
 def test_r3_08_poison_message_goes_to_dlq_and_does_not_block_valid_events() -> None:
     """R3-08: Poison/malformed messages must go to DLQ and never block subsequent valid events."""
-    from app.modules.events.outbox import consume_competency_stream_once
+    from app.shared.events.outbox import consume_competency_stream_once
 
     stream_name = f"plumora:test_stream_{uuid.uuid4().hex[:8]}"
     dlq_name = f"{stream_name}:dlq"

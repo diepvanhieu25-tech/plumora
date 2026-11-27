@@ -4,10 +4,10 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-echo "=== [1/7] Lint Check (Backend, RL, Frontend) ==="
+echo "=== [1/7] Lint, SAST & SCA Check (Backend, RL, Frontend) ==="
 (cd backend && uv run ruff check .)
 (cd rl && uv run ruff check .)
-(cd frontend && npm run lint)
+(cd frontend && npm run lint && npm audit --omit=dev --audit-level=high)
 
 echo "=== [2/7] Type Check (Backend, RL, Frontend) ==="
 (cd backend && uv run mypy app services tests)

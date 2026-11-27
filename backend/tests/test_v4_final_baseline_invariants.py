@@ -13,7 +13,7 @@ from sqlalchemy import select
 
 import app.db.models as db_models
 import app.modules.auth.router as auth_router
-from app.config import REPO_ROOT
+from app.core.config import REPO_ROOT
 from app.db.models import RecommendationLogModel, SessionLocal
 from app.main import app
 from app.modules.assessment.depth_state_machine import map_depth_to_competency

@@ -12,7 +12,8 @@ from fastapi import FastAPI
 from app.db.models import SessionLocal
 from app.modules.content.router_expert import router as expert_v2_router
 from app.modules.content.router_v2 import router as content_kg_router
-from app.modules.events.outbox import relay_pending_outbox_events
+from app.shared.events.outbox import relay_pending_outbox_events
+from services._runtime import register_common_middleware_and_handlers, register_health_routes
 
 logger = logging.getLogger(__name__)
 
@@ -43,10 +44,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Plumora content-kg-service", version="2.0.0", lifespan=lifespan)
+register_common_middleware_and_handlers(app, service_name="content-kg-service")
+register_health_routes(app, service_name="content-kg-service", schema_name="content_svc")
 app.include_router(content_kg_router)
 app.include_router(expert_v2_router)
-
-
-@app.get("/health")
-def health() -> dict[str, str]:
-    return {"service": "content-kg-service", "schema": "content_svc", "status": "up"}

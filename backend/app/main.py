@@ -17,16 +17,17 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.config import settings
+from app.core.config import settings
 from app.db.models import SessionLocal, engine
 from app.db.redis_pool import get_redis_client
 from app.modules.assessment.router_v2 import router as assessment_v2_router
-from app.modules.auth import router as auth_router
+from app.modules.auth.router import router as auth_router
 from app.modules.content import init_db_and_seed
 from app.modules.content.router_expert import router as expert_v2_router
 from app.modules.content.router_v2 import router as content_kg_router
-from app.modules.events.outbox import run_outbox_relay_and_consume_once
 from app.modules.recommendation.router_admin import router as admin_v2_router
+from app.modules.recommendation.router_v2 import router as recommendation_v2_router
+from app.shared.events.outbox import run_outbox_relay_and_consume_once
 
 _DB_INITIALIZED = False
 
@@ -82,6 +83,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(content_kg_router)
 app.include_router(assessment_v2_router)
+app.include_router(recommendation_v2_router)
 app.include_router(expert_v2_router)
 app.include_router(admin_v2_router)
 

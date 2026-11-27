@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../App'
-import { parseRoute } from '../router'
+import { parseRoute } from '../core/router'
 
 const EMOJI_REGEX = /\p{Extended_Pictographic}/u
 

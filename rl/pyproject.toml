@@ -1,7 +1,7 @@
 [project]
 name = "plumora-rl"
 version = "0.1.0"
-description = "Plumora Offline Reinforcement Learning Simulator & DQN Pipeline"
+description = "Plumora Multi-Domain GNN-PPO Simulator, Evaluation Suite & Shared Zero-Torch RL Kernel"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
@@ -33,6 +33,13 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "S"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S603"]
 
 [tool.mypy]
 python_version = "3.12"

@@ -6,7 +6,7 @@ from collections.abc import Sequence
 
 from plumora_rl.domain import EbbinghausMemoryModel, LearningMode
 
-from app.modules.contracts.dtos import ConceptNodeDTO, UserNodeCompetencyDTO
+from app.shared.contracts.dtos import ConceptNodeDTO, UserNodeCompetencyDTO
 
 _ESTIMATED_MINUTES: dict[LearningMode, int] = {
     LearningMode.LEARN_NEW: 10,

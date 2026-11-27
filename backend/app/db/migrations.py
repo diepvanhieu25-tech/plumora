@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import Callable
 from datetime import UTC, datetime
 
@@ -10,6 +11,30 @@ from sqlalchemy import Connection, Engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
 logger = logging.getLogger(__name__)
+
+_SVC_ROLE_PASSWORD_ENV: dict[str, str] = {
+    "auth_svc_user": "AUTH_DB_PASSWORD",
+    "content_svc_user": "CONTENT_DB_PASSWORD",
+    "assess_svc_user": "ASSESS_DB_PASSWORD",
+    "rec_ai_svc_user": "REC_AI_DB_PASSWORD",
+}
+_LOCAL_DEV_DB_FALLBACK = "plumora_dev_pass_local_only"  # noqa: S105
+
+
+def resolve_service_role_password(login_user: str) -> str:
+    """Resolve per-service PostgreSQL LOGIN role password from env; fail fast in production."""
+    env_var = _SVC_ROLE_PASSWORD_ENV.get(login_user)
+    if env_var is None:
+        raise RuntimeError(f"Unknown service role: {login_user}")
+    val = os.environ.get(env_var, "").strip()
+    if val:
+        return val
+    app_env = os.environ.get("APP_ENV", "development").strip().lower()
+    if app_env == "production":
+        raise RuntimeError(
+            f"{env_var} must be set in production environment for DB role '{login_user}'."
+        )
+    return _LOCAL_DEV_DB_FALLBACK
 
 
 def _migration_0001(conn: Connection) -> None:
@@ -89,9 +114,10 @@ def _migration_0005(conn: Connection) -> None:
         )
         conn.execute(
             text(
-                f"INSERT INTO {schema_name}.service_marker (service_name) "
-                f"VALUES ('{schema_name}') ON CONFLICT DO NOTHING;"
-            )
+                f"INSERT INTO {schema_name}.service_marker (service_name) "  # noqa: S608
+                "VALUES (:svc) ON CONFLICT DO NOTHING;"
+            ),
+            {"svc": schema_name},
         )
         conn.execute(
             text(
@@ -103,7 +129,7 @@ def _migration_0005(conn: Connection) -> None:
                     END IF;
                 END
                 $$;
-                """
+                """  # noqa: S608
             )
         )
 
@@ -202,7 +228,7 @@ def _migration_0007(conn: Connection) -> None:
                     END IF;
                 END
                 $$;
-                """
+                """  # noqa: S608
             )
         )
 
@@ -213,17 +239,21 @@ def _migration_0007(conn: Connection) -> None:
         ("rec_ai_svc", "rec_ai_svc_user"),
     ]
     for owner_schema, login_user in svc_users:
+        role_pw = resolve_service_role_password(login_user)
+        pw_sql_lit = role_pw.replace("'", "''")
         conn.execute(
             text(
                 f"""
                 DO $$
                 BEGIN
                     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{login_user}') THEN
-                        CREATE ROLE {login_user} LOGIN PASSWORD 'plumora_dev_pass_local_only';
+                        CREATE ROLE {login_user} LOGIN PASSWORD '{pw_sql_lit}';
+                    ELSE
+                        ALTER ROLE {login_user} WITH PASSWORD '{pw_sql_lit}';
                     END IF;
                 END
                 $$;
-                """
+                """  # noqa: S608
             )
         )
         for target_schema, _ in svc_users:
@@ -287,7 +317,7 @@ def migrate_public_table_safely(conn: Connection, target_schema: str, table_name
         overlap_count = int(
             conn.execute(
                 text(
-                    f"SELECT COUNT(*) FROM public.{table_name} p "
+                    f"SELECT COUNT(*) FROM public.{table_name} p "  # noqa: S608
                     f"JOIN {target_schema}.{table_name} t ON {join_cond}"
                 )
             ).scalar()
@@ -326,7 +356,9 @@ def migrate_public_table_safely(conn: Connection, target_schema: str, table_name
             f"Migration conflict: public.{table_name} has dependent FKs in public schema: {dep_fks}"
         )
 
-    conn.execute(text(f"INSERT INTO {target_schema}.{table_name} SELECT * FROM public.{table_name};"))
+    conn.execute(
+        text(f"INSERT INTO {target_schema}.{table_name} SELECT * FROM public.{table_name};")  # noqa: S608
+    )
     conn.execute(text(f"DROP TABLE public.{table_name};"))
 
 
@@ -693,32 +725,38 @@ def ensure_migrations_table(conn: Connection) -> None:
     )
 
 
+def run_database_migrations_on_connection(conn: Connection) -> list[str]:
+    """Execute all pending versioned migrations on an already-open transaction/connection."""
+    applied_versions: list[str] = []
+    ensure_migrations_table(conn)
+    rows = conn.execute(
+        text("SELECT version FROM schema_migrations ORDER BY version")
+    ).fetchall()
+    existing = {r[0] for r in rows}
+
+    for version, migration_fn in MIGRATIONS:
+        if version in existing:
+            continue
+        logger.info("Applying database migration %s...", version)
+        migration_fn(conn)
+        conn.execute(
+            text("INSERT INTO schema_migrations (version, applied_at) VALUES (:v, :now)"),
+            {"v": version, "now": datetime.now(UTC)},
+        )
+        applied_versions.append(version)
+        logger.info("Applied database migration %s successfully.", version)
+    return applied_versions
+
+
 def run_database_migrations(engine: Engine) -> list[str]:
     """Execute all pending versioned migrations in order.
 
     Strictly fails and raises RuntimeError on any migration error.
     Never swallows migration exceptions.
     """
-    applied_versions: list[str] = []
     try:
         with engine.begin() as conn:
-            ensure_migrations_table(conn)
-            rows = conn.execute(
-                text("SELECT version FROM schema_migrations ORDER BY version")
-            ).fetchall()
-            existing = {r[0] for r in rows}
-
-            for version, migration_fn in MIGRATIONS:
-                if version in existing:
-                    continue
-                logger.info("Applying database migration %s...", version)
-                migration_fn(conn)
-                conn.execute(
-                    text("INSERT INTO schema_migrations (version, applied_at) VALUES (:v, :now)"),
-                    {"v": version, "now": datetime.now(UTC)},
-                )
-                applied_versions.append(version)
-                logger.info("Applied database migration %s successfully.", version)
+            applied_versions = run_database_migrations_on_connection(conn)
     except SQLAlchemyError as exc:
         logger.error("Database migration execution failed: %s", exc)
         raise RuntimeError(f"Database migration failed: {exc}") from exc

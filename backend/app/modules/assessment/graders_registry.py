@@ -14,7 +14,7 @@ from app.modules.assessment.rubric_grader import (
     LlmRubricGraderAdapter,
     RubricCriterion,
 )
-from app.modules.contracts.dtos import DepthQuestionDTO
+from app.shared.contracts.dtos import DepthQuestionDTO
 
 
 @dataclass(frozen=True)
