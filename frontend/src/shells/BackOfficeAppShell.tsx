@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { AdminModelRegistryPage } from '../pages/AdminModelRegistryPage'
 import { AdminOnlineRlPage } from '../pages/AdminOnlineRlPage'
+import { AdminRlObservabilityPage } from '../pages/AdminRlObservabilityPage'
 import { AdminSystemHealthPage } from '../pages/AdminSystemHealthPage'
 import { CohortAnalyticsPage } from '../pages/CohortAnalyticsPage'
 import { ExpertCodeChallengesPage } from '../pages/ExpertCodeChallengesPage'
@@ -69,6 +70,12 @@ const COHORT_NAV_ITEMS: NavItemDef[] = [
 
 const MLOPS_NAV_ITEMS: NavItemDef[] = [
   {
+    view: 'admin_rl_observability',
+    label: 'Giám sát RL Production',
+    icon: BarChart3,
+    testId: 'bo-nav-rl-observability',
+  },
+  {
     view: 'admin_online_rl',
     label: 'Online RL & Policy Inspector',
     icon: Activity,
@@ -94,6 +101,7 @@ function normalizeBackOfficeView(rawView: string, role: string): BackOfficeView 
     rawView === 'expert_questions' ||
     rawView === 'expert_code' ||
     rawView === 'expert_cohort' ||
+    rawView === 'admin_rl_observability' ||
     rawView === 'admin_online_rl' ||
     rawView === 'admin_registry' ||
     rawView === 'admin_health'
@@ -182,11 +190,12 @@ function BackOfficeShellInner({
             </div>
           </div>
 
-          {/* RBAC Grouped Navigation */}
+          {/* RBAC Grouped Navigation: Admin prioritizes MLOps & RL Observability first (D-40) */}
           <nav aria-label="Điều hướng Back-Office" className="space-y-5">
+            {isAdmin && renderNavGroup('Giám sát & MLOps RL', MLOPS_NAV_ITEMS)}
+            {isAdmin && renderNavGroup('Giám sát Học viên', COHORT_NAV_ITEMS)}
             {renderNavGroup('Content Studio', STUDIO_NAV_ITEMS)}
-            {renderNavGroup('Giám sát Học viên', COHORT_NAV_ITEMS)}
-            {isAdmin && renderNavGroup('MLOps & Hệ thống', MLOPS_NAV_ITEMS)}
+            {!isAdmin && renderNavGroup('Giám sát Học viên', COHORT_NAV_ITEMS)}
           </nav>
         </div>
 
@@ -253,6 +262,9 @@ function BackOfficeShellInner({
           )}
           {currentView === 'expert_cohort' && (
             <CohortAnalyticsPage onNavigate={handleGuardedNavigate} />
+          )}
+          {isAdmin && currentView === 'admin_rl_observability' && (
+            <AdminRlObservabilityPage onNavigate={handleGuardedNavigate} />
           )}
           {isAdmin && currentView === 'admin_online_rl' && (
             <AdminOnlineRlPage onNavigate={handleGuardedNavigate} />

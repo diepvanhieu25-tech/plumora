@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class ExpertCreateDomainRequest(BaseModel):
@@ -113,6 +113,19 @@ class ExpertCodeChallengeRequest(BaseModel):
     timeout_ms: int = Field(default=3000, ge=200, le=3000)
     memory_limit_mb: int = Field(default=128, ge=32, le=128)
     setup_sql: str | None = None
+
+
+class ExpertPlaybookPatchRequest(BaseModel):
+    """Patch lesson_markdown for a single concept without re-uploading the entire domain graph."""
+
+    lesson_markdown: str = Field(min_length=10)
+
+    @field_validator("lesson_markdown")
+    @classmethod
+    def _validate_non_blank_markdown(cls, v: str) -> str:
+        if len(v.strip()) < 10:
+            raise ValueError("lesson_markdown must contain at least 10 non-whitespace characters")
+        return v
 
 
 class ExpertGraphUpdateResponse(BaseModel):

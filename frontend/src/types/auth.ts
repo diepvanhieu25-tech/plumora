@@ -19,6 +19,7 @@ export type ActiveView =
   | 'expert_questions'
   | 'expert_code'
   | 'cohort_analytics'
+  | 'admin_rl_observability'
   | 'admin_online_rl'
   | 'admin_registry'
   | 'admin_health'

@@ -12,6 +12,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import { apiStartPlacement, apiSubmitPlacementAnswer } from '../api'
+import { AdaptiveNextStepCard } from '../components/AdaptiveNextStepCard'
 import { PageContextBar } from '../components/ui/PageContextBar'
 import { SafetyConfirmModal } from '../components/ui/SafetyConfirmModal'
 import { StatusAlertBanner } from '../components/ui/StatusAlertBanner'
@@ -418,6 +419,8 @@ export function AdaptivePlacementPage({
                     ))}
                   </div>
                 )}
+
+                <AdaptiveNextStepCard domainSlug={domainSlug} />
 
                 <button
                   type="button"

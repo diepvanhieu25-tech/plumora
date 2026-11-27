@@ -20,9 +20,11 @@ import {
 import {
   apiExpertCreateDomain,
   apiExpertGetDomainGraph,
+  apiExpertPatchPlaybook,
   apiExpertUpdateGraph,
   apiGetDomains,
 } from '../api'
+import { MarkdownRenderer } from '../components/ui/MarkdownRenderer'
 import { useDagTopologyEditor } from '../hooks/useDagTopologyEditor'
 import { useOptionalBackOfficeStudio } from '../shells/BackOfficeStudioContext'
 import type { BackOfficeView } from '../types/expert'
@@ -37,88 +39,6 @@ const TIER_HEADER_META: Record<number, { title: string; dotColor: string }> = {
   2: { title: 'Tầng 2: Cơ chế Cốt lõi & Giao thức', dotColor: 'bg-[#15803D]' },
   3: { title: 'Tầng 3: Kiến trúc Ứng dụng & Tích hợp', dotColor: 'bg-[#D97706]' },
   4: { title: 'Tầng 4: Chuyên sâu, Bảo mật & Vận hành', dotColor: 'bg-[#9F1239]' },
-}
-
-function SimpleMarkdownPreview({ markdown }: { markdown: string }) {
-  const lines = markdown.replace(/\r\n/g, '\n').split('\n')
-  const blocks: React.ReactNode[] = []
-  let i = 0
-
-  while (i < lines.length) {
-    const line = lines[i]
-    if (line.trim().startsWith('```')) {
-      const lang = line.trim().slice(3).trim()
-      const codeLines: string[] = []
-      i++
-      while (i < lines.length && !lines[i].trim().startsWith('```')) {
-        codeLines.push(lines[i])
-        i++
-      }
-      blocks.push(
-        <div key={`code-${i}`} className="my-2 rounded-lg overflow-hidden bg-[#14241B] text-[#E9FFE7]">
-          <div className="px-3 py-1 bg-[#0C1711] text-[10px] font-mono text-[#98FBA9]">
-            {lang || 'code'}
-          </div>
-          <pre className="p-3 text-xs font-mono overflow-x-auto leading-relaxed">
-            <code>{codeLines.join('\n')}</code>
-          </pre>
-        </div>,
-      )
-      i++
-      continue
-    }
-    if (line.startsWith('## ')) {
-      blocks.push(
-        <h2
-          key={`h2-${i}`}
-          className="text-sm font-extrabold text-[#14241B] mt-3 mb-1.5 pl-2.5 border-l-3 border-[#15803D]"
-        >
-          {line.slice(3)}
-        </h2>,
-      )
-      i++
-      continue
-    }
-    if (line.startsWith('### ')) {
-      blocks.push(
-        <h3 key={`h3-${i}`} className="text-xs font-bold text-[#15803D] mt-2.5 mb-1">
-          {line.slice(4)}
-        </h3>,
-      )
-      i++
-      continue
-    }
-    if (line.trim().startsWith('- ') || line.trim().startsWith('* ')) {
-      const items: string[] = []
-      while (
-        i < lines.length &&
-        (lines[i].trim().startsWith('- ') || lines[i].trim().startsWith('* '))
-      ) {
-        items.push(lines[i].trim().slice(2))
-        i++
-      }
-      blocks.push(
-        <ul key={`ul-${i}`} className="my-1.5 space-y-1 pl-4 list-disc text-xs text-[#3F5247]">
-          {items.map((it, idx) => (
-            <li key={idx}>{it}</li>
-          ))}
-        </ul>,
-      )
-      continue
-    }
-    if (line.trim() === '') {
-      i++
-      continue
-    }
-    blocks.push(
-      <p key={`p-${i}`} className="text-xs text-[#3F5247] leading-relaxed my-1.5">
-        {line}
-      </p>,
-    )
-    i++
-  }
-
-  return <div className="space-y-1">{blocks}</div>
 }
 
 export function ExpertDomainsPage({ onNavigate }: ExpertDomainsPageProps) {
@@ -155,6 +75,23 @@ export function ExpertDomainsPage({ onNavigate }: ExpertDomainsPageProps) {
   const [statusMsg, setStatusMsg] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [savingPlaybook, setSavingPlaybook] = useState(false)
+
+  async function handleQuickSavePlaybook(slug: string, markdown: string) {
+    setSavingPlaybook(true)
+    setErrorMsg(null)
+    setStatusMsg(null)
+    try {
+      const res = await apiExpertPatchPlaybook(slug, markdown)
+      setStatusMsg(
+        `Đã lưu nhanh Playbook '${res.concept_slug}' (${res.markdown_length} ký tự, đồng bộ ${res.updated_domains_count} ngành).`,
+      )
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : 'Không thể lưu Playbook')
+    } finally {
+      setSavingPlaybook(false)
+    }
+  }
 
   const editor = useDagTopologyEditor()
   const {
@@ -924,23 +861,40 @@ export function ExpertDomainsPage({ onNavigate }: ExpertDomainsPageProps) {
                   </div>
                 ) : (
                   <div className="space-y-3" data-testid="lesson-markdown-editor-panel">
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="text-xs font-bold text-[#14241B]">
                         Nội dung Playbook ({selectedNode.lesson_markdown.length} ký tự)
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => setLessonPreview((p) => !p)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#F6F8F5] border border-[#D8E2D8] text-[11px] font-semibold text-[#14241B] cursor-pointer"
-                      >
-                        <Eye className="w-3.5 h-3.5 text-[#15803D]" aria-hidden="true" />
-                        <span>{lessonPreview ? 'Quay về Soạn thảo' : 'Xem trước Playbook'}</span>
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={savingPlaybook || selectedNode.lesson_markdown.trim().length < 10}
+                          onClick={() =>
+                            void handleQuickSavePlaybook(
+                              selectedNode.slug,
+                              selectedNode.lesson_markdown,
+                            )
+                          }
+                          data-testid="quick-save-playbook-btn"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#15803D] hover:bg-[#166534] disabled:opacity-45 text-white text-[11px] font-bold cursor-pointer"
+                        >
+                          <BookOpen className="w-3.5 h-3.5" aria-hidden="true" />
+                          <span>{savingPlaybook ? 'Đang lưu...' : 'Lưu riêng Playbook'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setLessonPreview((p) => !p)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#F6F8F5] border border-[#D8E2D8] text-[11px] font-semibold text-[#14241B] cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-[#15803D]" aria-hidden="true" />
+                          <span>{lessonPreview ? 'Quay về Soạn thảo' : 'Xem trước Playbook'}</span>
+                        </button>
+                      </div>
                     </div>
 
                     {lessonPreview ? (
-                      <div className="p-4 rounded-xl bg-[#F6F8F5] border border-[#D8E2D8] max-h-80 overflow-y-auto">
-                        <SimpleMarkdownPreview markdown={selectedNode.lesson_markdown} />
+                      <div className="p-4 rounded-xl bg-[#F6F8F5] border border-[#D8E2D8] max-h-96 overflow-y-auto">
+                        <MarkdownRenderer markdown={selectedNode.lesson_markdown} />
                       </div>
                     ) : (
                       <textarea

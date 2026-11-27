@@ -1,198 +1,123 @@
-# Kịch Bản Thao Diễn Bảo Vệ Đồ Án Tốt Nghiệp (`Graduation Defense Demo Runbook`)
+# Kịch Bản Thao Diễn & Phản Biện Bảo Vệ Đồ Án Tốt Nghiệp (`Plumora v4.0.0`)
 
-> **Đề tài:** Hệ thống Quản lý và Khuyến nghị Lộ trình Học Cá nhân hóa ứng dụng Mô hình Học Tăng cường (Plumora)  
-> **Phiên bản:** `v1.0.0-mvp` (Gate 4 Release)  
-> **Thời lượng thao diễn dự kiến:** 8–10 phút trình chiếu trực tiếp trên máy tính cá nhân.
+> **Đề tài:** Hệ thống Quản lý và Khuyến nghị Lộ trình Học Cá nhân hóa Đa lĩnh vực bằng Học tăng cường Đồ thị (`GNN-PPO`)
+> **Phiên bản:** `v4.0.0 Final Clean Baseline` (`D-31`–`D-36`)
+> **Thời lượng thao diễn dự kiến:** 8–10 phút trình chiếu trực tiếp trên cụm Docker Microservices thật.
 
 ---
 
-## 1. Chuẩn Bị Môi Trường Trước Giờ Báo Cáo
-
-Trước khi vào phòng hội đồng, hãy đảm bảo hệ thống ở trạng thái sạch và sẵn sàng:
+## 1. Chuẩn Bị Môi Trường Trước Giờ Hội Đồng
 
 ```bash
-# Di chuyển vào thư mục dự án
 cd /home/diepvanhieu/workspace/plumora
 
-# Dọn dẹp trạng thái cũ (nếu có) và khởi động cụm 4 dịch vụ
-docker compose down -v
-docker compose up --build -d
-
-# Kiểm tra trạng thái toàn bộ dịch vụ (Cả 4 container phải hiển thị Up/healthy)
+# Khởi động sạch cụm 4 Microservices + API Gateway + Frontend + PostgreSQL + Redis
+docker compose up -d --build --wait
 docker compose ps
 ```
 
-- **Giao diện Web Người học (Frontend):** Mở trình duyệt tại `http://localhost:3000` (hoặc `http://localhost:5173` nếu chạy dev mode).
-- **Tài liệu API Swagger (Backend):** Mở sẵn tại tab phụ `http://localhost:8000/docs`.
+- **Kiểm tra nhanh sức khỏe cụm (`status: "ok"`, `mode: "microservices"`):**
+  ```bash
+  curl -s http://127.0.0.1:8000/api/v1/health
+  ```
+- **Mở sẵn 3 tab trình duyệt:**
+  1. **Web Client (Học viên):** `http://localhost:3000/login`
+  2. **Back-Office Console (Chuyên gia & Quản trị):** `http://localhost:3000/backoffice/login`
+  3. **API Gateway Swagger:** `http://localhost:8000/docs`
+
+> **Tài khoản Seed (mật khẩu chung `PlumoraDemo#2026`, không có nút điền nhanh demo):**
+> - Học viên mới (`0/12` Backend): `learner_new` | Học viên nền tảng (`4/12` Backend): `learner_foundation`
+> - Chuyên gia: `expert_demo` | Quản trị viên: `admin_demo`
 
 ---
 
-## 2. Kịch Bản Thao Diễn Trực Tiếp 8 Bước (`Live Demo Script`)
+## 2. Luồng Thao Diễn Trực Tiếp 8–10 Phút (`Live Demo Flow`)
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor SV as Sinh viên (Thuyết trình)
-    actor HD as Hội đồng Chấm thi
-    participant UI as Giao diện Web (SCR-01..08)
-    participant API as FastAPI Backend (:8000)
-    participant DB as PostgreSQL SSoT (:5432)
-    participant Cache as Redis 24-dim (:6379)
-    participant DQN as SB3 DQN Model
+    actor SV as Sinh viên
+    participant FE as Nginx Frontend (:3000)
+    participant GW as API Gateway (:8000)
+    participant SVC as 4 Microservices (:8001..8004)
+    participant PG as PostgreSQL (4 Schemas)
+    participant RD as Redis (Cache + Streams)
 
-    SV->>UI: 1. Đăng nhập / Chọn Demo Preset
-    UI->>API: POST /api/v1/auth/login hoặc /me/preset
-    API->>DB: ACID Tx (SELECT ... FOR UPDATE)
-    API->>Cache: Write-Through State Vector 24 chiều
-    API->>DQN: Suy luận MLP Q-values (Pure NumPy)
-    DQN-->>API: Q-values & recommended_concept (db-transactions)
-    API-->>UI: Roadmap 12 Node + Banner Đề xuất Vàng Nắng Sớm
-    SV->>HD: 2. Thuyết minh tính cá nhân hóa của DQN & Đồ thị DAG
-    SV->>UI: 3. Vào học Markdown & Nộp Quiz 4 câu
-    UI->>API: POST /api/v1/concepts/{slug}/attempts (submission_id)
-    API->>DB: Kiểm tra lũy đẳng & Cập nhật max(old, score)
-    API-->>UI: Phản hồi Đạt chuẩn (Pass >= 75%)
-    SV->>UI: 4. Mở Ngăn kéo Bằng chứng SCR-06
-    SV->>HD: 5. Trình chiếu Vector 24 chiều & SHA-256 Checkpoint
-    SV->>Cache: 6. Thao diễn Chaos Fallback (Tắt Redis)
-    SV->>UI: 7. Tải lại trang: Hệ thống tự động chuyển postgres_fallback
-    SV->>HD: 8. Kết luận tính ổn định, tin cậy và không phụ thuộc giả lập
+    SV->>FE: 1. Đăng nhập learner_foundation (/login)
+    FE->>GW: POST /api/v1/auth/login (X-Request-ID + Rate Limit)
+    GW->>SVC: user-auth-service (:8001) -> Argon2id + HttpOnly Cookie
+    SV->>FE: 2. Xem Multi-Domain Hub & Lộ trình DAG + GNN-PPO Banner
+    GW->>SVC: content-kg-service (:8002) & recommendation-ai-service (:8004)
+    SV->>FE: 3. Học Playbook 5 phần -> Đào sâu 5 tầng -> Code Sandbox
+    GW->>SVC: assessment-grader-service (:8003) -> 3-Phase UoW + Sandbox uid=10001
+    SVC->>PG: Commit assess_svc + Outbox
+    SVC->>RD: Streams + Invalidate Cache
+    SV->>FE: 4. Sang Back-Office (/backoffice/login): Expert DAG & Admin Online RL
 ```
 
----
+### Phút 0–1: Kiến trúc Tổng thể & Bảo mật Tách 2 Cổng
+- Mở `http://localhost:3000/backoffice/login`, thử đăng nhập bằng `learner_foundation` $\rightarrow$ bị từ chối `403 FORBIDDEN_ROLE` (học viên không thể vào cổng quản trị).
+- Đăng nhập đúng tại `http://localhost:3000/login` (`learner_foundation` / `PlumoraDemo#2026`). Nhấn **`F5`** ngay sau khi vào trang để chứng minh phiên `HttpOnly __Host-` Cookie khôi phục mượt, không nháy màn hình đăng nhập.
 
-### Bước 1: Mở Đầu & Giới Thiệu Bản Sắc Thị Giác (Thời lượng: ~1 phút)
-- **Hành động trên màn hình:** Hiển thị màn hình đăng nhập `SCR-01` tại `http://localhost:3000`.
-- **Thuyết minh với Hội đồng:**
-  > *"Kính thưa Thầy Cô trong Hội đồng, Plumora lấy cảm hứng từ chồi cây non (Plumule) — tượng trưng cho sự sinh trưởng tri thức thích ứng với từng cá nhân. Hệ thống áp dụng bảng màu tự nhiên Chồi Cây Non (Botanical Sprout & Sunlit Canopy: Xanh lá `#15803D`, Vàng Nắng Sớm `#D97706`), sử dụng 100% SVG Vector icons chuẩn mực, tuyệt đối không dùng ký tự emoji để đảm bảo tính chuyên nghiệp của một sản phẩm giáo dục đại học."*
+### Phút 1–3: Đa lĩnh vực, Giao thoa Tri thức & Khuyến nghị `GNN-PPO`
+- Tại **Multi-Domain Hub**, chỉ ra 3 đồ thị DAG: `Backend (12)`, `Frontend (10)`, `DevOps (9)` cùng **7 khái niệm giao thoa liên ngành** (học ở ngành này tự động đồng bộ sang ngành khác).
+- Bấm vào ngành **Frontend** (hoặc **Backend**): chỉ ra Banner khuyến nghị **`GNN-PPO + Policy Guardrail`** kèm mã băm checkpoint `SHA-256 = 824bebf1...` và chỉ số trí nhớ *Ebbinghaus* $R(t) = e^{-\Delta t / S}$.
+- Chỉ ra một node đang bị khóa: nút hành động bị khóa mờ và hiển thị rõ điều kiện tiên quyết cần đạt (`>= 75%`).
 
----
+### Phút 3–6: Chuỗi Học Tuần Tự (`INV-SEQ-01` & Điều kiện Kép `1.00 Mastery`)
+- Chọn một node đã mở khóa (chưa học Playbook): chỉ ra nút **"Kiểm tra 5 tầng"** và **"Thực hành Code"** đang bị khóa mờ kèm nhắc nhở *"Cần đọc và xác nhận hoàn thành Bài giảng Lý thuyết trước"* (`INV-SEQ-01`).
+- Mở **Playbook 5 phần** $\rightarrow$ đọc lướt cấu trúc chuẩn 5 mục $\rightarrow$ bấm hoàn thành Playbook $\rightarrow$ hai nút kiểm tra mở khóa tức thì.
+- Vào **Kiểm tra Đào sâu 5 tầng**:
+  - Trả lời Tầng 1–2 (MCQ); cố tình chọn sai lượt 1 ở Tầng 1 để chứng minh hệ thống tự **xoay sang câu hỏi biến thể khác** từ ngân hàng **220 câu** (không lặp lại đề cũ).
+  - Nếu qua Tầng 3–5 tự luận, mở **AI Tutor & Rubric Drawer** để xem điểm từng tiêu chí (chạy `LLM Adapter` với timeout `8.0s` hoặc `Deterministic Fallback` khi offline) và nút CTA **"Sang Phòng Thực hành Code để đạt Làm chủ (100%)"** (`INV-SEQ-02`).
+- Vào **Code Sandbox** (`Python / JS / SQL`):
+  - Thử nhập `import os` (hoặc `while True: pass`) $\rightarrow$ bị chặn `422 SANDBOX_SECURITY_VIOLATION` (hoặc cắt timeout `<= 3000ms` `408`).
+  - Chạy lời giải đúng $\rightarrow$ Pass `100%` test cases.
 
-### Bước 2: Đăng Nhập & Hồ Sơ Mẫu Demo Presets (Thời lượng: ~1.5 phút)
-- **Hành động trên màn hình:**
-  - Nhấp vào nút chọn nhanh **"Demo 2: Nền tảng sẵn sàng (4/12 node)"** (`learner_foundation`).
-  - Hệ thống tự động điền thông tin và đăng nhập vào màn hình `SCR-02` (Bản đồ lộ trình DAG).
-- **Thuyết minh với Hội đồng:**
-  > *"Để hội đồng có thể kiểm chứng ngay khả năng thích ứng của mô hình mà không cần tốn 30 phút làm bài từ đầu, hệ thống cung cấp 3 tài khoản hạt giống thật (Seed Users) đi qua toàn bộ luồng mã hóa mật khẩu `Argon2id` và bảo mật phiên `HttpOnly Cookie`. Ở tài khoản này, học viên đã hoàn thành 4 khái niệm thuộc Tầng 1 và Tầng 2."*
+### Phút 6–8: Cổng Chuyên gia (`Expert`) & Quản trị (`Admin` — `Safe Online RL` & Microservices)
+- Đăng xuất $\rightarrow$ Đăng nhập `http://localhost:3000/backoffice/login` bằng `expert_demo` / `PlumoraDemo#2026`:
+  - Tại **Quản lý Lĩnh vực**: thử nối cạnh tạo vòng lặp DAG $\rightarrow$ bị chặn ngay `422 DAG_CYCLE_DETECTED` (thuật toán Kahn).
+  - Tại **Ngân hàng Câu hỏi & Code Sandbox**: chỉ ra đủ **220 câu hỏi** (2 câu/tầng/khái niệm), tổng trọng số Rubric $= 1.0$ và tính năng kiểm thử kép.
+- Đăng xuất $\rightarrow$ Đăng nhập `admin_demo` / `PlumoraDemo#2026`:
+  - Tại **Online RL & Safety Gate**: chỉ ra `Verified Experience Buffer`, **Policy Inspector** khớp `checkpoint_sha256`, **Safety Evaluation Gate** (`60` bước chuẩn, `KL <= 0.04`) và nút **`1-Click Rollback`** (`< 2000ms`).
+  - Tại **System Health**: chỉ ra **4 Microservices** khỏe mạnh, **4 Schema PostgreSQL cô lập (`schemas_isolated: true` qua `pg_catalog`)** và hàng đợi `Outbox / Redis Streams`.
 
----
-
-### Bước 3: Bản Đồ 12 Khái Niệm DAG & Khuyến Nghị DQN (Thời lượng: ~1.5 phút)
-- **Hành động trên màn hình:**
-  - Chỉ vào **AiRecommendationBanner** nổi bật màu Vàng Nắng Sớm ở đầu trang: `db-transactions` (Giao dịch Cơ sở dữ liệu).
-  - Lướt qua các tầng của đồ thị DAG:
-    - *Tầng 1 & 2:* Các node đã xanh lá (`100%` hoặc `75%`).
-    - *Tầng 3:* Node `db-transactions` viền vàng nhấp nháy (AI đề xuất), node `api-rest` viền xanh ngọc lá mạ (mới mở khóa), các node Tầng 4 màu xám đá ấm (đang khóa).
-- **Thuyết minh với Hội đồng:**
-  > *"Tại sao mô hình lại đề xuất `db-transactions` thay vì `api-rest` hay `db-nosql`? Ở đây, mạng Deep Q-Network đã được huấn luyện trên 24 chiều trạng thái: 12 chiều điểm thông thạo hiện tại và 12 chiều điều kiện tiên quyết hợp lệ. Mô hình nhận diện rằng học viên vừa nắm chắc `db-relational`, việc củng cố ngay tính chất ACID của Transaction sẽ tối ưu hóa khả năng tiếp thu và rút ngắn tổng số bước hoàn thành khóa học so với việc học ngẫu nhiên."*
-
----
-
-### Bước 4: Học Lý Thuyết & Nộp Bài Quiz 4 Câu (Thời lượng: ~1.5 phút)
-- **Hành động trên màn hình:**
-  - Nhấp vào nút **"SCR-03: Bài học"** hoặc nhấp trực tiếp vào thẻ `db-transactions`.
-  - Cuộn đọc bài học Markdown với các khái niệm ACID được định dạng rõ ràng.
-  - Chuyển sang phần **"SCR-04: Trắc nghiệm"**:
-    - Thử chọn 3 câu $\rightarrow$ Nút **"Nộp bài kiểm tra"** vẫn bị khóa mờ (`Disabled State`).
-    - Chọn đủ câu thứ 4 (ví dụ 3 câu đúng, 1 câu sai để đạt mốc $3/4 = 75\%$).
-    - Bấm **"Nộp bài kiểm tra"**.
-  - Kết quả hiển thị thẻ chúc mừng màu xanh lá: `ĐẠT CHUẨN THÔNG THẠO (PASSED: 75% — 3/4 câu đúng)`.
-- **Thuyết minh với Hội đồng:**
-  > *"Hệ thống áp dụng bất biến đánh giá nghiêm ngặt: Mỗi bài kiểm tra cố định 4 câu hỏi trắc nghiệm một đáp án, bắt buộc hoàn thành 100% mới được nộp. Ngưỡng đạt chuẩn là từ 75% trở lên. Khi đạt, trạng thái bài học lập tức chuyển thành Mastered."*
-
----
-
-### Bước 5: Giao Dịch ACID & Lũy Đẳng Chống Nộp Trùng (Thời lượng: ~1 phút)
-- **Hành động trên màn hình:**
-  - Nhấp lại vào nút nộp bài hoặc bấm Refresh trang.
-  - Tiến độ thông thạo tăng từ `4 / 12 (33%)` lên `5 / 12 (42%)`.
-  - Node tiếp theo trên tầng 3 (`api-rest`) được mở khóa.
-- **Thuyết minh với Hội đồng:**
-  > *"Dưới tầng Backend, toàn bộ quá trình nộp bài được bọc trong một giao dịch ACID của PostgreSQL với kỹ thuật Khóa Dòng Bị Động (`SELECT ... FOR UPDATE`). Hệ thống kiểm soát tính lũy đẳng bằng mã `submission_id` duy nhất: ngay cả khi học viên bị lag mạng và click đúp nộp 2 lần, hệ thống đảm bảo điểm số chỉ cập nhật một lần duy nhất, bảo lưu điểm cao nhất `mastery = max(old, score)`, không bao giờ khóa ngược các bài đã mở."*
-
----
-
-### Bước 6: Ngăn Kéo Bằng Chứng RL & Minh Bạch AI (Thời lượng: ~1 phút)
-- **Hành động trên màn hình:**
-  - Nhấp vào nút **"Bằng chứng AI & Vector 24 chiều"** ở góc phải thanh điều hướng.
-  - Ngăn kéo `SCR-06` trượt ra từ bên phải màn hình:
-    - Hiển thị 24 ô vuông trạng thái: 12 ô thông thạo (`0.0` – `1.0`) và 12 ô hợp lệ (`1.0` hoặc `0.0`).
-    - Hiển thị thông tin Checkpoint: `dqn-v1-seed303`, mã băm `SHA-256 = e464fa638cee...`, nguồn phục vụ `policy_source: dqn`.
-- **Thuyết minh với Hội đồng:**
-  > *"Plumora không phải là một chiếc hộp đen AI bí ẩn. Chúng em cung cấp cơ chế giải trình minh bạch: Hội đồng có thể quan sát trực tiếp vector đầu vào 24 chiều mà mạng Q-Network tiếp nhận, cùng mã băm SHA-256 bất biến của mô hình. Backend thực thi mạng nơ-ron này bằng pure NumPy tối ưu, đạt tốc độ suy luận dưới 1 phần nghìn giây mà không cần cài đặt thư viện PyTorch cồng kềnh trên server web."*
-
----
-
-### Bước 7: Thao Diễn Khả Năng Chịu Lỗi Đối Kháng (Chaos / Fallback) (Thời lượng: ~1 phút)
-- **Hành động trên màn hình:**
-  - Mở terminal và chạy lệnh tạm dừng Redis:
-    ```bash
-    docker stop plumora-redis
-    ```
-  - Quay lại trình duyệt và tải lại trang web `http://localhost:3000`.
-  - Web **hoàn toàn không bị lỗi 500 hay treo ứng dụng**. Mở ngăn kéo bằng chứng: trạng thái hiển thị rõ ràng: `state_source: postgres_fallback`.
-  - Chạy lệnh bật lại Redis:
-    ```bash
-    docker start plumora-redis
-    ```
-- **Thuyết minh với Hội đồng:**
-  > *"Trong kỹ thuật phần mềm doanh nghiệp, một mô hình AI xuất sắc vẫn vô nghĩa nếu hệ thống sập khi gặp sự cố mạng. Plumora thiết kế kiến trúc PostgreSQL làm nguồn chân lý duy nhất (SSoT) và Redis làm bộ đệm. Khi Redis gặp sự cố, hệ thống tự động giáng cấp nhẹ nhàng (Graceful Fallback), đọc trực tiếp từ PostgreSQL và tiếp tục phục vụ người học mà không làm gián đoạn bài giảng."*
-
----
-
-### Bước 8: Tổng Kết & Mời Hội Đồng Đặt Câu Hỏi (Thời lượng: ~30 giây)
-- **Thuyết minh với Hội đồng:**
-  > *"Em xin kết thúc phần thao diễn thực tế của đề tài Plumora. Toàn bộ mã nguồn, dữ liệu thực nghiệm trên 500 tập học viên ảo và quy trình kiểm thử độc lập 4 trục đều đã được kiểm chứng xanh 100%. Em xin kính mời Quý Thầy Cô trong Hội đồng đặt câu hỏi phản biện ạ!"*
-
----
-
-## 4. Kịch Bản Thao Diễn Hệ Thống Thống Nhất `v4.0` (4 Microservices + API Gateway & 2 Cổng Ứng Dụng)
-
-### 4.1. Khởi Chạy Cụm Docker 4 Microservices + API Gateway Thống Nhất (`D-27`)
+### Phút 8–9: Chứng minh Chịu lỗi & Bảo mật Biên (nếu Hội đồng yêu cầu)
 ```bash
-docker compose up --build -d
-docker compose ps
-```
-- Mặc định `docker compose up -d --build` khởi dựng đầy đủ: `postgres`, `redis`, `db-migrate-seed`, `user-auth-service:8001`, `content-kg-service:8002`, `assessment-grader-service:8003`, `recommendation-ai-service:8004`, `api-gateway:8000` và `frontend:3000` (Nginx non-root trỏ thẳng `http://api-gateway:8000`). *(Ghi chú: thư mục `k8s/` được giữ ở mức Experimental Production Blueprint ngoài phạm vi nghiệm thu hiện tại).*
+# 1. Edge Security tại API Gateway (:8000): Internal route -> 403, Traversal -> 400
+curl -i http://127.0.0.1:8000/api/v2/internal/domains/frontend/bundle
+curl -i --path-as-is "http://127.0.0.1:8000/api/v2/domains/%25252e%25252e/health"
 
-### 4.2. Luồng Bấm Demo 2 Cổng & 3 Vai Trò (`Web Client` & `Back-Office Console`)
-1. **Web Client — Vai trò `Learner` (`/login` $\rightarrow$ `/domains/*`, `SCR-09`..`SCR-14`):**
-   - Mở `http://localhost:3000/login` (giao diện sạch, không có nút demo; thử nhấn `F5` sau khi đăng nhập để thấy khôi phục phiên mượt không nháy màn hình Login). Đăng nhập `learner_foundation` (`PlumoraDemo#2026`) $\rightarrow$ Mở **`SCR-09` (`MultiDomainHubPage`)**: chỉ ra 3 ngành `Backend (12)`, `Frontend (10)`, `DevOps (9)` và 7 node giao thoa liên ngành.
-   - Chọn **"Định vị Đầu vào"** trên `Frontend` mở **`SCR-10` (`AdaptivePlacementPage`)**: làm 1–2 câu nhảy tầng DAG với *Transitive Prerequisite Promotion* mở khóa Tầng 2 (trần khởi tạo `75%`, `confidence = 0.60`).
-   - Vào **`SCR-11` (`MultiDomainRoadmapPage`)**: chỉ ra Banner **`GNN-PPO + Policy Guardrail`** (`SHA-256 = bf55d809...` verified) và lịch hẹn ôn tập *Ebbinghaus* thực tế (`next_review_due_at`).
-   - Tuân thủ chuỗi tuần tự `INV-SEQ-01..03`: mở **Playbook 5 phần** $\rightarrow$ bấm hoàn thành Playbook $\rightarrow$ chuyển sang **`SCR-12` (`DepthProbePage`)** làm câu Tầng 1–2 trắc nghiệm & Tầng 3–5 tự luận có phản hồi **Socratic AI Tutor & Rubric Drawer (`SCR-14`)** + `PlaybookQuickDrawer` $\rightarrow$ mở **`SCR-13` (`CodeSandboxPage`)** chạy thử bài tập `Python` / `JavaScript` / `SQL` trong Sandbox cô lập (`<= 3000ms`, khóa trần `INV-SEQ-02` `50%` nếu chưa đạt `Deep >= 75%`).
-2. **Back-Office Console — Vai trò `Expert` (`/backoffice/login` $\rightarrow$ `/backoffice/studio/*`, `SCR-15`..`SCR-17`):**
-   - Đăng xuất $\rightarrow$ Mở `http://localhost:3000/backoffice/login`, đăng nhập `expert_demo` (`PlumoraDemo#2026`).
-   - Trên **`SCR-15`**, thử nối cạnh vòng lặp để kích hoạt `422 DAG_CYCLE_DETECTED`, sau đó sửa hợp lệ và xuất bản (`DomainGraphUpdatedEvent` + đồng bộ `plumora:kg:epoch` đa worker).
-   - Giới thiệu **`SCR-16`** (CRUD câu hỏi 5 tầng, tổng trọng số Rubric $= 1.0$ + **Live Rubric Dry-Run**), **`SCR-17`** (CRUD Code Sandbox Python/JS/SQL với **Dual Sandbox Verification**) và **Cohort Analytics** (`/backoffice/cohort` tổng hợp trực tiếp từ `assessment-grader-service`).
-3. **Back-Office Console — Vai trò `Admin` (`/backoffice/login` $\rightarrow$ `/backoffice/mlops/*` & `/infra/*`, `SCR-18`..`SCR-20`):**
-   - Đăng nhập `admin_demo` (`PlumoraDemo#2026`) tại `/backoffice/login`.
-   - Trên **`SCR-18`**, trình chiếu `Verified Experience Buffer`, **Policy Inspector** (khớp chính xác `model_version` với `checkpoint_sha256` thực tế) kèm thanh trượt **What-If Time Clock** mô phỏng suy giảm *Ebbinghaus* theo ngày.
-   - Trên **`SCR-19`**, chỉ ra bảng điểm **Safety Evaluation Gate** (`200` episodes, `KL <= 0.02`, khóa cứng model `BLOCKED` theo `INV-ONLINE-RL-01`) và thao diễn **`1-Click Rollback`** ($< 2000\text{ms}$, lưu ứng viên bền vững trên volume `plumora_rl_candidates`).
-   - Trên **`SCR-20`**, trình chiếu trạng thái sống của **4 Microservices**, **4 Schema PostgreSQL cô lập (`schemas_isolated: true` qua `pg_catalog`)**, số đếm Outbox theo từng `event_type`, nút **Trigger Outbox Relay** liên dịch vụ và kiểm tra **Redis Streams DLQ**.
+# 2. Chaos Fallback: Tắt Redis -> Web Client vẫn chạy bình thường nhờ PostgreSQL SSoT
+docker stop plumora-redis
+# (Reload trang web -> state_source chuyển sang postgres_fallback)
+docker start plumora-redis
+```
 
 ---
 
-## 3. Bộ Câu Hỏi Phản Biện Thường Gặp Của Hội Đồng & Đáp Án Thuyết Phục
+## 3. Bộ Câu Hỏi Hóc Búa Của Hội Đồng & Đáp Án Chuẩn Khoa Học (`v4.0.0`)
 
-### Câu hỏi 1: Tại sao lại dùng Học tăng cường (DQN) cho đồ án này mà không dùng luật đơn giản (Heuristic/Cây quyết định)?
+### Câu 1: Tại sao phải dùng `GNN-PPO` mà không dùng Heuristic (luật cứng) hay mạng MLP (`DQN-MLP`, `PPO-MLP`)?
 - **Trả lời:**
-  > *"Thưa Thầy Cô, đối với đồ án tốt nghiệp, mục tiêu nghiên cứu của em là xây dựng nền tảng thích ứng thông minh dài hạn. Thuật toán luật (Heuristic) hoạt động tốt trên đồ thị nhỏ cố định, nhưng mang tính cứng nhắc và không có khả năng tự tối ưu hóa khi không gian bài học mở rộng hoặc khi người học có các đặc tính tiếp thu bất đối xứng.
-  Mô hình DQN trong đồ án chứng minh khả năng tự học cấu trúc đồ thị tiên quyết mà không cần chỉ dẫn thủ công (đạt tỷ lệ chọn bài sai quy tắc `0.00%` trên tập kiểm thử), đồng thời hoàn thành khóa học nhanh hơn thuật toán ngẫu nhiên hợp lệ B2 trung bình 1.32 bước. Đây là nền tảng để nhóm phát triển tiếp sang học thích ứng trực tuyến (Online RL) trong tương lai."*
+  > *"Thưa Thầy Cô, mạng MLP thông thường nhận đầu vào dạng vector phẳng kích thước cố định, nên khi số lượng khái niệm thay đổi hoặc sang đồ thị mới, MLP không hiểu được cấu trúc cạnh tiên quyết. Thực nghiệm trên 500 học viên ảo (`eval_seed = 2026`, `60,000` steps/seed) chứng minh: khi tắt mặt nạ `Policy Guardrail`, `DQN-MLP` và `PPO-MLP` mắc lỗi chọn bài sai quy tắc tới **`78.58% – 87.04%`**, trong khi `GNN-PPO` nhờ truyền thông điệp trên đồ thị đạt **`0.00%` lỗi** trên cả 3 ngành đã biết lẫn đồ thị chưa từng thấy (`heldout_data_eng_graph`). Về điểm thưởng, `GNN-PPO Masked` đạt **`59.30`** (Known) và **`60.63`** (Zero-shot), vượt toàn bộ `Heuristic B1/B2/B3` (`36.08–55.47`) và `MLP` (`55.31–57.71`)."*
 
-### Câu hỏi 2: Kết quả trên môi trường giả lập (Gymnasium Student Simulator) có đáng tin cậy trên người học thật không?
+### Câu 2: Kết quả mô phỏng có chứng minh mô hình giúp người học thật giỏi hơn không?
 - **Trả lời:**
-  > *"Thưa Thầy Cô, nhóm em hoàn toàn trung thực về mặt khoa học: Kết quả mô phỏng trên Gymnasium chứng minh tính hội tụ toán học và độ tin cậy phần mềm của giải thuật, nhưng **không thể đánh đồng trực tiếp với hiệu quả học tập trên học viên thực tế**. 
-  Trong môi trường giả lập, học viên ảo có năng lực $\alpha$ cố định và không bị quên kiến thức. Trong thực tế, trí nhớ con người suy giảm theo thời gian (Ebbinghaus curve). Nhóm đã nêu rõ giới hạn này trong báo cáo khoa học và coi đây là tiền đề để mở rộng sang các thuật toán Lặp lại Ngắt quãng (Spaced Repetition) ở Giai đoạn 2."*
+  > *"Dạ thưa Thầy Cô, hoàn toàn không thể đánh đồng trực tiếp. Nhóm em tuân thủ nghiêm ngặt ranh giới khoa học: kết quả trên `MultiDomainStudentSimulatorEnv` (`dt = 0.25` ngày/bước, đường cong quên Ebbinghaus $R(t) = e^{-\Delta t/S}$, `30%` khởi tạo trạng thái Placement) chứng minh tính hội tụ toán học, khả năng tổng quát hóa Zero-shot và tính an toàn ràng buộc của giải thuật. Để khẳng định hiệu quả sư phạm trên người thật cần thử nghiệm A/B có đối chứng sau đồ án."*
 
-### Câu hỏi 3: Tại sao nhóm không tích hợp chấm code tự động (Auto-grader) hay AI Tutor bằng LLM vào ngay giai đoạn này?
+### Câu 3: Khi chạy `Online RL` cập nhật mô hình từ dữ liệu người dùng thật, làm sao tránh mô hình học sai hoặc bị hỏng (`Catastrophic Forgetting`)?
 - **Trả lời:**
-  > *"Dạ thưa Thầy Cô, theo phương pháp luận phát triển phần mềm chuẩn mực (Agile MVP), một sản phẩm tốt phải giải quyết dứt điểm bài toán cốt lõi trước khi mở rộng. Bài toán cốt lõi của đề tài này là **Cá nhân hóa lộ trình bằng Học tăng cường**. 
-  Nếu đưa thêm Auto-grader (cần sandbox Docker cô lập) hoặc AI Tutor (gọi LLM bên ngoài), phạm vi đề tài sẽ bị phân tán, gia tăng rủi ro bảo mật và chi phí vận hành. Nhóm quyết định khóa chặt phạm vi MVP ở 12 khái niệm Backend với trắc nghiệm MCQ 4 câu để kiểm soát chất lượng kỹ thuật đạt chuẩn Gate 3, và đưa Auto-grader vào lộ trình Giai đoạn 2 sau tốt nghiệp."*
+  > *"Hệ thống áp dụng 4 lớp khóa an toàn (`INV-ONLINE-RL-01`): (1) Tinh chỉnh theo lô nhỏ (`Micro-batch PPO`) dùng TD Critic Advantage kèm ràng buộc **Trust-Region KL** (`target_kl = 0.04`, tự lùi bước nếu vượt ngưỡng); (2) Mọi checkpoint ứng viên bắt buộc đi qua **Safety Evaluation Gate** giả lập `200` episodes chuẩn 60 bước — nếu `unmasked_invalid_rate >= 5%` hoặc reward tụt dưới `98%` production sẽ bị khóa `BLOCKED`; (3) Tầng phục vụ luôn bọc `Policy Guardrail` đảm bảo `0%` vi phạm DAG; (4) Admin có nút **`1-Click Rollback`** khôi phục tức thì dưới `2000ms`."*
 
-### Câu hỏi 4: Nhóm đã làm thế nào để đảm bảo hệ thống không bị rò rỉ dữ liệu (Data Leakage) khi huấn luyện RL?
+### Câu 4: Tại sao đồ án tốt nghiệp lại tách tới 4 Microservices + 4 Schema PostgreSQL? Có bị "over-engineering" không?
 - **Trả lời:**
-  > *"Dạ thưa Thầy Cô, nhóm áp dụng 3 biện pháp kỹ thuật nghiêm ngặt:
-  1. **Tách biệt không gian trạng thái:** Vector quan sát 24 chiều chỉ chứa điểm thông thạo và cờ hợp lệ; biến ẩn năng lực học viên $\alpha$ tuyệt đối không xuất hiện trong vector quan sát (được kiểm chứng qua bài test `INV-RL-01`).
-  2. **Tách biệt Hạt giống độc lập:** Nhóm tách biệt hoàn toàn giữa các hạt giống huấn luyện (`train_seeds = [101, 202, 303]`), hạt giống chọn mô hình (`val_seed = 999`) và hạt giống đánh giá độc lập (`eval_seed = 2026`).
-  3. **Tập kiểm thử Held-out cố định:** Đánh giá trên 500 hồ sơ học viên hoàn toàn mới mà mô hình chưa từng gặp trong quá trình huấn luyện."*
+  > *"Việc tách 4 dịch vụ gắn với 4 miền nghiệp vụ tách biệt rõ ràng: `Auth`, `Content KG`, `Assessment & Sandbox` (tác vụ nặng I/O gọi LLM 8s và chạy subprocess Code Sandbox 3s), và `Recommendation AI` (suy luận GNN-PPO). Nhờ tách riêng và dùng mô hình **3-Phase Unit of Work**, độ trễ chấm LLM/Sandbox không làm nghẽn kết nối DB của luồng đăng nhập hay đọc lộ trình; đồng thời mỗi service bị khóa chặt quyền trên schema riêng (`pg_catalog` xác nhận không đọc/ghi chéo schema) và đồng bộ bất đồng bộ qua `Transactional Outbox + Redis Streams`. Benchmark 20 người dùng đồng thời trên cụm Docker thật đạt `126.93 req/s`, `0.0%` lỗi 5xx, `p95 GNN-PPO = 242.89ms`."*
+
+### Câu 5: Chạy code Python/JS/SQL của người dùng trực tiếp trên server có bị tấn công RCE hay treo server không?
+- **Trả lời:**
+  > *"Hệ thống bảo vệ Sandbox đa lớp (`INV-SANDBOX-01`): (1) Kiểm tra tĩnh AST / SQLite authorizer chặn `import os/socket`, dunder attributes, `PRAGMA/ATTACH`, `require/process/fetch` trước khi thực thi; (2) Thực thi trong tiến trình con không đặc quyền (`uid = 10001`), xóa toàn bộ biến môi trường bí mật, giới hạn bộ nhớ `128MB` (`RLIMIT_AS`) và ngắt cứng vòng lặp vô hạn trong `<= 3000ms` (`408 SANDBOX_TIMEOUT`)."*
+
+### Câu 6: Làm sao chống gian lận dữ liệu (Data Leakage) khi huấn luyện và đánh giá RL?
+- **Trả lời:**
+  > *"Biến ẩn năng lực học viên $\alpha$ chỉ nằm trong simulator và tuyệt đối không xuất hiện trong vector đặc trưng 8 chiều/node (`test_arch_rl_numerical_parity`). Tập hạt giống tách biệt hoàn toàn: `train_seeds = [101, 202, 303]`, chọn mô hình trên `val_seed = 999`, và đánh giá độc lập trên `eval_seed = 2026` (`500` episodes) cùng đồ thị giữ kín `heldout_data_eng_graph`."*

@@ -1,4 +1,5 @@
 import type {
+  AdminRlAnalyticsResponse,
   ManualOutboxRelayResponse,
   MicroBatchTrainResponse,
   ModelSwitchResponse,
@@ -104,5 +105,23 @@ export async function apiAdminGetSystemHealth(): Promise<SystemHealthResponse> {
     '/api/v2/admin/system-health',
     {},
     'Không thể tải sức khỏe cụm dịch vụ',
+  )
+}
+
+
+export async function apiAdminGetRlAnalytics(params?: {
+  domainSlug?: string
+  userId?: string
+  limit?: number
+}): Promise<AdminRlAnalyticsResponse> {
+  const qs = new URLSearchParams()
+  if (params?.domainSlug) qs.set('domain_slug', params.domainSlug)
+  if (params?.userId) qs.set('user_id', params.userId)
+  if (params?.limit) qs.set('limit', String(params.limit))
+  const suffix = qs.toString() ? `?${qs.toString()}` : ''
+  return requestJson<AdminRlAnalyticsResponse>(
+    `/api/v2/admin/rl-analytics${suffix}`,
+    {},
+    'Không thể tải dữ liệu giám sát RL Production',
   )
 }

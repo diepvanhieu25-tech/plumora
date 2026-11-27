@@ -89,3 +89,49 @@ class PedagogicalRationaleBuilder:
             parts.append("Kiến thức liên thông: điểm năng lực được tự động đồng bộ sang các lộ trình khác.")
 
         return " ".join(parts)
+
+    @staticmethod
+    def build_decision_factors(
+        *,
+        target_node: ConceptNodeDTO,
+        mode: LearningMode,
+        all_nodes: Sequence[ConceptNodeDTO],
+        comp_map: dict[str, UserNodeCompetencyDTO],
+        retention: float,
+    ) -> list[str]:
+        """Return 2-3 concise, learner-friendly adaptive factors explaining why RL prioritized this step."""
+        factors: list[str] = []
+        comp = comp_map.get(target_node.concept_slug)
+        depth_pct = round((comp.depth_level_norm if comp else 0.0) * 100)
+        downstream = [n.title for n in all_nodes if target_node.concept_slug in n.prerequisites]
+
+        if mode == LearningMode.SPACED_REVIEW:
+            factors.append(f"Độ bền trí nhớ đang giảm còn {round(retention * 100)}% (ngưỡng nhắc ôn 60%)")
+            factors.append("Ôn tập 3 phút giúp kéo dài chu kỳ ghi nhớ dài hạn")
+        elif mode == LearningMode.LEARN_NEW:
+            factors.append(f"Phù hợp mức năng lực hiện tại ({depth_pct}%) và đã đủ điều kiện tiên quyết")
+            if downstream:
+                factors.append(f"Mở khóa trực tiếp {len(downstream)} chủ đề chuyên sâu tiếp theo")
+        elif mode == LearningMode.DEEP_PROBE:
+            factors.append(f"Đang ở mức {depth_pct}% — tối ưu nhất để nâng lên chuẩn Hiểu bản chất (75%)")
+            if downstream:
+                factors.append(f"Đạt 75% sẽ mở khóa: {', '.join(downstream[:2])}")
+        else:
+            factors.append(f"Đã đạt lý thuyết ({depth_pct}%), chỉ còn bước thực hành Code để chạm 100% Làm chủ")
+
+        if target_node.is_shared:
+            factors.append("Chủ đề liên thông: kết quả tự đồng bộ sang các chuyên ngành khác")
+
+        return factors[:3]
+
+    @staticmethod
+    def goal_summary_for_mode(mode: LearningMode) -> tuple[int, str]:
+        """Return (estimated_minutes, concise goal summary) for planned path preview."""
+        est = _ESTIMATED_MINUTES.get(mode, 10)
+        if mode == LearningMode.SPACED_REVIEW:
+            return est, "Củng cố trí nhớ & kéo dài chu kỳ quên"
+        if mode == LearningMode.LEARN_NEW:
+            return est, "Nắm mô hình tư duy qua Playbook 5 phần"
+        if mode == LearningMode.DEEP_PROBE:
+            return est, "Nâng bậc lên Hiểu bản chất (75%)"
+        return est, "Hoàn thiện thực hành Code đạt Làm chủ (100%)"

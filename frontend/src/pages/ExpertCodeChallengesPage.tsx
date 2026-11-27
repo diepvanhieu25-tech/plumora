@@ -13,6 +13,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import {
+  apiExpertDryRunCodeChallenge,
   apiExpertGetDomainGraph,
   apiExpertListCodeChallenges,
   apiExpertPublishCodeChallenge,
@@ -94,6 +95,7 @@ export function ExpertCodeChallengesPage({ onNavigate }: ExpertCodeChallengesPag
   ])
 
   const [submitting, setSubmitting] = useState(false)
+  const [dryRunning, setDryRunning] = useState(false)
   const [statusMsg, setStatusMsg] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [verificationResults, setVerificationResults] = useState<SandboxTestResultItem[]>([])
@@ -214,6 +216,52 @@ export function ExpertCodeChallengesPage({ onNavigate }: ExpertCodeChallengesPag
       return JSON.parse(raw)
     } catch {
       return raw
+    }
+  }
+
+  async function handleDryRun() {
+    setErrorMsg(null)
+    setStatusMsg(null)
+    setVerificationResults([])
+    setVerificationMeta(null)
+    setDryRunning(true)
+    try {
+      const res = await apiExpertDryRunCodeChallenge({
+        title: title.trim() || `Bài tập thực hành ${conceptSlug}`,
+        language,
+        prompt: prompt.trim() || 'Hoàn thiện mã nguồn vượt qua toàn bộ kiểm thử.',
+        buggy_starter_code: starterCode,
+        solution_code: solutionCode,
+        test_cases: testCases.map((tc) => ({
+          name: tc.name,
+          call: tc.call,
+          expected: parseExpected(tc.expected),
+          is_hidden: tc.is_hidden,
+        })),
+        timeout_ms: Math.min(3000, Math.max(200, timeoutMs)),
+        memory_limit_mb: Math.min(128, Math.max(32, memoryLimitMb)),
+        setup_sql: language === 'sql' ? setupSql.trim() || null : null,
+      })
+      setVerificationResults(
+        (res.test_results || []).map((tr) => ({
+          name: tr.name,
+          passed: tr.passed,
+          error: tr.error ?? undefined,
+        })),
+      )
+      setVerificationMeta({
+        runtimeMs: res.runtime_ms,
+        memoryKb: res.memory_kb,
+        starterFailed: res.starter_failed,
+      })
+      setStatusMsg(
+        `Dry-Run thành công (chưa lưu DB): Solution pass ${res.passed_tests}/${res.total_tests} (${res.runtime_ms}ms), Starter code fail đúng yêu cầu.`,
+      )
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Lỗi chạy thử Sandbox (Dry-Run)')
+      setVerificationResults(extractTestResultsFromError(err))
+    } finally {
+      setDryRunning(false)
     }
   }
 
@@ -718,21 +766,37 @@ export function ExpertCodeChallengesPage({ onNavigate }: ExpertCodeChallengesPag
             <span className="text-xs text-[#57534E]">
               Kiểm chứng kép: Solution Pass 100% &amp; Starter Code Fail &ge; 1 test.
             </span>
-            <button
-              type="button"
-              disabled={submitting || !conceptSlug}
-              onClick={() => void handlePublish()}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#15803D] hover:bg-[#166534] disabled:opacity-45 text-white text-xs font-bold cursor-pointer"
-            >
-              {submitting ? (
-                <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
-              ) : (
-                <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
-              )}
-              <span>
-                {submitting ? 'Đang chạy Kiểm chứng Kép...' : 'Chạy Kiểm chứng Kép & Xuất bản'}
-              </span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                disabled={dryRunning || submitting || !conceptSlug}
+                onClick={() => void handleDryRun()}
+                data-testid="dry-run-sandbox-btn"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#F0FDF4] border border-[#86EFAC] hover:bg-[#DCFCE7] disabled:opacity-45 text-[#14532D] text-xs font-bold cursor-pointer"
+              >
+                {dryRunning ? (
+                  <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <ShieldCheck className="w-4 h-4 text-[#15803D]" aria-hidden="true" />
+                )}
+                <span>{dryRunning ? 'Đang chạy Dry-Run...' : 'Chạy thử Sandbox (Dry-Run)'}</span>
+              </button>
+              <button
+                type="button"
+                disabled={submitting || dryRunning || !conceptSlug}
+                onClick={() => void handlePublish()}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#15803D] hover:bg-[#166534] disabled:opacity-45 text-white text-xs font-bold cursor-pointer"
+              >
+                {submitting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
+                )}
+                <span>
+                  {submitting ? 'Đang chạy Kiểm chứng Kép...' : 'Chạy Kiểm chứng Kép & Xuất bản'}
+                </span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

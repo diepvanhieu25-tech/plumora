@@ -43,6 +43,12 @@ export function parseRoute(pathname: string, search: string = ''): ParsedRoute {
   }
 
   if (
+    clean === '/backoffice/mlops/observability' ||
+    clean === '/admin/observability'
+  ) {
+    return { portal: 'admin', view: 'admin_rl_observability', isLoginPath: false, isRegisterPath: false }
+  }
+  if (
     clean === '/backoffice/mlops/online-rl' ||
     clean === '/admin' ||
     clean === '/admin/online-rl'
@@ -238,6 +244,8 @@ export function pathForView(
       return '/backoffice/studio/code-challenges'
     case 'cohort_analytics':
       return '/backoffice/cohort'
+    case 'admin_rl_observability':
+      return '/backoffice/mlops/observability'
     case 'admin_online_rl':
       return '/backoffice/mlops/online-rl'
     case 'admin_registry':
